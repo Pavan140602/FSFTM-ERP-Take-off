@@ -527,3 +527,20 @@ email-delivery-failures*.jsonl
 
 # Locale bootstrap batches, see scripts/i18n_new_locale.py
 .i18n-work/
+
+# ---------------------------------------------------------------------------
+# FSFTM: upload EVERY project file to GitHub (images, icons, data, scripts…)
+# except installed packages, caches, build output and password files.
+# Everything above this block is overridden by the next line.
+!*
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.env
+.env.*
+!.env.example
