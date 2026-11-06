@@ -1,0 +1,60 @@
+const path = require('path');
+const fs = require('fs');
+const [frontendDir, outDir, qaFile] = process.argv.slice(2);
+const qa = JSON.parse(fs.readFileSync(qaFile, 'utf8'));
+fs.mkdirSync(outDir, { recursive: true });
+const { chromium } = require(path.join(path.resolve(frontendDir), 'node_modules', 'playwright-core'));
+const BASE = 'http://localhost:5173';
+const shot = (page, n) => page.screenshot({ path: path.join(outDir, n) });
+(async () => {
+  const browser = await chromium.launch({ channel: 'chrome', headless: true });
+  const ctx = await browser.newContext({ viewport: { width: 1700, height: 1000 }, acceptDownloads: true });
+  const page = await ctx.newPage();
+  const r = {};
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(String(e).slice(0, 200)));
+  try {
+    await page.goto(BASE + '/login', { timeout: 120000 });
+    const body = await (await page.request.post(BASE + '/api/v1/users/auth/login/', { data: { email: qa.email, password: qa.pw } })).json();
+    await page.evaluate(({ tok }) => { localStorage.clear(); for (const st of [sessionStorage, localStorage]) st.setItem('oe_access_token', tok); localStorage.setItem('oe_onboarding_completed', 'true'); for (const k of ['takeoff.showDimensions', 'takeoff.showLabels', 'takeoff.labelShowName.v2', 'takeoff.labelShowDimension']) localStorage.setItem(k, 'false'); }, { tok: body.access_token });
+    await page.goto(`${BASE}/takeoff?tab=measurements`);
+    await page.waitForTimeout(3000);
+    await page.locator('input[type="file"][accept="application/pdf"]').first().setInputFiles(path.join(__dirname, 'labels_A.pdf'));
+    await page.waitForFunction(() => document.querySelector('canvas.block')?.width > 300, null, { timeout: 120000 });
+    await page.waitForTimeout(2500);
+    await page.locator('[data-testid="status-scale"]').click();
+    await page.locator('[data-testid="set-scale-preset"]').selectOption({ index: 5 });
+    r.scalePicked = await page.locator('[data-testid="set-scale-preset"]').evaluate((s) => s.selectedOptions[0].textContent);
+    await page.locator('[data-testid="set-scale-apply"]').click();
+    await page.waitForTimeout(500);
+    const draw = async (tool, pts, finish) => {
+      await page.locator(`[data-strip-tool="${tool}"]`).click();
+      for (const [x, y] of pts) { await page.mouse.click(x, y); await page.waitForTimeout(80); }
+      if (finish) await page.keyboard.press('Enter');
+      await page.waitForTimeout(400);
+    };
+    await draw('area', [[700, 420], [1000, 420], [1000, 600], [700, 600]], true);
+    await page.locator('[data-strip-tool="select"]').click();
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: path.join(outDir, 'i1-area.png'), clip: { x: 650, y: 380, width: 420, height: 260 } });
+    const cell = async () => (await page.locator('tbody tr[tabindex="0"]').first().innerText()).split('\t').filter(Boolean);
+    r.before = (await cell()).join('|');
+    await page.locator('tbody tr[tabindex="0"]').first().locator('td').nth(2).click();
+    await page.waitForTimeout(400);
+    const bar = page.locator('[data-testid="area-tool-popup"]');
+    r.bar = await bar.count();
+    const sels = bar.locator('select');
+    await sels.nth(sels.count ? (await sels.count()) - 1 : 4).selectOption('Degree');
+    const inputs = bar.locator('input');
+    await inputs.nth((await inputs.count()) - 1).fill('30');
+    await page.waitForTimeout(600);
+    r.after = (await cell()).join('|');
+    await page.screenshot({ path: path.join(outDir, 'i2-slope.png'), clip: { x: 650, y: 380, width: 420, height: 260 } });
+    r.btn = await page.locator('[data-testid="toolbar-export-pdf-button"]').innerText();
+    const [dl] = await Promise.all([page.waitForEvent('download'), page.locator('[data-testid="toolbar-export-pdf-button"]').click()]);
+    r.download = dl.suggestedFilename();
+  } catch (e) { r.fail = String(e).slice(0, 300); await shot(page, 'fail.png').catch(() => {}); }
+  r.errors = errors;
+  console.log(JSON.stringify(r));
+  await browser.close();
+})();

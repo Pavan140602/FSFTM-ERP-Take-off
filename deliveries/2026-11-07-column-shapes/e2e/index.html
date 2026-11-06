@@ -1,0 +1,12 @@
+<!doctype html><html><body style="margin:0;background:#fff">
+<canvas id="c" width="900" height="260"></canvas>
+<script src="cs.js"></script>
+<script>
+const ctx=document.getElementById('c').getContext('2d');
+ctx.font='13px Arial'; ctx.fillStyle='#000';
+const items=[['W18X158',[60,34,0]],['W18X158 (turned 90)',[60,34,90]],['HSS8X8X1/2',[44,44,0]],['HSS8X4X1/4',[60,30,0]],['HSS8X4X1/4 (30 deg)',[60,30,30]],['HSS6.625X.280',[44,44,0]],['COLUMN (no size)',null]];
+items.forEach((it,i)=>{const x=70+i*125,y=110;const shape=CS.columnShape(it[0].split(' ')[0]);const sy=it[1];
+ const long=sy?sy[0]:40, short=sy?sy[1]:40, ang=sy?sy[2]*Math.PI/180:0;
+ CS.drawColumnSymbol(ctx,x,y,shape,long,short,ang,'#0b9e52',2.5);
+ ctx.fillStyle='#000'; ctx.fillText(it[0].split(' ')[0],x-45,190); if(it[0].includes('(')) ctx.fillText(it[0].slice(it[0].indexOf('(')),x-45,206); ctx.fillText(shape.kind,x-45,225);});
+</script></body></html>

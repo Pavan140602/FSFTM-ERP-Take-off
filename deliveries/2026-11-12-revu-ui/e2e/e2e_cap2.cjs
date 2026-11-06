@@ -1,0 +1,66 @@
+const path = require('path');
+const fs = require('fs');
+const [frontendDir, outDir, qaFile] = process.argv.slice(2);
+const qa = JSON.parse(fs.readFileSync(qaFile, 'utf8'));
+fs.mkdirSync(outDir, { recursive: true });
+const { chromium } = require(path.join(path.resolve(frontendDir), 'node_modules', 'playwright-core'));
+const BASE = 'http://localhost:5173';
+const shot = (page, n) => page.screenshot({ path: path.join(outDir, n) });
+(async () => {
+  const browser = await chromium.launch({ channel: 'chrome', headless: true });
+  const ctx = await browser.newContext({ viewport: { width: 1700, height: 1000 }, acceptDownloads: true });
+  const page = await ctx.newPage();
+  const r = {};
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(String(e).slice(0, 200)));
+  try {
+    await page.goto(BASE + '/login', { timeout: 120000 });
+    const body = await (await page.request.post(BASE + '/api/v1/users/auth/login/', { data: { email: qa.email, password: qa.pw } })).json();
+    await page.evaluate(({ tok }) => { localStorage.clear(); for (const st of [sessionStorage, localStorage]) st.setItem('oe_access_token', tok); localStorage.setItem('oe_onboarding_completed', 'true'); }, { tok: body.access_token });
+    await page.goto(`${BASE}/takeoff?tab=measurements`);
+    await page.waitForTimeout(3000);
+    await page.locator('input[type="file"][accept="application/pdf"]').first().setInputFiles(path.join(__dirname, 'labels_A.pdf'));
+    await page.waitForFunction(() => document.querySelector('canvas.block')?.width > 300, null, { timeout: 120000 });
+    await page.waitForTimeout(2500);
+    await page.locator('[data-testid="status-scale"]').click();
+    await page.locator('[data-testid="set-scale-preset"]').selectOption({ index: 5 });
+    r.scalePicked = await page.locator('[data-testid="set-scale-preset"]').evaluate((s) => s.selectedOptions[0].textContent);
+    await page.locator('[data-testid="set-scale-apply"]').click();
+    await page.waitForTimeout(500);
+    await page.locator('[data-strip-tool="distance"]').click();
+    await page.mouse.click(600, 600); await page.mouse.click(900, 600);
+    await page.waitForTimeout(400);
+    await page.locator('[data-strip-tool="polyline"]').click();
+    await page.mouse.click(600, 450); await page.mouse.click(800, 450); await page.mouse.click(800, 350);
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(600);
+    await page.locator('[data-strip-tool="select"]').click();
+    await page.waitForTimeout(500);
+    // Values off (all dimensions hidden), then Caption = Label + Length on the polyline.
+    await page.locator('button:has-text("Values")').first().click();
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: path.join(outDir, 'g1-values-off.png'), clip: { x: 500, y: 300, width: 600, height: 380 } });
+    await page.locator('tbody tr[tabindex="0"]').nth(1).locator('td').nth(2).click();
+    await page.waitForTimeout(300);
+    await page.locator('[data-testid="props-caption"]').click();
+    r.before = await page.locator('[data-testid="props-caption-list"] input').evaluateAll((els) => els.map((e) => e.checked));
+    await page.locator('[data-testid="props-caption-length"]').click();
+    await page.waitForTimeout(200);
+    r.after1 = await page.locator('[data-testid="props-caption-list"] input').evaluateAll((els) => els.map((e) => e.checked));
+    r.btn1 = await page.locator('[data-testid="props-caption"]').innerText();
+    if (!r.after1[1]) { await page.locator('[data-testid="props-caption-length"]').click(); await page.waitForTimeout(200); }
+    r.after2 = await page.locator('[data-testid="props-caption-list"] input').evaluateAll((els) => els.map((e) => e.checked));
+    r.btn2 = await page.locator('[data-testid="props-caption"]').innerText();
+    await page.locator('[data-testid="props-caption-close"]').click();
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: path.join(outDir, 'g2-caption-length.png'), clip: { x: 500, y: 300, width: 600, height: 380 } });
+    r.captionBtn = await page.locator('[data-testid="props-caption"]').innerText();
+    await page.keyboard.press('Escape');
+    await page.mouse.click(1200, 720);
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: path.join(outDir, 'g3-deselected.png'), clip: { x: 500, y: 300, width: 600, height: 380 } });
+  } catch (e) { r.fail = String(e).slice(0, 300); await shot(page, 'fail.png').catch(() => {}); }
+  r.errors = errors;
+  console.log(JSON.stringify(r));
+  await browser.close();
+})();

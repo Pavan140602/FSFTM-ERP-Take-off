@@ -1,0 +1,81 @@
+const path = require('path');
+const fs = require('fs');
+const [frontendDir, outDir, qaFile] = process.argv.slice(2);
+const qa = JSON.parse(fs.readFileSync(qaFile, 'utf8'));
+fs.mkdirSync(outDir, { recursive: true });
+const { chromium } = require(path.join(path.resolve(frontendDir), 'node_modules', 'playwright-core'));
+const BASE = 'http://localhost:5173';
+const shot = (page, n) => page.screenshot({ path: path.join(outDir, n) });
+(async () => {
+  const browser = await chromium.launch({ channel: 'chrome', headless: true });
+  const ctx = await browser.newContext({ viewport: { width: 1700, height: 1000 }, acceptDownloads: true });
+  const page = await ctx.newPage();
+  const r = {};
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(String(e).slice(0, 200)));
+  try {
+    await page.goto(BASE + '/login', { timeout: 120000 });
+    const body = await (await page.request.post(BASE + '/api/v1/users/auth/login/', { data: { email: qa.email, password: qa.pw } })).json();
+    await page.evaluate(({ tok }) => { localStorage.clear(); for (const st of [sessionStorage, localStorage]) st.setItem('oe_access_token', tok); localStorage.setItem('oe_onboarding_completed', 'true'); }, { tok: body.access_token });
+    await page.goto(`${BASE}/takeoff?tab=measurements`);
+    await page.waitForTimeout(3000);
+    await page.locator('input[type="file"][accept="application/pdf"]').first().setInputFiles(path.join(__dirname, 'labels_A.pdf'));
+    await page.waitForFunction(() => document.querySelector('canvas.block')?.width > 300, null, { timeout: 120000 });
+    await page.waitForTimeout(2500);
+    await page.locator('[data-testid="status-scale"]').click();
+    await page.locator('[data-testid="set-scale-preset"]').selectOption({ index: 5 });
+    r.scalePicked = await page.locator('[data-testid="set-scale-preset"]').evaluate((s) => s.selectedOptions[0].textContent);
+    await page.locator('[data-testid="set-scale-apply"]').click();
+    await page.waitForTimeout(500);
+    await page.locator('[data-strip-tool="distance"]').click();
+    await page.mouse.click(600, 600); await page.mouse.click(900, 600);
+    await page.waitForTimeout(400);
+    await page.locator('[data-strip-tool="polyline"]').click();
+    await page.mouse.click(600, 450); await page.mouse.click(800, 450); await page.mouse.click(800, 350);
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(600);
+    await page.locator('[data-strip-tool="select"]').click();
+    await page.locator('[data-testid="thumbnail-strip"]').screenshot({ path: path.join(outDir, 'e1-thumbs.png') });
+    await page.screenshot({ path: path.join(outDir, 'e2-top.png'), clip: { x: 0, y: 0, width: 1700, height: 60 } });
+    r.tab = await page.locator('[data-testid="doc-tab"]').innerText();
+    const [dl] = await Promise.all([page.waitForEvent('download'), page.locator('[data-testid="toolbar-export-pdf-button"]').click()]);
+    const saved = path.join(outDir, 'saved_u22.pdf');
+    await dl.saveAs(saved);
+    // New PDF (same size + scale by default).
+    await page.locator('[data-testid="toolbar-new-pdf"]').click();
+    r.newPreset = await page.locator('[data-testid="newpdf-preset"]').evaluate((s) => s.selectedOptions[0].textContent);
+    r.keepScale = await page.locator('[data-testid="newpdf-keep-scale-row"]').innerText().catch(() => null);
+    await shot(page, 'e3-newpdf.png');
+    const [dl2] = await Promise.all([page.waitForEvent('download'), page.locator('[data-testid="newpdf-ok"]').click()]);
+    const np = path.join(outDir, 'new_u22.pdf');
+    await dl2.saveAs(np);
+    // Close via the tab x, open the new PDF: its scale.
+    await page.locator('[data-testid="toolbar-close-pdf"]').click();
+    await page.waitForTimeout(1500);
+    r.closed = await page.locator('canvas.block').count();
+    await page.locator('input[type="file"][accept="application/pdf"]').first().setInputFiles(np);
+    await page.waitForFunction(() => document.querySelector('canvas.block')?.width > 300, null, { timeout: 120000 });
+    await page.waitForTimeout(3000);
+    r.newPdfScale = await page.locator('[data-testid="status-scale"]').innerText();
+    // Render the saved PDF the way another viewer would (annotations on).
+    const p2 = await ctx.newPage();
+    await p2.goto(BASE + '/login');
+    const b64 = fs.readFileSync(saved).toString('base64');
+    const dataUrl = await p2.evaluate(async ({ b64 }) => {
+      const pdfjs = await import('/node_modules/.vite/deps/pdfjs-dist_legacy_build_pdf__mjs.js');
+      const lib = pdfjs.default ?? pdfjs;
+      lib.GlobalWorkerOptions.workerSrc = '/node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs';
+      const bin = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+      const doc = await lib.getDocument({ data: bin }).promise;
+      const pg = await doc.getPage(1);
+      const vp = pg.getViewport({ scale: 1.2 });
+      const c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height;
+      await pg.render({ canvas: c, viewport: vp }).promise;
+      return c.toDataURL('image/png');
+    }, { b64 });
+    fs.writeFileSync(path.join(outDir, 'e4-saved-render.png'), Buffer.from(dataUrl.split(',')[1], 'base64'));
+  } catch (e) { r.fail = String(e).slice(0, 300); await shot(page, 'fail.png').catch(() => {}); }
+  r.errors = errors;
+  console.log(JSON.stringify(r));
+  await browser.close();
+})();

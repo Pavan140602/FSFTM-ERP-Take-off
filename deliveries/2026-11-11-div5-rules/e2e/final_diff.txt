@@ -1,0 +1,56 @@
+studio:8 OLD {'walls/Load Bearing Wall': [168, 1735], 'walls/Strap Braced Wall': [42, 820], 'walls/Shear Wall': [16, 116], 'other/Load Bearing Header': [48, 0], 'other/Steel Brace': [3, 0], 'other/Holdown': [108, 0], 'walls/Wall': [7, 24]}
+         NEW {'walls/Load Bearing Wall': [168, 1735], 'walls/Strap Braced Wall': [42, 820], 'walls/Shear Wall': [16, 116], 'other/Load Bearing Header': [48, 0], 'other/Steel Brace': [3, 0], 'other/Holdown': [108, 0], 'walls/Wall': [6, 22]}
+studio unchanged pages 22
+ac:26 OLD {'other/Stud': [9, 352], 'other/Track': [12, 346], 'walls/CFS Wall': [38, 319], 'walls/Shear Wall': [31, 442], 'walls/Non-Load Bearing Wall': [1, 27], 'columns/Column': [8, 0], 'walls/Wall': [32, 225]}
+      NEW {'other/Stud': [9, 352], 'other/Track': [12, 346], 'walls/CFS Wall': [38, 319], 'walls/Shear Wall': [31, 442], 'walls/Non-Load Bearing Wall': [1, 27], 'columns/Column': [8, 0], 'walls/Wall': [20, 138]}
+ac:27 OLD {'other/Stud': [9, 352], 'other/Track': [12, 346], 'walls/CFS Wall': [42, 315], 'walls/Shear Wall': [19, 222], 'walls/Non-Load Bearing Wall': [1, 7], 'columns/Column': [3, 0], 'walls/Wall': [17, 112]}
+      NEW {'other/Stud': [9, 352], 'other/Track': [12, 346], 'walls/CFS Wall': [42, 315], 'walls/Shear Wall': [19, 222], 'walls/Non-Load Bearing Wall': [1, 7], 'columns/Column': [3, 0], 'walls/Wall': [13, 88]}
+ac:35 OLD {'other/Stud': [9, 352], 'other/Track': [12, 346], 'walls/CFS Wall': [37, 415], 'walls/Shear Wall': [19, 377], 'walls/Non-Load Bearing Wall': [1, 15], 'columns/Column': [8, 0], 'walls/Wall': [34, 242]}
+      NEW {'other/Stud': [9, 352], 'other/Track': [12, 346], 'walls/CFS Wall': [37, 415], 'walls/Shear Wall': [19, 377], 'walls/Non-Load Bearing Wall': [1, 15], 'columns/Column': [8, 0], 'walls/Wall': [22, 155]}
+ac:36 OLD {'other/Stud': [9, 358], 'other/Track': [12, 341], 'walls/CFS Wall': [33, 339], 'walls/Shear Wall': [11, 200], 'walls/Non-Load Bearing Wall': [2, 10], 'columns/Column': [4, 0], 'walls/Wall': [19, 132]}
+      NEW {'other/Stud': [9, 358], 'other/Track': [12, 341], 'walls/CFS Wall': [33, 339], 'walls/Shear Wall': [11, 200], 'walls/Non-Load Bearing Wall': [2, 10], 'columns/Column': [4, 0], 'walls/Wall': [15, 108]}
+ac:44 OLD {'other/Stud': [9, 352], 'other/Track': [12, 347], 'walls/Shear Wall': [4, 104], 'walls/CFS Wall': [17, 228], 'walls/Non-Load Bearing Wall': [1, 27], 'columns/Column': [5, 0], 'walls/Wall': [22, 222]}
+      NEW {'other/Stud': [9, 352], 'other/Track': [12, 347], 'walls/Shear Wall': [4, 104], 'walls/CFS Wall': [17, 228], 'walls/Non-Load Bearing Wall': [1, 27], 'columns/Column': [5, 0], 'walls/Wall': [9, 74]}
+ac:49 OLD {'beams/Beam': [4, 268], 'other/Load Bearing Header': [8, 143], 'columns/Column': [6, 0]}
+      NEW {'beams/Beam': [4, 268], 'other/Load Bearing Header': [8, 143], 'columns/Column': [6, 0], 'trusses/Roof Truss': [59, 3873]}
+ac:59 OLD {'columns/Column': [12, 0], 'walls/CMU Wall': [1, 15]}
+      NEW {'walls/CFS Wall': [2, 63], 'columns/Column': [12, 0], 'walls/CMU Wall': [1, 15]}
+ac unchanged pages 55
+home2:5 OLD {'walls/Non-Load Bearing Wall': [66, 740], 'walls/Shear Wall': [23, 305], 'walls/CFS Wall': [4, 37], 'walls/Wall': [91, 573], 'walls/CMU Wall': [1, 10]}
+        NEW {'walls/Non-Load Bearing Wall': [66, 740], 'walls/Shear Wall': [23, 305], 'walls/CFS Wall': [4, 37], 'walls/Wall': [84, 537], 'walls/CMU Wall': [1, 10]}
+home2:7 OLD {'walls/Non-Load Bearing Wall': [55, 816], 'walls/Shear Wall': [26, 374], 'walls/CFS Wall': [2, 28], 'walls/Wall': [83, 448], 'walls/CMU Wall': [1, 10]}
+        NEW {'walls/Non-Load Bearing Wall': [55, 816], 'walls/Shear Wall': [26, 374], 'walls/CFS Wall': [2, 28], 'walls/Wall': [75, 409], 'walls/CMU Wall': [1, 10]}
+home2:10 OLD {'other/Non-Load Bearing Header': [11, 186], 'other/Load Bearing Header': [26, 343], 'walls/Shear Wall': [26, 298], 'walls/Non-Load Bearing Wall': [59, 749], 'walls/CFS Wall': [4, 34], 'walls/Wall': [84, 538], 'walls/CMU Wall': [1, 10]}
+         NEW {'other/Non-Load Bearing Header': [11, 186], 'other/Load Bearing Header': [26, 343], 'walls/Shear Wall': [26, 298], 'walls/Non-Load Bearing Wall': [59, 749], 'walls/CFS Wall': [4, 34], 'walls/Wall': [77, 501], 'walls/CMU Wall': [1, 10]}
+home2:13 OLD {'walls/Non-Load Bearing Wall': [61, 841], 'walls/Shear Wall': [20, 243], 'walls/CFS Wall': [4, 37], 'walls/Wall': [84, 530], 'walls/CMU Wall': [1, 10]}
+         NEW {'walls/Non-Load Bearing Wall': [61, 841], 'walls/Shear Wall': [20, 243], 'walls/CFS Wall': [4, 37], 'walls/Wall': [77, 494], 'walls/CMU Wall': [1, 10]}
+home2 unchanged pages 30
+cfs:3 OLD {'other/Stud': [5, 138], 'columns/Column': [22, 0], 'walls/Shear Wall': [54, 1128]}
+      NEW {'other/Stud': [5, 138], 'columns/Column': [22, 0], 'other/Stair': [1, 0], 'walls/Shear Wall': [54, 1128]}
+cfs:4 OLD {'other/Stud': [3, 93], 'walls/Shear Wall': [71, 1742]}
+      NEW {'other/Stud': [3, 93], 'other/Stair': [2, 0], 'walls/Shear Wall': [71, 1742]}
+cfs:5 OLD {'other/Stud': [4, 93], 'walls/Shear Wall': [69, 1604]}
+      NEW {'other/Stud': [4, 93], 'other/Stair': [2, 0], 'walls/Shear Wall': [69, 1604]}
+cfs:6 OLD {'other/Stud': [4, 100], 'walls/Shear Wall': [74, 1650]}
+      NEW {'other/Stud': [4, 100], 'other/Stair': [3, 0], 'walls/Shear Wall': [74, 1650]}
+cfs:7 OLD {'other/Stud': [4, 140], 'walls/Wall': [20, 140], 'walls/Shear Wall': [73, 1647]}
+      NEW {'other/Stud': [4, 140], 'other/Stair': [4, 0], 'walls/Non-Load Bearing Wall': [6, 37], 'walls/Wall': [12, 93], 'walls/Load Bearing Wall': [2, 9], 'walls/Shear Wall': [73, 1647]}
+cfs:8 OLD {'other/Stud': [9, 141], 'other/Hat Channel': [2, 24], 'joists/CFS Joist': [21, 181], 'areas/Framing Area': [1, 0]}
+      NEW {'other/Stud': [9, 141], 'other/Hat Channel': [2, 24], 'joists/CFS Joist': [21, 181], 'areas/Framing Area': [1, 0], 'other/Stair': [2, 0]}
+cfs:10 OLD {'other/Stud': [2, 22], 'columns/Column': [1, 0]}
+       NEW {'other/Stud': [2, 22], 'columns/Column': [1, 0], 'other/Stair': [1, 0]}
+cfs:11 OLD {'other/Stud': [5, 74]}
+       NEW {'other/Stud': [5, 74], 'other/Stair': [1, 0]}
+cfs:12 OLD {'other/Stud': [1, 20], 'columns/Column': [7, 0]}
+       NEW {'other/Stud': [1, 20], 'columns/Column': [7, 0], 'joists/CFS Joist': [700, 9200], 'other/Stair': [1, 0]}
+cfs:13 OLD {'other/Stud': [1, 20]}
+       NEW {'other/Stud': [1, 20], 'joists/CFS Joist': [196, 8762], 'other/Stair': [4, 0]}
+cfs:14 OLD {'other/Hat Channel': [2, 44], 'columns/Column': [28, 0]}
+       NEW {'other/Hat Channel': [2, 44], 'columns/Column': [28, 0], 'joists/Roof Joist': [291, 8862], 'other/Stair': [2, 0]}
+cfs:24 OLD {'other/Hat Channel': [1, 6]}
+       NEW {'other/Hat Channel': [1, 6], 'walls/Load Bearing Wall': [121, 1060], 'walls/Non-Load Bearing Wall': [77, 837], 'other/Stair': [1, 0], 'walls/Wall': [40, 289]}
+cfs:25 OLD {'other/Hat Channel': [1, 6], 'walls/Wall': [5, 93]}
+       NEW {'other/Hat Channel': [1, 6], 'walls/Non-Load Bearing Wall': [180, 1594], 'walls/Load Bearing Wall': [189, 1699], 'other/Stair': [2, 0], 'walls/Wall': [83, 1119]}
+cfs:26 OLD {'other/Hat Channel': [1, 6]}
+       NEW {'other/Hat Channel': [1, 6], 'walls/Non-Load Bearing Wall': [150, 1421], 'walls/Load Bearing Wall': [206, 1787], 'other/Stair': [2, 0], 'walls/Wall': [85, 1052]}
+cfs unchanged pages 17

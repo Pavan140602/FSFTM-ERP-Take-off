@@ -1,0 +1,16 @@
+<!doctype html><html><body style="margin:0;background:#f3f4f6">
+<canvas id="c" width="900" height="300" style="background:#fff"></canvas>
+<script src="tb.js"></script>
+<script>
+const ctx=document.getElementById('c').getContext('2d');
+const D=TB.DEFAULT_TEXT_STYLE;
+const boxes=[
+ [20,20,200,'Default Revu box: Arial 12, border in text colour, no fill.',{}],
+ [240,20,190,'Bold + underline, centred, yellow fill 60%.',{bold:true,underline:true,align:'center',fill:'#FFEB3B',fillAlpha:0.6,color:'#111827',border:'#111827'}],
+ [450,20,200,'Cloud border, Times 14 italic, right aligned.\nSecond line.',{font:'Times New Roman',size:14,italic:true,align:'right',borderStyle:'cloud',border:'#DC2626',color:'#DC2626'}],
+ [20,160,200,'No border, dashed? none. Strike-through text in Courier.',{font:'Courier New',strike:true,border:null,color:'#2563EB'}],
+ [240,160,190,'Dashed blue border 2pt, 50% opacity, size 16.',{size:16,borderStyle:'dashed',borderWidth:2,border:'#2563EB',opacity:0.5,color:'#2563EB'}],
+ [450,160,200,'Legacy box (no style): bold 14.',null],
+];
+for(const [x,y,w,t,own] of boxes){const s=own===null?TB.LEGACY_TEXT_STYLE:TB.resolveTextStyle(own);const lay=TB.layoutTextBox(t,w,s);TB.drawTextBox(ctx,x,y,w,lay.contentHeight,lay.lines,s,1,'#DC2626');}
+</script></body></html>
