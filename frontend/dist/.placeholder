@@ -1,0 +1,2 @@
+Placeholder created by backend/hatch_build.py so editable
+installs work on a cold clone. Overwritten by `npm run build`.
