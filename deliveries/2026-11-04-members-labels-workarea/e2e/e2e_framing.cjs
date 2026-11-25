@@ -25,7 +25,7 @@ const shot = (page, n) => page.screenshot({ path: path.join(outDir, n) });
     await page.goto(`${BASE}/takeoff?tab=measurements&doc=${DOC}&name=x.pdf`);
     await page.waitForFunction(() => document.querySelector('canvas.block')?.width > 400, null, { timeout: 120000 });
     await page.waitForTimeout(1500);
-    const ws = page.locator('[data-testid="revu-workspace-toggle"]');
+    const ws = page.locator('[data-testid="fsftm-workspace-toggle"]');
     if ((await ws.innerText()).includes('Exit')) await ws.click();
     await page.waitForTimeout(1200);
     r.videosBar = await page.locator('text=Videos for this step').count();

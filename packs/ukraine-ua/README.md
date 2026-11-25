@@ -1,6 +1,6 @@
 # Ukraine Construction Pack
 
-Configures OpenConstructionERP for the Ukrainian construction market. A
+Configures Florida Steel Frame & Truss Manufacturing LLC for the Ukrainian construction market. A
 Ukrainian estimate (кошторис) is built under the Настанова з визначення вартості
 будівництва: local estimates roll up into object estimates and then into the
 зведений кошторисний розрахунок, the summary estimate of twelve chapters. The
@@ -154,7 +154,7 @@ indicators of Додатки 25 and 27. Pending review by a Ukrainian cost engin
 
 ## Install
 
-This pack ships inside OpenConstructionERP. Activate it from Modules then Partner
+This pack ships inside Florida Steel Frame & Truss Manufacturing LLC. Activate it from Modules then Partner
 Packs: click Rescan, find "Ukraine Construction Pack", then Activate pack.
 
 To run a workspace that boots straight into it:

@@ -1,6 +1,6 @@
 # Getting Started
 
-Three ways to run OpenConstructionERP. Pick whichever fits your setup.
+Three ways to run Florida Steel Frame & Truss Manufacturing LLC. Pick whichever fits your setup.
 
 ## Path A: Desktop App (easiest)
 

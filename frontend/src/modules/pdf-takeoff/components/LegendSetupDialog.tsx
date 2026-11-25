@@ -1,6 +1,6 @@
-// OE-DELIVERY: 2026-11-12-revu-ui (legend setup)
+// OE-DELIVERY: 2026-11-12-fsftm-ui (legend setup)
 /**
- * Legend Setup, like Revu's: title (and the title row on / off), the
+ * Legend Setup, like FSFTM's: title (and the title row on / off), the
  * columns to keep (tick, and move up / down), the table lines (grid,
  * horizontal only, vertical only, outline, none) with a small preview, and
  * whether the legend stays live with the page.

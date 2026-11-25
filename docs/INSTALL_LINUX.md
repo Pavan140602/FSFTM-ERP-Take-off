@@ -1,4 +1,4 @@
-# Installing OpenConstructionERP on Linux (Ubuntu / Debian)
+# Installing Florida Steel Frame & Truss Manufacturing LLC on Linux (Ubuntu / Debian)
 
 This page covers the Linux-specific gotchas that the generic `pip install openconstructionerp` instruction does not. If you are on Ubuntu 23.04 or newer (including Ubuntu 26), read this first - `pip install` directly to system Python will fail.
 
@@ -119,7 +119,7 @@ Do **not** use `pip install --break-system-packages` - it can corrupt your syste
 
 ## 2. Python 3.12 vs 3.13 on Ubuntu 26
 
-OpenConstructionERP requires Python 3.12 or newer (`requires-python = ">=3.12"`). Ubuntu 26 ships with `python3.13` as the default `python3`, which works, but some heavy wheels (pyarrow, opencv-python-headless) may lag a release behind on 3.13. If `pip install` complains about missing wheels on 3.13, fall back to 3.12 explicitly:
+Florida Steel Frame & Truss Manufacturing LLC requires Python 3.12 or newer (`requires-python = ">=3.12"`). Ubuntu 26 ships with `python3.13` as the default `python3`, which works, but some heavy wheels (pyarrow, opencv-python-headless) may lag a release behind on 3.13. If `pip install` complains about missing wheels on 3.13, fall back to 3.12 explicitly:
 
 ```bash
 sudo apt install -y python3.12 python3.12-venv
@@ -141,7 +141,7 @@ sudo apt install -y python3.12 python3.12-venv
 
 ## 3. System packages for source-build fallback
 
-OpenConstructionERP depends on pandas, pyarrow, opencv-python-headless, Pillow, asyncpg, psycopg2-binary, cryptography. All of these publish manylinux wheels, so a fresh `pip install` on a supported architecture downloads pre-built binaries - no compiler needed.
+Florida Steel Frame & Truss Manufacturing LLC depends on pandas, pyarrow, opencv-python-headless, Pillow, asyncpg, psycopg2-binary, cryptography. All of these publish manylinux wheels, so a fresh `pip install` on a supported architecture downloads pre-built binaries - no compiler needed.
 
 If pip falls back to building from source (uncommon CPU architecture, very new Python, locked-down corporate mirror), install the development headers first:
 
@@ -217,7 +217,7 @@ For a long-running deployment, drop a unit file at `/etc/systemd/system/opencons
 
 ```ini
 [Unit]
-Description=OpenConstructionERP
+Description=Florida Steel Frame & Truss Manufacturing LLC
 After=network.target
 
 [Service]

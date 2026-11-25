@@ -218,7 +218,7 @@ export function AboutPage() {
             </span>
             <span className="text-xs font-semibold uppercase tracking-widest text-emerald-600">Open Source</span>
           </div>
-          <h2 className="text-3xl font-bold text-content-primary tracking-tight">OpenConstructionERP</h2>
+          <h2 className="text-3xl font-bold text-content-primary tracking-tight">Florida Steel Frame &amp; Truss Manufacturing LLC</h2>
           <p className="mt-2 text-base text-content-secondary">
             {t('about.tagline', { defaultValue: 'The #1 open-source platform for construction cost estimation, project management and resource control' })}
           </p>
@@ -314,7 +314,7 @@ export function AboutPage() {
             ))}
           </div>
           <p className="mt-auto pt-4 text-sm text-content-secondary leading-relaxed">
-            {t('about.platform_desc', { defaultValue: 'OpenConstructionERP covers the full construction estimation workflow - BOQ editing, 4D scheduling, 5D cost modeling, AI-powered estimation, CAD/BIM quantity takeoff (RVT, IFC, DWG, DGN), tendering, and reporting. Supports regional classification standards and custom schemas.' })}
+            {t('about.platform_desc', { defaultValue: 'Florida Steel Frame & Truss Manufacturing LLC covers the full construction estimation workflow - BOQ editing, 4D scheduling, 5D cost modeling, AI-powered estimation, CAD/BIM quantity takeoff (RVT, IFC, DWG, DGN), tendering, and reporting. Supports regional classification standards and custom schemas.' })}
           </p>
         </div>
       </Card>
@@ -479,7 +479,7 @@ export function AboutPage() {
             </h2>
           </div>
           <p className="mb-5 text-sm text-content-secondary">
-            {t('about.story_subtitle', { defaultValue: 'Why OpenConstructionERP exists, and where it\'s going.' })}
+            {t('about.story_subtitle', { defaultValue: 'Why Florida Steel Frame & Truss Manufacturing LLC exists, and where it\'s going.' })}
           </p>
           {/* Bio — line length now governed by the col width itself. */}
           <div>
@@ -863,7 +863,7 @@ export function AboutPage() {
                   <Handshake size={18} className="text-oe-blue" />
                 </div>
                 <h2 className="text-xl font-bold tracking-tight text-content-primary">
-                  {t('about.support_title', { defaultValue: 'Support OpenConstructionERP' })}
+                  {t('about.support_title', { defaultValue: 'Support Florida Steel Frame & Truss Manufacturing LLC' })}
                 </h2>
               </div>
               <p className="text-sm text-content-secondary leading-relaxed mb-2">
@@ -1292,7 +1292,7 @@ export function AboutPage() {
           <p className="text-sm text-content-secondary leading-relaxed mb-6 max-w-3xl">
             {t('about.thanks_subtitle', {
               defaultValue:
-                'OpenConstructionERP keeps growing thanks to its community. Every question, bug report and feature idea shapes what we build next, and every star, share and contribution keeps the platform free and open for everyone. Thank you to the people below.',
+                'Florida Steel Frame & Truss Manufacturing LLC keeps growing thanks to its community. Every question, bug report and feature idea shapes what we build next, and every star, share and contribution keeps the platform free and open for everyone. Thank you to the people below.',
             })}
           </p>
 
@@ -1445,7 +1445,7 @@ export function AboutPage() {
         </h2>
         <div className="space-y-2 text-sm text-content-secondary leading-relaxed">
           <p>
-            {t('about.dev_model_p1', { defaultValue: 'OpenConstructionERP has been under continuous development for more than six years and has benefited from contributions, feedback, testing, and domain expertise from many different people.' })}
+            {t('about.dev_model_p1', { defaultValue: 'Florida Steel Frame & Truss Manufacturing LLC has been under continuous development for more than six years and has benefited from contributions, feedback, testing, and domain expertise from many different people.' })}
           </p>
           <p>
             {t('about.dev_model_p2', { defaultValue: 'To maintain a consistent architecture and reduce security, dependency, and integration risks, the project follows a centralized integration model. Most production code is ultimately reviewed, consolidated, tested, and published through a single maintainer account. As a result, the GitHub contributor history does not necessarily reflect the actual number of people who have contributed to the project.' })}

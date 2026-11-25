@@ -1,4 +1,4 @@
-"""OpenConstructionERP — Denmark Construction partner pack (V&S + AB 18 + SfB/CCS)."""
+"""Florida Steel Frame & Truss Manufacturing LLC — Denmark Construction partner pack (V&S + AB 18 + SfB/CCS)."""
 
 from __future__ import annotations
 from .manifest import MANIFEST

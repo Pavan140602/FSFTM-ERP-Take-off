@@ -1,6 +1,6 @@
 # Indonesia Construction Pack
 
-Configures OpenConstructionERP for the Indonesian construction market. Estimating
+Configures Florida Steel Frame & Truss Manufacturing LLC for the Indonesian construction market. Estimating
 in Indonesia follows the AHSP (Analisa Harga Satuan Pekerjaan) unit rate analysis
 method, where every work item is built up from its material, labour and equipment
 components against SNI standards. Currency is IDR with 11% PPN on construction
@@ -49,7 +49,7 @@ pack is legal, tax or regulatory advice.
 
 ## Install
 
-This pack ships inside OpenConstructionERP. Activate it from Modules then Partner
+This pack ships inside Florida Steel Frame & Truss Manufacturing LLC. Activate it from Modules then Partner
 Packs: click Rescan, find "Indonesia Construction Pack", then Activate pack.
 
 To run a workspace that boots straight into it:

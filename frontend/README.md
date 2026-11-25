@@ -1,4 +1,4 @@
-# OpenConstructionERP Frontend
+# Florida Steel Frame & Truss Manufacturing LLC Frontend
 
 This is the web client for OpenConstructionERP, the open construction estimating and construction management platform by DataDrivenConstruction. It is a single-page application that talks to the FastAPI backend over its REST API under `/api/v1`.
 

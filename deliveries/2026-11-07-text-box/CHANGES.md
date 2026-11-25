@@ -1,8 +1,8 @@
-# 2026-11-07: Revu-style Text Box
+# 2026-11-07: FSFTM-style Text Box
 
 Apply after `2026-11-07-column-shapes`. Restore with `python deliveries/2026-11-07-text-box/restore.py` (add `--dry-run` to preview), then reload the browser. This change is frontend only; no backend restart is needed for it.
 
-## How it works (like Bluebeam Revu's Text Box)
+## How it works (like FSFTM's Text Box)
 
 **Draw**
 - Text Box tool (**T**): **press and drag** to draw the box. A dashed outline shows the size as you drag.
@@ -31,7 +31,7 @@ Apply after `2026-11-07-column-shapes`. Restore with `python deliveries/2026-11-
 
 **Defaults**
 - With the Text Box tool active and nothing selected, the bar sets the look of **new** boxes ("New text boxes:").
-- The last look you set is remembered as the tool default, like Revu.
+- The last look you set is remembered as the tool default, like FSFTM.
 - Text boxes made before this delivery keep their old bold-14 look until you restyle them.
 
 **Saving and export**
@@ -54,7 +54,7 @@ Apply after `2026-11-07-column-shapes`. Restore with `python deliveries/2026-11-
 - `frontend/src/modules/pdf-takeoff/useMeasurementPersistence.ts`: `text_style` saved and loaded; style and size in the change check.
 - `frontend/src/features/takeoff/lib/takeoff-types.ts`: `textStyle` field.
 - `frontend/src/features/takeoff/lib/takeoff-export.ts`: PDF export of styled boxes.
-- `frontend/src/modules/pdf-takeoff/components/RevuPropertiesBar.tsx`: caption font controls hidden for text boxes.
+- `frontend/src/modules/pdf-takeoff/components/FSFTMPropertiesBar.tsx`: caption font controls hidden for text boxes.
 
 ## Checks
 - **Unit tests:** text-box 5 pass. The takeoff suites run 574 pass and 6 fail; those 6 are the same old failures (value sort, wheel zoom) and are unrelated.
@@ -66,4 +66,4 @@ Apply after `2026-11-07-column-shapes`. Restore with `python deliveries/2026-11-
   - Ctrl+Enter placed the box.
   - Selecting the box showed the bar; choosing "Cloud" redrew the border as a cloud.
   - After the auto-save, reopening with the browser storage cleared loaded the box back from the server with the same look. Screenshots: `t2-editing.png`, `t4-selected-cloud.png`, `r1-reloaded.png`.
-- The QA drawing now has one test text box ("Revu text box test"). Delete it if you like.
+- The QA drawing now has one test text box ("FSFTM text box test"). Delete it if you like.

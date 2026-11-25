@@ -19,7 +19,7 @@ export const ANNOTATION_TYPES = new Set([
   'text',
   'rectangle',
   'highlight',
-  // Revu markup tools (OE-DELIVERY 2026-10-30-revu-markup-tools).
+  // FSFTM markup tools (OE-DELIVERY 2026-10-30-fsftm-markup-tools).
   'line',
   'polygon',
   'ellipse',

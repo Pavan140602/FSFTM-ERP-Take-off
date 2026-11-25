@@ -1,4 +1,4 @@
-"""OpenConstructionERP - Belgium country pack (bilingual NL/FR, BB/SfB, meetstaat)."""
+"""Florida Steel Frame & Truss Manufacturing LLC - Belgium country pack (bilingual NL/FR, BB/SfB, meetstaat)."""
 
 from __future__ import annotations
 

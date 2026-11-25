@@ -1,6 +1,6 @@
 # Croatia Construction Pack
 
-Configures OpenConstructionERP for the Croatian construction market. A Croatian
+Configures Florida Steel Frame & Truss Manufacturing LLC for the Croatian construction market. A Croatian
 estimate is a troškovnik, a priced bill of quantities with all-in unit rates,
 and it is priced in EUR (the euro replaced the kuna on 1 January 2023) with
 PDV (porez na dodanu vrijednost, VAT) added once, on the recapitulation.
@@ -62,7 +62,7 @@ pack is legal, tax or regulatory advice.
 
 ## Install
 
-This pack ships inside OpenConstructionERP. Activate it from Modules then Partner
+This pack ships inside Florida Steel Frame & Truss Manufacturing LLC. Activate it from Modules then Partner
 Packs: click Rescan, find "Croatia Construction Pack", then Activate pack.
 
 To run a workspace that boots straight into it:

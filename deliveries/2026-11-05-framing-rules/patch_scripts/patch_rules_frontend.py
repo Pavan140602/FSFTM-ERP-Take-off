@@ -182,11 +182,11 @@ export function sheetKindName(kind: string, level: number | null): string {
 const LABEL_MODES: { key: AutoStyle['labelMode']; label: string }[] = [''')
 
 # ── TakeoffViewerModule.tsx ──
-rep("viewer", '''          // Markups list (Revu Subject / profile columns).
+rep("viewer", '''          // Markups list (FSFTM Subject / profile columns).
           customFields: { Subject: subjectFor(item), Material: item.profile || item.designation },
           auto: tagForItem(item, pts),
         };
-        return { ...base, ...valueFor(base, pts) };''', '''          // Markups list (Revu Subject / profile columns).
+        return { ...base, ...valueFor(base, pts) };''', '''          // Markups list (FSFTM Subject / profile columns).
           customFields: { Subject: subjectFor(item), Material: item.profile || item.designation, ...(item.level ? { Level: item.level } : {}) },
           // Wall height from the schedule row (feet -> metres) drives Wall Area
           // (OE-DELIVERY 2026-11-05-framing-rules).

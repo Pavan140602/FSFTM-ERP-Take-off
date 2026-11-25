@@ -16,9 +16,9 @@ def patch(rel, pairs):
     p.write_text(s, encoding='utf-8')
 
 
-patch('components/RevuPropertiesBar.tsx', [
-    ("""  /** Revu "Add to Tool Chest" for the selection. */
-  onAddToChest?: () => void;""", """  /** Revu "Add to Tool Chest" for the selection. */
+patch('components/FSFTMPropertiesBar.tsx', [
+    ("""  /** FSFTM "Add to Tool Chest" for the selection. */
+  onAddToChest?: () => void;""", """  /** FSFTM "Add to Tool Chest" for the selection. */
   onAddToChest?: () => void;
   /** Lay out framing across the selected outline (OE-DELIVERY 2026-11-04-framing-layout). */
   onLayoutFraming?: () => void;"""),
@@ -39,16 +39,16 @@ patch('components/RevuPropertiesBar.tsx', [
 
 V = 'TakeoffViewerModule.tsx'
 patch(V, [
-    ("""import { RevuToolChest } from './components/RevuToolChest';""", """import { RevuToolChest } from './components/RevuToolChest';
+    ("""import { FSFTMToolChest } from './components/FSFTMToolChest';""", """import { FSFTMToolChest } from './components/FSFTMToolChest';
 import { FramingLayoutDialog, type FramingRequest } from './components/FramingLayoutDialog';
 import { layoutMembers } from './data/framing-layout';"""),
     ("""                onAddToChest={() => addSelectionToChest(chestSets.find((x) => !x.recent)?.id ?? 'my-tools')}""",
      """                onAddToChest={() => addSelectionToChest(chestSets.find((x) => !x.recent)?.id ?? 'my-tools')}
                 onLayoutFraming={() => setShowFraming(true)}"""),
-    ("""                { label: 'Auto Takeoff…', onClick: () => showRevuPanel('auto'), testId: 'revu-tools-auto' },""",
-     """                { label: 'Auto Takeoff…', onClick: () => showRevuPanel('auto'), testId: 'revu-tools-auto' },
-                { label: 'Lay out framing…', onClick: () => setShowFraming(true), testId: 'revu-tools-framing' },"""),
-    ("""  /** Revu default keyboard shortcuts (OE-DELIVERY 2026-11-02-revu-shortcuts).""", """  /* Lay out framing (OE-DELIVERY 2026-11-04-framing-layout): members across a
+    ("""                { label: 'Auto Takeoff…', onClick: () => showFSFTMPanel('auto'), testId: 'fsftm-tools-auto' },""",
+     """                { label: 'Auto Takeoff…', onClick: () => showFSFTMPanel('auto'), testId: 'fsftm-tools-auto' },
+                { label: 'Lay out framing…', onClick: () => setShowFraming(true), testId: 'fsftm-tools-framing' },"""),
+    ("""  /** FSFTM default keyboard shortcuts (OE-DELIVERY 2026-11-02-fsftm-shortcuts).""", """  /* Lay out framing (OE-DELIVERY 2026-11-04-framing-layout): members across a
    * selected outline at a spacing, for framing that is not drawn. */
   const [showFraming, setShowFraming] = useState(false);
   const framingArea = propsSelected.find((m) => (m.type === 'area' || m.type === 'polygon') && m.points.length >= 3) ?? null;
@@ -112,7 +112,7 @@ import { layoutMembers } from './data/framing-layout';"""),
     [framingArea, framingLine, pageScales, addToast, pushUndo],
   );
 
-  /** Revu default keyboard shortcuts (OE-DELIVERY 2026-11-02-revu-shortcuts)."""),
+  /** FSFTM default keyboard shortcuts (OE-DELIVERY 2026-11-02-fsftm-shortcuts)."""),
     ("""      {showShortcutSheet && (""", """      {showFraming && (
         <FramingLayoutDialog
           onClose={() => setShowFraming(false)}

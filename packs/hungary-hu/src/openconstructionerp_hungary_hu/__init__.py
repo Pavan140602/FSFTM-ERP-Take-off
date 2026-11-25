@@ -1,4 +1,4 @@
-"""OpenConstructionERP - Hungary country pack (item orders, material and fee split, VAT).
+"""Florida Steel Frame & Truss Manufacturing LLC - Hungary country pack (item orders, material and fee split, VAT).
 
 This package exports a module-level ``MANIFEST`` instance of
 :class:`PartnerPackManifest` referenced from ``pyproject.toml``::

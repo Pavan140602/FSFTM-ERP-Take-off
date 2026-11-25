@@ -1,6 +1,6 @@
 // DDC-CWICR-OE: DataDrivenConstruction · OpenConstructionERP
 // Copyright (c) 2026 Artem Boiko / DataDrivenConstruction
-// OpenConstructionERP - AI Chat read-renderer deep links (CONN-80).
+// Florida Steel Frame & Truss Manufacturing LLC - AI Chat read-renderer deep links (CONN-80).
 //
 // The chat tool handlers already serialize the primary key on every row
 // (project id, boq_id + position id, validation report id, risk id). These

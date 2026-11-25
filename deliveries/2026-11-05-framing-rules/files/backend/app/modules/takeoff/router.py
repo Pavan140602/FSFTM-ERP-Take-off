@@ -1844,7 +1844,7 @@ async def install_converter(
             "platform_unsupported": True,
             "message": (
                 f"{meta['name']} has no native build for {platform}. Run "
-                f"OpenConstructionERP in Docker (Linux container - the converter "
+                f"Florida Steel Frame & Truss Manufacturing LLC in Docker (Linux container - the converter "
                 f"downloads automatically there) or on a Linux host, or convert the "
                 f"file to IFC first and upload the IFC - IFC has a built-in text "
                 f"fallback parser that works on every platform."
@@ -2154,7 +2154,7 @@ async def _install_converter_impl(converter_id: str, force: bool, app: Any) -> d
             "platform_unsupported": True,
             "message": (
                 f"{meta['name']} has no native build for {platform}. Run "
-                f"OpenConstructionERP in Docker (Linux container - the converter "
+                f"Florida Steel Frame & Truss Manufacturing LLC in Docker (Linux container - the converter "
                 f"downloads automatically there) or on a Linux host, or convert the "
                 f"file to IFC first and upload the IFC - IFC has a built-in text "
                 f"fallback parser that works on every platform."

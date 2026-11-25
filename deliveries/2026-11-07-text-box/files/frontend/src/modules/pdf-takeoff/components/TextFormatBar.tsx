@@ -1,6 +1,6 @@
 // OE-DELIVERY: 2026-11-07-text-box
 /**
- * Text Box properties bar, like Revu's text toolbar: font, size, bold /
+ * Text Box properties bar, like FSFTM's text toolbar: font, size, bold /
  * italic / underline / strike-through, alignment, text colour, fill, border
  * and opacity. Floats over the sheet above the text box being edited or
  * selected, and sets the default for new boxes when the Text Box tool is

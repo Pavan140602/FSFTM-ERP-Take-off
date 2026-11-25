@@ -1,6 +1,6 @@
 # 2026-11-06 pdf-roundtrip
 
-Apply after `2026-11-12-revu-ui`: `python deliveries/2026-11-06-pdf-roundtrip/restore.py` (add `--dry-run` to preview), then reload the page.
+Apply after `2026-11-12-fsftm-ui`: `python deliveries/2026-11-06-pdf-roundtrip/restore.py` (add `--dry-run` to preview), then reload the page.
 - This change is frontend only, so the backend does not need a restart.
 - Code is marked `OE-DELIVERY: 2026-11-06-pdf-roundtrip`.
 

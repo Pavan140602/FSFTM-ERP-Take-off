@@ -32,8 +32,8 @@ import {
   formatMeasurement,
   type ScaleConfig,
 } from './scale-helpers';
-// OE-DELIVERY: 2026-10-30-revu-markup-tools
-import { arcLengthPx, hitRevuBody } from './revu-markups';
+// OE-DELIVERY: 2026-10-30-fsftm-markup-tools
+import { arcLengthPx, hitFSFTMBody } from './fsftm-markups';
 
 export interface Point {
   x: number;
@@ -62,7 +62,7 @@ export type EditableMeasurementType =
   | 'ellipseCutout'
   | 'dynamicFill'
   | 'legend'
-  // Revu markup + arc tools (OE-DELIVERY 2026-10-30-revu-markup-tools).
+  // FSFTM markup + arc tools (OE-DELIVERY 2026-10-30-fsftm-markup-tools).
   | 'line'
   | 'polygon'
   | 'ellipse'
@@ -91,7 +91,7 @@ export const GRAB_PX = 8;
  *  vertex always wins over the edge it sits on). */
 export const VERTEX_GRAB_PX = 10;
 
-/* ── Text box metrics (Revu-style text annotations) ───────────────────
+/* ── Text box metrics (FSFTM-style text annotations) ───────────────────
  * Shared by the viewer's canvas draw, its editor overlay and the
  * hit-test below so all three agree on the box geometry. All values are
  * PDF units; the font renders at TEXT_FONT_PX × zoom on screen. */
@@ -239,9 +239,9 @@ export function hitTest(
   // path here cannot know the row count, so it defers.
   if (m.type === 'legend') return null;
 
-  // Revu ellipse / stamp / callout / arc bodies (vertices tested above).
-  const revuHit = hitRevuBody(pt, m, edgeTol);
-  if (revuHit !== null) return revuHit ? { kind: 'body', index: 0 } : null;
+  // FSFTM ellipse / stamp / callout / arc bodies (vertices tested above).
+  const fsftmHit = hitFSFTMBody(pt, m, edgeTol);
+  if (fsftmHit !== null) return fsftmHit ? { kind: 'body', index: 0 } : null;
 
   // Rectangle / highlight: two-corner bbox. The corners were already
   // tested as vertices; the body is the filled bbox.

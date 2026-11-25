@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "OpenConstructionERP",
+    "name": "Florida Steel Frame & Truss Manufacturing LLC",
     "tagline": "Açık kaynak inşaat maliyet tahmini"
   },
   "nav": {
@@ -164,7 +164,7 @@
     "update": "Güncelle"
   },
   "dashboard": {
-    "welcome": "OpenConstructionERP'ye hoş geldiniz",
+    "welcome": "Florida Steel Frame & Truss Manufacturing LLC'ye hoş geldiniz",
     "subtitle": "Açık kaynak inşaat maliyet tahmini platformu",
     "recent_projects": "Son projeler",
     "system_status": "Sistem durumu",

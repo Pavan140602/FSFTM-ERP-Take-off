@@ -1,4 +1,4 @@
-"""OpenConstructionERP — US Construction partner pack.
+"""Florida Steel Frame & Truss Manufacturing LLC — US Construction partner pack.
 
 Pre-configured for US general contractors:
 

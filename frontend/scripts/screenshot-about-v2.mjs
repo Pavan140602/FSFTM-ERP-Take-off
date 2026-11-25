@@ -37,11 +37,11 @@ async function main() {
 
   // Anchor on the section H2 texts so it doesn't drift when content moves.
   const anchors = [
-    { name: 'header', selector: 'h1:has-text("OpenConstructionERP")' },
+    { name: 'header', selector: 'h1:has-text("Florida Steel Frame & Truss Manufacturing LLC")' },
     { name: 'platform', selector: 'h2:has-text("Platform Capabilities")' },
     { name: 'about-project', selector: 'h2:has-text("About the project")' },
     { name: 'consulting', selector: 'h2:has-text("Consulting")' },
-    { name: 'support', selector: 'h2:has-text("Support OpenConstructionERP")' },
+    { name: 'support', selector: 'h2:has-text("Support Florida Steel Frame & Truss Manufacturing LLC")' },
     { name: 'guidebook', selector: 'h2:has-text("Data-Driven Construction")' },
     { name: 'docs', selector: 'h2:has-text("Documentation")' },
     { name: 'license', selector: 'h2:has-text("License & Open Source")' },

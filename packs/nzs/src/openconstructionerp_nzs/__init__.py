@@ -1,4 +1,4 @@
-"""OpenConstructionERP — New Zealand partner pack.
+"""Florida Steel Frame & Truss Manufacturing LLC — New Zealand partner pack.
 
 Pre-configures OCERP for New Zealand contractors against the New Zealand
 Building Code (NZBC) acceptable solutions, NZS 3604:2011 timber-framed

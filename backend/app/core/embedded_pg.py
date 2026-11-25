@@ -1498,7 +1498,7 @@ def windows_path_limit_problem(pgdata: Path | str) -> PathTooLong | None:
             _PGINSTALL_LONGEST_RELATIVE,
             "The PostgreSQL that ships with this application sits too deep in the filesystem "
             "for Windows to let it open its own files.",
-            "Install OpenConstructionERP somewhere shorter, for example C:\\OpenConstructionERP, and this goes away.",
+            "Install Florida Steel Frame & Truss Manufacturing LLC somewhere shorter, for example C:\\OpenConstructionERP, and this goes away.",
         )
         if install_problem is not None:
             if data_problem is None:
@@ -1733,8 +1733,8 @@ def _clear_incomplete_cluster(pgdata: Path) -> None:
 
 #: Delimits the settings this module owns inside ``postgresql.conf``, so the
 #: block can be rewritten in place instead of appended to on every boot.
-_SETTINGS_BEGIN = "# BEGIN OpenConstructionERP settings (managed, do not edit)"
-_SETTINGS_END = "# END OpenConstructionERP settings"
+_SETTINGS_BEGIN = "# BEGIN Florida Steel Frame & Truss Manufacturing LLC settings (managed, do not edit)"
+_SETTINGS_END = "# END Florida Steel Frame & Truss Manufacturing LLC settings"
 
 #: Lock slots are a shared pool sized ``max_locks_per_transaction`` times
 #: ``max_connections``, not a per-transaction allowance. The platform's schema

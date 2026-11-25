@@ -17,7 +17,7 @@
 
 /** Target thumbnail width in CSS px. A page is rendered at the pdf.js scale
  *  that makes the bitmap roughly this wide so the strip stays compact. */
-// Sharper page thumbnails (OE-DELIVERY 2026-11-02-revu-left-panel): rendered at 2x this.
+// Sharper page thumbnails (OE-DELIVERY 2026-11-02-fsftm-left-panel): rendered at 2x this.
 export const THUMB_MAX_WIDTH = 300;
 
 /** Default number of rendered thumbnails kept in memory. A 300-page set at a

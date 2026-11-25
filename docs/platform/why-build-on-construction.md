@@ -2,7 +2,7 @@
 
 ## The position, in one sentence
 
-OpenConstructionERP is one open platform for building any construction
+Florida Steel Frame & Truss Manufacturing LLC is one open platform for building any construction
 application. Not a horizontal business toolkit that happens to have a
 construction template, a platform whose core, data and standards are
 construction from the ground up.
@@ -28,7 +28,7 @@ about construction.
 
 ## This platform ships the hard part
 
-OpenConstructionERP inverts that. The construction foundations are the core,
+Florida Steel Frame & Truss Manufacturing LLC inverts that. The construction foundations are the core,
 and they are already here in the repository:
 
 - Cost databases and rate management (`backend/app/modules/costs`,

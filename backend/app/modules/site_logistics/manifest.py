@@ -17,7 +17,7 @@ manifest = ModuleManifest(
         "positions they carry, so every estimate line reads back as booked, "
         "delivered and outstanding."
     ),
-    author="OpenConstructionERP",
+    author="Florida Steel Frame & Truss Manufacturing LLC",
     category="business",
     # oe_boq: a delivery line points at the BOQ position it delivers, and the
     # bill-coverage table reads the estimate directly.

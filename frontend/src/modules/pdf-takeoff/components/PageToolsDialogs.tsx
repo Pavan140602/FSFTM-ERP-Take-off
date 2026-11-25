@@ -1,8 +1,8 @@
-// OE-DELIVERY: 2026-11-12-revu-ui (update 19 - Revu Extract / Delete Pages windows)
+// OE-DELIVERY: 2026-11-12-fsftm-ui (update 19 - FSFTM Extract / Delete Pages windows)
 /**
- * Revu's "Extract Pages" and "Delete Pages" windows:
+ * FSFTM's "Extract Pages" and "Delete Pages" windows:
  *   Pages: [Selected (13) v] of 34     (Current / Selected / All Pages / typed 1-3,5)
- * Extract also has Revu's options (delete after, separate files, page-label
+ * Extract also has FSFTM's options (delete after, separate files, page-label
  * names, open after extraction, keep links).
  */
 import { useEffect, useRef, useState } from 'react';

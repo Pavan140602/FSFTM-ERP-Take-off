@@ -705,7 +705,7 @@ export const CFS_EXPORT_TARGETS: Array<{
   { id: 'nonLoadBearingWalls', groupName: 'Non Load Bearing Walls', tabLabel: 'Wall Studs' },
 ];
 
-/* ── Tool Chest (Bluebeam-style custom tools) ───────────────────────────
+/* ── Tool Chest (FSFTM-style custom tools) ───────────────────────────
  * A saved tool captures the current measuring setup — tool type, markup
  * color and active group — under a name. Clicking it restores the setup
  * instantly. Persisted in localStorage so the chest survives reloads. */
@@ -715,11 +715,11 @@ export interface SavedTool {
   tool: MeasureTool;
   color: string;
   group: string;
-  /** Bluebeam subject (e.g. Howe) — shown as its own field, stamped onto measurements. */
+  /** FSFTM subject (e.g. Howe) — shown as its own field, stamped onto measurements. */
   subject?: string;
-  /** Bluebeam label/material (e.g. 362S162-43) — shown as its own field, becomes the annotation. */
+  /** FSFTM label/material (e.g. 362S162-43) — shown as its own field, becomes the annotation. */
   label?: string;
-  /** Bluebeam tool set this came from (e.g. Truss, CFS). */
+  /** FSFTM tool set this came from (e.g. Truss, CFS). */
   toolSet?: string;
 }
 
@@ -764,7 +764,7 @@ const TOOL_LABELS: Record<MeasureTool, string> = {
   dynamicFill: 'Dynamic Fill',
 };
 
-/** Bluebeam-style legend (placed on the PDF) geometry, in PDF user units.
+/** FSFTM-style legend (placed on the PDF) geometry, in PDF user units.
  *  The box height grows with the row count; the viewer hit-tests and paints
  *  from these same constants so the two can never disagree. */
 const LEGEND_WIDTH = 230;
@@ -1216,7 +1216,7 @@ function toCalibrationUnit(label: string): 'm' | 'mm' | 'ft' | 'in' {
   return 'ft';
 }
 
-/** Parse a Bluebeam-style distance string into metres.
+/** Parse a FSFTM-style distance string into metres.
  *  Accepts `1'-6"`, `1'6"`, `18"`, `1.5'` as well as plain decimals
  *  (interpreted in `fallbackUnit`). Returns null when unparsable. */
 function parseDistanceToMeters(raw: string, fallbackUnit: 'm' | 'mm' | 'ft' | 'in' | 'ft-in'): number | null {
@@ -1429,7 +1429,7 @@ function readPanelWidth(key: string, fallback: number, min: number, max: number)
  *  element is fullscreen — without this, no notification is visible in
  *  fullscreen measuring mode. */
 /** Second split-screen pane: an independent read-only view of the same PDF
- *  document (Bluebeam-style split view). It has its own page, zoom and
+ *  document (FSFTM-style split view). It has its own page, zoom and
  *  scroll position; measurements on its page are drawn as a lightweight
  *  read-only overlay. All measuring stays in the main pane. */
 function SplitPane({
@@ -2422,7 +2422,7 @@ export default function TakeoffViewerModule({
   const pageModeRef = useRef(pageMode);
   pageModeRef.current = pageMode;
 
-  /* Split-screen view (Bluebeam-style): a second independent read-only pane
+  /* Split-screen view (FSFTM-style): a second independent read-only pane
    * showing the same PDF. 'vertical' = panes side by side, 'horizontal' =
    * panes stacked. The second pane has its own page + zoom. */
   const [splitMode, setSplitMode] = useState<'off' | 'horizontal' | 'vertical'>('off');
@@ -2493,7 +2493,7 @@ export default function TakeoffViewerModule({
   useEffect(() => {
     try { localStorage.setItem('takeoff.labelTextSize', String(labelTextSize)); } catch { /* ignore */ }
   }, [labelTextSize]);
-  /** Material-line size (defaults to 88% of the name size, Bluebeam-like). */
+  /** Material-line size (defaults to 88% of the name size, FSFTM-like). */
   const [labelMaterialSize, setLabelMaterialSize] = useState<number>(() => {
     try {
       const v = Number(localStorage.getItem('takeoff.labelMaterialSize'));
@@ -2611,7 +2611,7 @@ export default function TakeoffViewerModule({
 
   // Measurement state
   const [activeTool, setActiveTool] = useState<MeasureTool>('select');
-  /** Bluebeam-style area tool settings popup: display units + depth + slope.
+  /** FSFTM-style area tool settings popup: display units + depth + slope.
    *  Shown when the Area tool is active; depth/slope are stamped onto new
    *  area measurements. */
   const [areaLengthUnit, setAreaLengthUnit] = useState('mm');
@@ -2864,7 +2864,7 @@ export default function TakeoffViewerModule({
 
 
   /* Pending annotation label from an applied chest tool (e.g. 362S162-43).
-   * Sticky like a Bluebeam tool: every measurement drawn while the tool is
+   * Sticky like a FSFTM tool: every measurement drawn while the tool is
    * active gets this annotation. Cleared when the user switches tools
    * manually via selectTool. A ref (not state) so nextAnnotation can read it
    * without re-subscribing. */
@@ -3020,7 +3020,7 @@ export default function TakeoffViewerModule({
   const [vertexSnap, setVertexSnap] = useState(false);
   const vertexSnapRef = useRef(vertexSnap);
   vertexSnapRef.current = vertexSnap;
-  /** Snap to PDF drawing content (vector geometry). Bluebeam-style. Off by
+  /** Snap to PDF drawing content (vector geometry). FSFTM-style. Off by
    *  default so clicks never get hijacked unexpectedly (accuracy). */
   const [contentSnap, setContentSnap] = useState(false);
   const contentSnapRef = useRef(contentSnap);
@@ -3073,7 +3073,7 @@ export default function TakeoffViewerModule({
     setPanOffset({ x: 0, y: 0 });
     if (panWrapRef.current) panWrapRef.current.style.transform = '';
   }, [currentPage]);
-  /* ── Marquee (rubber-band) multi-select, Bluebeam-style ───────────────
+  /* ── Marquee (rubber-band) multi-select, FSFTM-style ───────────────
    * In select mode, dragging on empty canvas draws a selection box; every
    * measurement intersecting it joins `selectedLedgerIds`. Shift+click
    * toggles a single measurement in/out of the set. The rect lives in PDF
@@ -3086,7 +3086,7 @@ export default function TakeoffViewerModule({
   const [zoomAreaRect, setZoomAreaRect] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   const zoomAreaRef = useRef<{ start: Point; current: Point } | null>(null);
 
-  /** Bluebeam-style legend placement: when armed (via the Legend panel's
+  /** FSFTM-style legend placement: when armed (via the Legend panel's
    *  "Place Legend" button), the next canvas click drops a legend box at
    *  that point on the current page. Read through a ref inside the click
    *  handler so it never enters the dependency array. */
@@ -3172,9 +3172,9 @@ export default function TakeoffViewerModule({
     y: number;
     measurementId: string;
   } | null>(null);
-  /** Multiply dialog: linear Bluebeam-style copy. Null when closed; carries
+  /** Multiply dialog: linear FSFTM-style copy. Null when closed; carries
    *  the source measurement id. Direction/Distance/Copies/Preview mirror
-   *  Bluebeam Revu's Multiply dialog. */
+   *  FSFTM's Multiply dialog. */
   const [multiplyDialog, setMultiplyDialog] = useState<{ measurementId: string } | null>(null);
   const multiplyDialogRef = useRef(multiplyDialog);
   multiplyDialogRef.current = multiplyDialog;
@@ -3187,7 +3187,7 @@ export default function TakeoffViewerModule({
   multiplyCopiesRef.current = multiplyCopies;
   const multiplyDirectionRef = useRef(multiplyDirection);
   multiplyDirectionRef.current = multiplyDirection;
-  /** Unit pick list for the multiply distance (Bluebeam-style). */
+  /** Unit pick list for the multiply distance (FSFTM-style). */
   const [multiplyUnit, setMultiplyUnit] = useState<'ft' | 'ft-in' | 'in' | 'mm' | 'm'>('ft');
   const multiplyUnitRef = useRef(multiplyUnit);
   multiplyUnitRef.current = multiplyUnit;
@@ -3213,7 +3213,7 @@ export default function TakeoffViewerModule({
   const [offsetUnit, setOffsetUnit] = useState<'ft' | 'ft-in' | 'in' | 'mm' | 'm'>('ft');
   const offsetUnitRef = useRef(offsetUnit);
   offsetUnitRef.current = offsetUnit;
-  /** Interactive offset tool (Bluebeam-style): hover shows ghost, click commits.
+  /** Interactive offset tool (FSFTM-style): hover shows ghost, click commits.
    *  Toggle via the toolbar button. */
   const [offsetTool, setOffsetTool] = useState(false);
   const offsetToolRef = useRef(false);
@@ -3623,7 +3623,7 @@ export default function TakeoffViewerModule({
   const [customColumns, setCustomColumns] = useState<string[]>([]);
   /** Manage Columns dialog visibility. */
   const [manageColumnsOpen, setManageColumnsOpen] = useState(false);
-  /** Hidden built-in ledger columns (Bluebeam-style Manage Columns). */
+  /** Hidden built-in ledger columns (FSFTM-style Manage Columns). */
   const [hiddenLedgerColumns, setHiddenLedgerColumns] = useState<ReadonlySet<string>>(new Set());
   // Load the document's custom columns (on mount and when the document changes).
   useEffect(() => {
@@ -3668,7 +3668,7 @@ export default function TakeoffViewerModule({
   const handleLedgerFieldChange = useCallback(
     (id: string, field: 'annotation' | 'group' | 'qty' | 'label' | 'material', value: string) => {
       // Bulk edit: when the edited row is part of a multi-selection, apply
-      // the change to every selected row (Bluebeam-style). Otherwise just
+      // the change to every selected row (FSFTM-style). Otherwise just
       // the single row.
       const ids =
         selectedLedgerIds.size > 1 && selectedLedgerIds.has(id)
@@ -5277,7 +5277,7 @@ export default function TakeoffViewerModule({
       }
 
       if (m.type === 'text' && m.points.length >= 1) {
-        // Revu-style text box: wrapped text inside a stored-width box,
+        // FSFTM-style text box: wrapped text inside a stored-width box,
         // anchor at the box's top-left. While this text is open in the
         // editor the textarea shows the content, so the canvas skips it.
         if (!(showTextInput && editingTextId === m.id)) {
@@ -5320,7 +5320,7 @@ export default function TakeoffViewerModule({
         }
       }
 
-      // Bluebeam-style placed legend: white box with a table of
+      // FSFTM-style placed legend: white box with a table of
       // (swatch, type label, + visible legend columns) rows. Selection-based
       // legends show their snapshot; "all" legends stay live.
       // Column set follows the panel's visibility toggles.
@@ -5884,7 +5884,7 @@ export default function TakeoffViewerModule({
       ctx.restore();
     }
 
-    /* ── Multi-select highlight + marquee box (Bluebeam-style) ──────────
+    /* ── Multi-select highlight + marquee box (FSFTM-style) ──────────
      * Every id in selectedLedgerIds that is not the primary selection gets a
      * dashed blue outline around its bounding box. The live marquee rubber-
      * band is drawn on top while the drag is in flight. */
@@ -6080,7 +6080,7 @@ export default function TakeoffViewerModule({
   const nextAnnotation = useCallback(
     (type: string) => {
       // A chest tool's sticky label wins over the auto "Distance 1" style
-      // annotation, Bluebeam-style. Built as "{Type} {Material}" — e.g.
+      // annotation, FSFTM-style. Built as "{Type} {Material}" — e.g.
       // "Howe truss 800S200-33", "CFS joist 800S200-43",
       // "CFS load bearing wall 600S200-54".
       if (toolLabelRef.current || toolSubjectRef.current) {
@@ -6328,7 +6328,7 @@ export default function TakeoffViewerModule({
       const y = (e.clientY - rect.top) / zoom;
       let point: Point = { x, y };
 
-      // Bluebeam-style legend placement: drop a legend box at the click
+      // FSFTM-style legend placement: drop a legend box at the click
       // point on the current page, then disarm. The legend's rows are
       // derived live at render time, so nothing type-specific is stored.
       if (legendPlacingRef.current) {
@@ -6446,7 +6446,7 @@ export default function TakeoffViewerModule({
           return;
         }
       } else {
-        // PDF-content snap (Bluebeam-style): snap to the drawing's own vector
+        // PDF-content snap (FSFTM-style): snap to the drawing's own vector
         // geometry (endpoints, midpoints, edges) when markup-vertex snap misses.
         const csnap = !settingScale && canVertexSnap && contentSnapRef.current
           ? (() => {
@@ -7741,7 +7741,7 @@ export default function TakeoffViewerModule({
 
       // Clicked empty space: start a marquee (rubber-band) selection. A plain
       // click with no drag deselects on mouseup (finishMarquee); a drag
-      // selects every intersecting markup, Bluebeam-style.
+      // selects every intersecting markup, FSFTM-style.
       // Zoom-to-area mode: draw a rectangle to zoom into instead.
       if (zoomAreaArmed) {
         activeVertexRef.current = null;
@@ -8780,11 +8780,11 @@ export default function TakeoffViewerModule({
     [orderedMeasurements, currentPage],
   );
 
-  /** Markups List filter (Bluebeam-style). */
+  /** Markups List filter (FSFTM-style). */
   const [markupFilter, setMarkupFilter] = useState<MarkupFilter>({});
   const [showTotals, setShowTotals] = useState(true);
 
-  /** Bluebeam-style legend panel collapsed state (sidebar). */
+  /** FSFTM-style legend panel collapsed state (sidebar). */
   const [legendCollapsed, setLegendCollapsed] = useState(false);
 
   /** Legend column visibility: set of hidden column keys. Derived from the
@@ -8827,7 +8827,7 @@ export default function TakeoffViewerModule({
     [filteredLedgerMeasurements],
   );
 
-  /** Bluebeam-style legend rows: measurements grouped by type (annotations
+  /** FSFTM-style legend rows: measurements grouped by type (annotations
    *  and placed legends excluded — a legend never lists itself), each with
    *  the group's representative color, count, and summed total. Derived
    *  live from `measurements` so the panel and any placed legend boxes
@@ -10330,7 +10330,7 @@ export default function TakeoffViewerModule({
     setRenderNonce((n) => n + 1);
   }, [multiplyDialog, resolveMultiply]);
 
-  /** Multiply confirm: Bluebeam-style linear copies. */
+  /** Multiply confirm: FSFTM-style linear copies. */
   const handleMultiplyConfirm = useCallback(() => {
     const resolved = resolveMultiply(true);
     if (!resolved) return;
@@ -12573,7 +12573,7 @@ export default function TakeoffViewerModule({
       selectTool(t.tool);
       setAnnotationColor(t.color);
       setActiveGroup(t.group);
-      // Sticky Bluebeam-style subject + material for the next measurements.
+      // Sticky FSFTM-style subject + material for the next measurements.
       toolLabelRef.current = t.label ?? null;
       toolSubjectRef.current = t.subject ?? null;
       toolSetRef.current = t.toolSet ?? null;
@@ -15260,7 +15260,7 @@ export default function TakeoffViewerModule({
               />
             )}
 
-{/* Tool Chest — Bluebeam-style saved custom tools. */}
+{/* Tool Chest — FSFTM-style saved custom tools. */}
             {sidebarTab === 'tools' && (
               <div className="space-y-2">
                 {/* ── Material Library (SSMA / AISC / Vulcraft) ─────────────── */}
@@ -15710,7 +15710,7 @@ export default function TakeoffViewerModule({
               </div>
             )}
 
-            {/* Bluebeam-style Legend — first in Properties tab. */}
+            {/* FSFTM-style Legend — first in Properties tab. */}
             {sidebarTab === 'properties' && legendDashboardVisible && (
                 <div className="rounded-md border border-border/80 bg-surface-primary shadow-sm">
                   <div className="flex items-center gap-1.5 px-3 py-2">
@@ -17318,7 +17318,7 @@ export default function TakeoffViewerModule({
           </div>
         </div>
       )}
-      {/* Multiply dialog: Bluebeam-style linear copies. */}
+      {/* Multiply dialog: FSFTM-style linear copies. */}
       {multiplyDialog && (
         <div
           className="fixed z-[70] left-1/2 top-20 -translate-x-1/2 w-full max-w-xs rounded-xl border border-border bg-surface-primary p-5 shadow-2xl"
@@ -17939,7 +17939,7 @@ export default function TakeoffViewerModule({
           </div>
         </div>
       )}
-      {/* Area tool settings popup (Bluebeam-style): shown under the Area
+      {/* Area tool settings popup (FSFTM-style): shown under the Area
           tool button when the Area tool is active, or when an area/volume
           markup is selected. */}
       {showAreaPopup && areaPopupPos && (

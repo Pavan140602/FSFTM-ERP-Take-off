@@ -592,7 +592,7 @@ def ensure_converter(fmt: str) -> Path:
     if sys.platform == "darwin":
         raise ConverterUnavailableError(
             f"There is no native macOS build of the .{fmt.upper()} converter. "
-            f"Run OpenConstructionERP in Docker (Linux container - the converter "
+            f"Run Florida Steel Frame & Truss Manufacturing LLC in Docker (Linux container - the converter "
             f"is downloaded automatically there) or on a Linux host, or convert "
             f"the file to IFC first (IFC also has a built-in text fallback parser "
             f"that works on macOS)."

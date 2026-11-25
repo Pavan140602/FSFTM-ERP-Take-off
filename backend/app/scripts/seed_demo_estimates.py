@@ -627,7 +627,7 @@ async def main() -> None:
         # 1. Find or create a demo user
         # ------------------------------------------------------------------
         print("=" * 78)
-        print("  OpenConstructionERP  -  Demo Estimate Seeder")
+        print("  Florida Steel Frame & Truss Manufacturing LLC  -  Demo Estimate Seeder")
         print("=" * 78)
 
         user = await find_showcase_owner(session)

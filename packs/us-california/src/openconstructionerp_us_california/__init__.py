@@ -1,4 +1,4 @@
-"""OpenConstructionERP - California construction pack.
+"""Florida Steel Frame & Truss Manufacturing LLC - California construction pack.
 
 State depth for California, layered on the national US pack rather than
 repeating it. What this pack adds:

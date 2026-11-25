@@ -319,7 +319,7 @@ S.append(Paragraph("PDF Measurements", ParagraphStyle("ct", fontName="Arial-Bold
 S.append(Paragraph("Master Flow &amp; User Guide", ParagraphStyle("cs", fontName="Arial", fontSize=19, leading=25, textColor=GREY, alignment=TA_CENTER)))
 S.append(Spacer(1, 0.35 * inch))
 S.append(Paragraph("How to take off a drawing set in the ERP, from upload to the finished, marked-up PDF: "
-                   "scale, Auto Takeoff, Bluebeam Revu-style tools, legends, saving and sharing.",
+                   "scale, Auto Takeoff, FSFTM-style tools, legends, saving and sharing.",
                    ParagraphStyle("cd", fontName="Arial", fontSize=11, leading=16, textColor=INK, alignment=TA_CENTER, leftIndent=40, rightIndent=40)))
 S.append(Spacer(1, 1.3 * inch))
 S.append(Paragraph("Florida Steel Frame &amp; Truss Manufacturing LLC<br/>ERP module: Takeoff &gt; PDF Measurements<br/>Edition: 6 November 2026 · covers every change in <font name='Consolas'>deliveries/</font> (18 delivery folders)",
@@ -336,7 +336,7 @@ S += [Paragraph("Contents", ss["h1"]), toc, PageBreak()]
 
 # ── 1. About ───────────────────────────────────────────────────────────────
 S.append(H1("1. What PDF Measurements is"))
-S.append(P("PDF Measurements is the ERP's drawing takeoff workspace. It looks and works like Bluebeam Revu, and it adds "
+S.append(P("PDF Measurements is the ERP's drawing takeoff workspace. It looks and works like FSFTM, and it adds "
            "<b>Auto Takeoff</b>, which reads structural and cold-formed steel (CFS) drawings and places the markups for you. "
            "Every markup is saved on the ERP server against the project, so the whole team sees the same takeoff."))
 S.append(P("You open it from <b>Takeoff &gt; PDF Measurements</b> (address <font name='Consolas'>/takeoff?tab=measurements</font>)."))
@@ -345,7 +345,7 @@ S += B([
     "<b>Auto Takeoff</b>: columns, beams, joists, trusses, deck, CFS walls (with studs and header areas), headers, jambs, "
     "shear and strap-braced walls, holdowns, base plates, stairs and more. It reads the schedules, legends and sheet titles first, "
     "the way an estimator does. The rules work without AI; an AI step is optional and uses your own key.",
-    "<b>Manual Revu tools</b>: Length, Polylength, Area, Count, Volume and the other measure tools, plus markups "
+    "<b>Manual FSFTM tools</b>: Length, Polylength, Area, Count, Volume and the other measure tools, plus markups "
     "(Text Box, Cloud, Cloud+, Callout, Highlight ...), the Tool Chest of structural tools, legends and the Markups list.",
 ])
 S.append(P("<b>Who this guide is for:</b> anyone receiving a copy of this ERP who needs to understand the takeoff workflow "
@@ -393,7 +393,7 @@ S.append(table([
 # ── 4. Screen ──────────────────────────────────────────────────────────────
 S.append(PageBreak())
 S.append(H1("4. The screen"))
-S.append(P("With a drawing open, the workspace fills the browser window like Revu. The numbers match the table below."))
+S.append(P("With a drawing open, the workspace fills the browser window like FSFTM. The numbers match the table below."))
 S.append(ScreenMap(fw))
 S.append(Spacer(1, 8))
 S.append(table([
@@ -610,7 +610,7 @@ S.append(table([
     ["Rectangle, Ellipse, Polygon", "R, E, Shift+P", "Drag (rectangle, ellipse) or click points (polygon)"],
     ["Pen, Stamp", "P, S", "Freehand / one click with a stamp preset"],
 ], [1.7 * inch, 1.0 * inch, 4.3 * inch]))
-S.append(H2("Drawing behaviour (Revu style)"))
+S.append(H2("Drawing behaviour (FSFTM style)"))
 S += B([
     "<b>A tool exits after one markup</b> and goes back to Select. <b>Double-click</b> a tool button to lock it on (lock badge). "
     "The <b>REUSE</b> button in the status bar keeps every tool on (remembered). Count always continues until Esc.",
@@ -675,7 +675,7 @@ S += B([
 S.append(CondPageBreak(3.2 * inch))
 S.append(H1("13. Legends"))
 S.append(P("The legend summarises the markups: one row per Subject and look, with symbol, <b>Count</b>, Description (Subject), total Length / Area and Unit "
-           "(the <b>Revu</b> layout, default). The older per-length layout is <b>Detailed</b>, one click away in the legend panel header."))
+           "(the <b>FSFTM</b> layout, default). The older per-length layout is <b>Detailed</b>, one click away in the legend panel header."))
 S.append(H2("Create a legend for chosen markups"))
 S += B([
     "Select markups, right-click &gt; <b>Legend ► Create New Legend (this sheet)</b> (or the toolbar Legend button with markups selected), then click the sheet to place it.",
@@ -708,7 +708,7 @@ S.append(table([
     ["Save", "Save button, Ctrl+S, File &gt; Save", "Saves to the ERP now and confirms (work also auto-saves)."],
     ["Download PDF", "Green toolbar button, File &gt; Download PDF (with markups)",
      "The original vector PDF with every markup as a real PDF annotation on an \"OE Markups\" layer, each with its drawn appearance and dimension "
-     "label (12'-6\", 45.2 sf, n ea). Shows the same in Revu, Acrobat, Chrome and Edge. Opens editable again in the ERP."],
+     "label (12'-6\", 45.2 sf, n ea). Shows the same in FSFTM, Acrobat, Chrome and Edge. Opens editable again in the ERP."],
     ["Export flattened PDF", "File menu", "Picture PDF of the pages with markups burned in."],
     ["Markup Summary CSV", "Thumbnail menu &gt; Markup Summary ► CSV", "Spreadsheet of the markups."],
     ["Extract / Email / Print", "Thumbnail menu", "See section 6."],
@@ -764,7 +764,7 @@ S.append(table([
 S.append(H1("18. Known limits"))
 S += B([
     "Tool Chest sets and sheet-label edits are saved per browser, not on the server.",
-    "Revu's Eraser, Snapshot tool, Image and Lasso tools are not included. Bookmarks and Search are a simple page index and Find. "
+    "FSFTM's Eraser, Snapshot tool, Image and Lasso tools are not included. Bookmarks and Search are a simple page index and Find. "
     "The scale window has no \"Separate Y scale\".",
     "Columns drawn only as part of a wall (no symbol of their own) are not added; on plain foundation sheets without house rules, a column "
     "drawn as separate crossing lines can be missed (house rules find it).",
@@ -780,12 +780,12 @@ S.append(P("All custom code is marked with <font name='Consolas'>OE-DELIVERY: &l
 S.append(table([
     ["Area", "Files"],
     ["Viewer", "frontend/src/modules/pdf-takeoff/TakeoffViewerModule.tsx, useMeasurementPersistence.ts"],
-    ["Revu UI", "components/RevuMenuBar, RevuPropertiesBar, RevuToolStrip, RevuToolChest, SetScaleDialog, LegendSetupDialog, LegendPropertiesPanel, TextFormatBar, ColorPicklist, PageToolsDialogs, PdfCreateDialogs, revu-icons"],
-    ["Viewer data", "modules/pdf-takeoff/data/: auto-takeoff, auto-colours, column-shape, stud-wall, text-box, structural-tools, tool-chest-sets, revu-shortcuts, sheet-index, pdf-pages, length-input, text-words, thumb-cache"],
+    ["FSFTM UI", "components/FSFTMMenuBar, FSFTMPropertiesBar, FSFTMToolStrip, FSFTMToolChest, SetScaleDialog, LegendSetupDialog, LegendPropertiesPanel, TextFormatBar, ColorPicklist, PageToolsDialogs, PdfCreateDialogs, fsftm-icons"],
+    ["Viewer data", "modules/pdf-takeoff/data/: auto-takeoff, auto-colours, column-shape, stud-wall, text-box, structural-tools, tool-chest-sets, fsftm-shortcuts, sheet-index, pdf-pages, length-input, text-words, thumb-cache"],
     ["Takeoff page", "frontend/src/features/takeoff/: TakeoffPage.tsx, components/MeasurementLedger.tsx, UploadProgressBar.tsx, lib/takeoff-*.ts"],
     ["Auto Takeoff engine", "backend/app/modules/takeoff/: auto_takeoff.py, auto_takeoff_ai.py, detail_scan.py, framing_rules.py, bearing_walls.py, detect.py, router.py, schemas.py"],
     ["Tests", "backend/tests/unit/test_takeoff_*.py; frontend vitest next to each data file"],
-    ["History", "deliveries/2026-11-02-… to 2026-11-12-revu-ui: CHANGES.md, files/, patch_scripts/, e2e/, restore.py"],
+    ["History", "deliveries/2026-11-02-… to 2026-11-12-fsftm-ui: CHANGES.md, files/, patch_scripts/, e2e/, restore.py"],
 ], [1.4 * inch, 5.6 * inch]))
 
 doc.multiBuild(S)

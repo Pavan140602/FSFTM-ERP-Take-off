@@ -1,4 +1,4 @@
-# Install OpenConstructionERP as a Windows service (autostart on boot).
+# Install Florida Steel Frame & Truss Manufacturing LLC as a Windows service (autostart on boot).
 # Uses Windows Task Scheduler - no extra tools required (NSSM optional).
 #
 # Run this script ONCE as Administrator:
@@ -56,7 +56,7 @@ Register-ScheduledTask `
     -Trigger $trigger `
     -Settings $settings `
     -Principal $principal `
-    -Description "OpenConstructionERP backend on http://${bindHost}:${port}"
+    -Description "Florida Steel Frame & Truss Manufacturing LLC backend on http://${bindHost}:${port}"
 
 Start-ScheduledTask -TaskName $taskName
 

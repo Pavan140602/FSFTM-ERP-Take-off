@@ -3,7 +3,7 @@
 Copies every file under ./files back to its place in the project root. Any file
 it would overwrite is first copied to <file>.pre-restore-<timestamp>.
 
-Usage (from anywhere):  python deliveries/2026-11-02-revu-pdf-takeoff/restore.py [--dry-run]
+Usage (from anywhere):  python deliveries/2026-11-02-fsftm-pdf-takeoff/restore.py [--dry-run]
 """
 import shutil
 import sys

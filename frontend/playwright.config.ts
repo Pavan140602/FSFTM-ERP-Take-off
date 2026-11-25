@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 import os from 'node:os';
 
 /**
- * Playwright E2E test configuration for OpenConstructionERP frontend.
+ * Playwright E2E test configuration for Florida Steel Frame & Truss Manufacturing LLC frontend.
  *
  * Scope: this config drives the NEW QA infrastructure under `tests/e2e/`
  * (smoke/, fixtures/, helpers/). The legacy spec folder `./e2e/` is still

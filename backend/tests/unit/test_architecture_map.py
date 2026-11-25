@@ -76,7 +76,7 @@ PREFIX = "/api/v1/architecture-map"
 FIXTURE_MANIFEST: dict[str, Any] = {
     "_meta": {
         "generator": "generate_architecture_manifest.py",
-        "description": "Auto-generated architecture manifest for OpenConstructionERP",
+        "description": "Auto-generated architecture manifest for Florida Steel Frame & Truss Manufacturing LLC",
         "version": "1.0.0",
     },
     "modules": [

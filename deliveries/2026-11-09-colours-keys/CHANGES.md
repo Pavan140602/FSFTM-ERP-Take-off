@@ -4,7 +4,7 @@ Restore after 2026-11-08-stud-walls: `python deliveries/2026-11-09-colours-keys/
 then restart the backend (port 8000) and reload the frontend.
 
 ## Colours (picklist, one per parameter set)
-- `data/auto-colours.ts` (new): every Auto Takeoff markup takes a Revu picklist colour.
+- `data/auto-colours.ts` (new): every Auto Takeoff markup takes a FSFTM picklist colour.
   - Header areas and header tags get warm colours.
   - Walls get cool colours.
   - Other members get the rest of the palette.

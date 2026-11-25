@@ -59,7 +59,7 @@ const shot = (page, n) => page.screenshot({ path: path.join(outDir, n) });
     await shot(page, 'w3-shear-only.png');
     await page.locator('[data-testid="auto-wall-role"]', { hasText: 'All walls' }).first().click();
     await page.waitForTimeout(400);
-    // Revu colour picklist on a group.
+    // FSFTM colour picklist on a group.
     await page.locator('[data-testid="auto-group-colour"]').first().click();
     await page.waitForTimeout(200);
     r.paletteCells = await page.locator('[data-testid="auto-group-colour-menu"] [data-testid="auto-group-colour-cell"]').count();

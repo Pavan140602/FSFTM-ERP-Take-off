@@ -12,7 +12,7 @@
 //   * "Refresh status" — re-probes /qdrant/health.
 //
 // We deliberately do NOT mention Docker anywhere in the user-facing
-// copy. Every other heavy dependency in OpenConstructionERP runs
+// copy. Every other heavy dependency in Florida Steel Frame & Truss Manufacturing LLC runs
 // without Docker (Postgres→SQLite, Redis→memory, MinIO→local fs); the
 // native binary brings Qdrant in line with that policy.
 

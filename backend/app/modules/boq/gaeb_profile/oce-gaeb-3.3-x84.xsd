@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  OpenConstructionERP GAEB DA XML 3.3 profile schema, exchange phase X84
+  Florida Steel Frame &amp; Truss Manufacturing LLC GAEB DA XML 3.3 profile schema, exchange phase X84
   (Angebotsabgabe, the priced bid submission).
 
   Copyright (c) 2026 Artem Boiko / DataDrivenConstruction. Published under
@@ -10,7 +10,7 @@
   publicly available GAEB DA XML 3.3 Fachdokumentation describes and from
   the reader and writer in this repository, not by editing a copy of any
   schema published by GAEB, DIN or BVBS. It describes only the subset of
-  the standard that OpenConstructionERP actually reads and writes, and it
+  the standard that Florida Steel Frame &amp; Truss Manufacturing LLC actually reads and writes, and it
   uses type names of our own choosing.
 
   A document that satisfies this profile is a valid GAEB DA XML 3.3 X84.

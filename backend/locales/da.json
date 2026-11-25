@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "OpenConstructionERP",
+    "name": "Florida Steel Frame & Truss Manufacturing LLC",
     "tagline": "Byggekalkulation med åben kildekode"
   },
   "nav": {
@@ -164,7 +164,7 @@
     "update": "Opdater"
   },
   "dashboard": {
-    "welcome": "Velkommen til OpenConstructionERP",
+    "welcome": "Velkommen til Florida Steel Frame & Truss Manufacturing LLC",
     "subtitle": "Byggekalkulation med åben kildekode",
     "recent_projects": "Seneste projekter",
     "system_status": "Systemstatus",

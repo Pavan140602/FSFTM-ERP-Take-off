@@ -1,4 +1,4 @@
-"""OpenConstructionERP UK Construction partner pack (NRM, JCT, UK statute).
+"""Florida Steel Frame & Truss Manufacturing LLC UK Construction partner pack (NRM, JCT, UK statute).
 
 This package exports a module-level ``MANIFEST`` instance of
 :class:`PartnerPackManifest` referenced from ``pyproject.toml``::

@@ -1,6 +1,6 @@
 # UK Construction Pack
 
-Pre-configures OpenConstructionERP for United Kingdom contracting: the RICS
+Pre-configures Florida Steel Frame & Truss Manufacturing LLC for United Kingdom contracting: the RICS
 measurement rules, the JCT contract suite, the Construction Act payment
 regime, CIS and the VAT domestic reverse charge, CDM 2015 duties and the
 Building Safety Act 2022.
@@ -134,7 +134,7 @@ who has and has not read it.
 
 ## Install
 
-This pack ships inside OpenConstructionERP. Activate it from Modules then
+This pack ships inside Florida Steel Frame & Truss Manufacturing LLC. Activate it from Modules then
 Partner Packs: click Rescan, find "UK Construction Pack", then Activate pack.
 
 To run a workspace that boots straight into it:

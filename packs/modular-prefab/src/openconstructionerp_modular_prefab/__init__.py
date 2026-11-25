@@ -1,4 +1,4 @@
-"""OpenConstructionERP — Modular & Prefab partner pack (EN 1090 + AS 5104 + factory QC).
+"""Florida Steel Frame & Truss Manufacturing LLC — Modular & Prefab partner pack (EN 1090 + AS 5104 + factory QC).
 
 This package exports a module-level ``MANIFEST`` instance of
 :class:`PartnerPackManifest` referenced from ``pyproject.toml``::

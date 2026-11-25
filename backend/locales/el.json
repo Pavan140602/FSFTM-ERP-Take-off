@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "OpenConstructionERP",
+    "name": "Florida Steel Frame & Truss Manufacturing LLC",
     "tagline": "Εκτίμηση κόστους κατασκευής ανοιχτού κώδικα"
   },
   "nav": {
@@ -164,7 +164,7 @@
     "update": "Ενημέρωση"
   },
   "dashboard": {
-    "welcome": "Καλώς ήρθατε στο OpenConstructionERP",
+    "welcome": "Καλώς ήρθατε στο Florida Steel Frame & Truss Manufacturing LLC",
     "subtitle": "Ο χώρος εργασίας εκτίμησης κατασκευής σας",
     "recent_projects": "Πρόσφατα Έργα",
     "system_status": "Κατάσταση Συστήματος",

@@ -49,7 +49,7 @@ const shot = (page, n) => page.screenshot({ path: path.join(outDir, n) });
     // chest sets
     await page.locator('[data-testid="rail-tools"]').click();
     await page.waitForTimeout(500);
-    r.sets = (await page.locator('[data-testid="revu-tool-chest"] section header').allInnerTexts()).map((x) => x.split('\n').slice(0, 2).join(' '));
+    r.sets = (await page.locator('[data-testid="fsftm-tool-chest"] section header').allInnerTexts()).map((x) => x.split('\n').slice(0, 2).join(' '));
     await page.locator('[data-testid="chest-set-zs-headers"] header button').first().click();
     await page.locator('[data-testid="chest-set-zs-lb-walls"] header button').first().click();
     await page.waitForTimeout(300);

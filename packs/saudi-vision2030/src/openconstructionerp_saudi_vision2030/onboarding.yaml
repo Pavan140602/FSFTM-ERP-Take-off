@@ -25,11 +25,11 @@ steps:
     kind: intro
     skippable: false
     title_i18n:
-      ar: "أهلاً بكم في OpenConstructionERP — إصدار المملكة العربية السعودية"
+      ar: "أهلاً بكم في Florida Steel Frame & Truss Manufacturing LLC — إصدار المملكة العربية السعودية"
       en: "Welcome to OCERP — Saudi Edition"
     body_i18n:
-      ar: "تم تهيئة OpenConstructionERP مسبقاً لسوق المملكة العربية السعودية — رؤية 2030. تسع خطوات سريعة وستكون جاهزاً لتقدير مشاريعك وفق معايير SBC و MoMRAH و أرامكو و نيوم."
-      en: "Your OpenConstructionERP install is pre-configured for the Kingdom of Saudi Arabia — Vision 2030. Nine quick steps and you are ready to estimate against SBC, MoMRAH, Aramco and NEOM standards."
+      ar: "تم تهيئة Florida Steel Frame & Truss Manufacturing LLC مسبقاً لسوق المملكة العربية السعودية — رؤية 2030. تسع خطوات سريعة وستكون جاهزاً لتقدير مشاريعك وفق معايير SBC و MoMRAH و أرامكو و نيوم."
+      en: "Your Florida Steel Frame & Truss Manufacturing LLC install is pre-configured for the Kingdom of Saudi Arabia — Vision 2030. Nine quick steps and you are ready to estimate against SBC, MoMRAH, Aramco and NEOM standards."
 
   - id: company-profile
     kind: form

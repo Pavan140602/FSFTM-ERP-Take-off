@@ -1,7 +1,7 @@
 [project]
 name = "oe-sdk"
 version = "0.1.0"
-description = "Module SDK for OpenConstructionERP. One clean import surface for building construction modules on the platform core."
+description = "Module SDK for Florida Steel Frame & Truss Manufacturing LLC. One clean import surface for building construction modules on the platform core."
 license = "AGPL-3.0-or-later"
 requires-python = ">=3.12"
 authors = [

@@ -1,6 +1,6 @@
 {
   "what": "English sentences that a locale renders more than one way, as the files contain them. Nothing here was written by this process; it is a reading.",
-  "product": "OpenConstructionERP / OpenEstimate",
+  "product": "Florida Steel Frame & Truss Manufacturing LLC / OpenEstimate",
   "holder": "DataDrivenConstruction",
   "recorded": "2026-08-08",
   "tree": "20de3d9346ca5a832f8d3b577419b870b1afbf66",
@@ -4960,17 +4960,17 @@
         ]
       },
       "welcome_title": {
-        "english": "Welcome to OpenConstructionERP",
+        "english": "Welcome to Florida Steel Frame & Truss Manufacturing LLC",
         "phrase": false,
         "renderings": [
           {
-            "value": "مرحباً بك في OpenConstructionERP",
+            "value": "مرحباً بك في Florida Steel Frame & Truss Manufacturing LLC",
             "keys": [
               "dashboard.welcome_title"
             ]
           },
           {
-            "value": "مرحبًا بك في OpenConstructionERP",
+            "value": "مرحبًا بك في Florida Steel Frame & Truss Manufacturing LLC",
             "keys": [
               "onboarding.welcome_title"
             ]
@@ -11866,17 +11866,17 @@
         ]
       },
       "back_to_app": {
-        "english": "Back to OpenConstructionERP",
+        "english": "Back to Florida Steel Frame & Truss Manufacturing LLC",
         "phrase": false,
         "renderings": [
           {
-            "value": "Zpět do OpenConstructionERP",
+            "value": "Zpět do Florida Steel Frame & Truss Manufacturing LLC",
             "keys": [
               "payportal.back_to_app"
             ]
           },
           {
-            "value": "Zpět na OpenConstructionERP",
+            "value": "Zpět na Florida Steel Frame & Truss Manufacturing LLC",
             "keys": [
               "homeportal.back_to_app"
             ]
@@ -31218,11 +31218,11 @@
         ]
       },
       "back_to_app": {
-        "english": "Back to OpenConstructionERP",
+        "english": "Back to Florida Steel Frame & Truss Manufacturing LLC",
         "phrase": false,
         "renderings": [
           {
-            "value": "Tagasi OpenConstructionERP juurde",
+            "value": "Tagasi Florida Steel Frame & Truss Manufacturing LLC juurde",
             "keys": [
               "homeportal.back_to_app"
             ]
@@ -33702,17 +33702,17 @@
         ]
       },
       "back_to_app": {
-        "english": "Back to OpenConstructionERP",
+        "english": "Back to Florida Steel Frame & Truss Manufacturing LLC",
         "phrase": false,
         "renderings": [
           {
-            "value": "Takaisin OpenConstructionERP:hen",
+            "value": "Takaisin Florida Steel Frame & Truss Manufacturing LLC:hen",
             "keys": [
               "payportal.back_to_app"
             ]
           },
           {
-            "value": "Takaisin OpenConstructionERP:ään",
+            "value": "Takaisin Florida Steel Frame & Truss Manufacturing LLC:ään",
             "keys": [
               "homeportal.back_to_app"
             ]
@@ -37522,7 +37522,7 @@
         ]
       },
       "welcome_title": {
-        "english": "Welcome to OpenConstructionERP",
+        "english": "Welcome to Florida Steel Frame & Truss Manufacturing LLC",
         "phrase": false,
         "renderings": [
           {
@@ -37532,7 +37532,7 @@
             ]
           },
           {
-            "value": "Tervetuloa OpenConstructionERP:iin",
+            "value": "Tervetuloa Florida Steel Frame & Truss Manufacturing LLC:iin",
             "keys": [
               "dashboard.welcome_title"
             ]
@@ -41336,17 +41336,17 @@
         ]
       },
       "welcome_title": {
-        "english": "Welcome to OpenConstructionERP",
+        "english": "Welcome to Florida Steel Frame & Truss Manufacturing LLC",
         "phrase": false,
         "renderings": [
           {
-            "value": "Bienvenue dans OpenConstructionERP",
+            "value": "Bienvenue dans Florida Steel Frame & Truss Manufacturing LLC",
             "keys": [
               "dashboard.welcome_title"
             ]
           },
           {
-            "value": "Bienvenue sur OpenConstructionERP",
+            "value": "Bienvenue sur Florida Steel Frame & Truss Manufacturing LLC",
             "keys": [
               "onboarding.welcome_title"
             ]
@@ -41809,17 +41809,17 @@
         ]
       },
       "back_to_app": {
-        "english": "Back to OpenConstructionERP",
+        "english": "Back to Florida Steel Frame & Truss Manufacturing LLC",
         "phrase": false,
         "renderings": [
           {
-            "value": "OpenConstructionERP पर वापस जाएँ",
+            "value": "Florida Steel Frame & Truss Manufacturing LLC पर वापस जाएँ",
             "keys": [
               "payportal.back_to_app"
             ]
           },
           {
-            "value": "OpenConstructionERP पर वापस जाएं",
+            "value": "Florida Steel Frame & Truss Manufacturing LLC पर वापस जाएं",
             "keys": [
               "homeportal.back_to_app"
             ]
@@ -58713,17 +58713,17 @@
         ]
       },
       "welcome_title": {
-        "english": "Welcome to OpenConstructionERP",
+        "english": "Welcome to Florida Steel Frame & Truss Manufacturing LLC",
         "phrase": false,
         "renderings": [
           {
-            "value": "Benvenuto in OpenConstructionERP",
+            "value": "Benvenuto in Florida Steel Frame & Truss Manufacturing LLC",
             "keys": [
               "dashboard.welcome_title"
             ]
           },
           {
-            "value": "Benvenuto su OpenConstructionERP",
+            "value": "Benvenuto su Florida Steel Frame & Truss Manufacturing LLC",
             "keys": [
               "onboarding.welcome_title"
             ]
@@ -69025,17 +69025,17 @@
         ]
       },
       "back_to_app": {
-        "english": "Back to OpenConstructionERP",
+        "english": "Back to Florida Steel Frame & Truss Manufacturing LLC",
         "phrase": false,
         "renderings": [
           {
-            "value": "OpenConstructionERP'ке кайтуу",
+            "value": "Florida Steel Frame & Truss Manufacturing LLC'ке кайтуу",
             "keys": [
               "payportal.back_to_app"
             ]
           },
           {
-            "value": "OpenConstructionERPге кайтуу",
+            "value": "Florida Steel Frame & Truss Manufacturing LLCге кайтуу",
             "keys": [
               "homeportal.back_to_app"
             ]
@@ -74200,17 +74200,17 @@
         ]
       },
       "welcome_title": {
-        "english": "Welcome to OpenConstructionERP",
+        "english": "Welcome to Florida Steel Frame & Truss Manufacturing LLC",
         "phrase": false,
         "renderings": [
           {
-            "value": "OpenConstructionERP'ге кош келиңиз",
+            "value": "Florida Steel Frame & Truss Manufacturing LLC'ге кош келиңиз",
             "keys": [
               "dashboard.welcome_title"
             ]
           },
           {
-            "value": "OpenConstructionERP'ке кош келиңиз",
+            "value": "Florida Steel Frame & Truss Manufacturing LLC'ке кош келиңиз",
             "keys": [
               "onboarding.welcome_title"
             ]
@@ -93137,17 +93137,17 @@
         ]
       },
       "welcome_title": {
-        "english": "Welcome to OpenConstructionERP",
+        "english": "Welcome to Florida Steel Frame & Truss Manufacturing LLC",
         "phrase": false,
         "renderings": [
           {
-            "value": "Witaj w OpenConstructionERP",
+            "value": "Witaj w Florida Steel Frame & Truss Manufacturing LLC",
             "keys": [
               "onboarding.welcome_title"
             ]
           },
           {
-            "value": "Witamy w OpenConstructionERP",
+            "value": "Witamy w Florida Steel Frame & Truss Manufacturing LLC",
             "keys": [
               "dashboard.welcome_title"
             ]
@@ -93364,17 +93364,17 @@
         ]
       },
       "back_to_app": {
-        "english": "Back to OpenConstructionERP",
+        "english": "Back to Florida Steel Frame & Truss Manufacturing LLC",
         "phrase": false,
         "renderings": [
           {
-            "value": "Voltar ao OpenConstructionERP",
+            "value": "Voltar ao Florida Steel Frame & Truss Manufacturing LLC",
             "keys": [
               "payportal.back_to_app"
             ]
           },
           {
-            "value": "Voltar para OpenConstructionERP",
+            "value": "Voltar para Florida Steel Frame & Truss Manufacturing LLC",
             "keys": [
               "homeportal.back_to_app"
             ]
@@ -102776,17 +102776,17 @@
         ]
       },
       "welcome_title": {
-        "english": "Welcome to OpenConstructionERP",
+        "english": "Welcome to Florida Steel Frame & Truss Manufacturing LLC",
         "phrase": false,
         "renderings": [
           {
-            "value": "Bine ați venit în OpenConstructionERP",
+            "value": "Bine ați venit în Florida Steel Frame & Truss Manufacturing LLC",
             "keys": [
               "dashboard.welcome_title"
             ]
           },
           {
-            "value": "Bun venit în OpenConstructionERP",
+            "value": "Bun venit în Florida Steel Frame & Truss Manufacturing LLC",
             "keys": [
               "onboarding.welcome_title"
             ]
@@ -103185,17 +103185,17 @@
         ]
       },
       "back_to_app": {
-        "english": "Back to OpenConstructionERP",
+        "english": "Back to Florida Steel Frame & Truss Manufacturing LLC",
         "phrase": false,
         "renderings": [
           {
-            "value": "Вернуться в OpenConstructionERP",
+            "value": "Вернуться в Florida Steel Frame & Truss Manufacturing LLC",
             "keys": [
               "homeportal.back_to_app"
             ]
           },
           {
-            "value": "Назад в OpenConstructionERP",
+            "value": "Назад в Florida Steel Frame & Truss Manufacturing LLC",
             "keys": [
               "payportal.back_to_app"
             ]
@@ -112274,17 +112274,17 @@
         ]
       },
       "back_to_app": {
-        "english": "Back to OpenConstructionERP",
+        "english": "Back to Florida Steel Frame & Truss Manufacturing LLC",
         "phrase": false,
         "renderings": [
           {
-            "value": "กลับไปที่ OpenConstructionERP",
+            "value": "กลับไปที่ Florida Steel Frame & Truss Manufacturing LLC",
             "keys": [
               "homeportal.back_to_app"
             ]
           },
           {
-            "value": "กลับไปยัง OpenConstructionERP",
+            "value": "กลับไปยัง Florida Steel Frame & Truss Manufacturing LLC",
             "keys": [
               "payportal.back_to_app"
             ]
@@ -117791,17 +117791,17 @@
         ]
       },
       "back_to_app": {
-        "english": "Back to OpenConstructionERP",
+        "english": "Back to Florida Steel Frame & Truss Manufacturing LLC",
         "phrase": false,
         "renderings": [
           {
-            "value": "OpenConstructionERP'ye dön",
+            "value": "Florida Steel Frame & Truss Manufacturing LLC'ye dön",
             "keys": [
               "payportal.back_to_app"
             ]
           },
           {
-            "value": "OpenConstructionERP'ye geri dön",
+            "value": "Florida Steel Frame & Truss Manufacturing LLC'ye geri dön",
             "keys": [
               "homeportal.back_to_app"
             ]
@@ -121904,17 +121904,17 @@
         ]
       },
       "welcome_title": {
-        "english": "Welcome to OpenConstructionERP",
+        "english": "Welcome to Florida Steel Frame & Truss Manufacturing LLC",
         "phrase": false,
         "renderings": [
           {
-            "value": "OpenConstructionERP'ya Hoş Geldiniz",
+            "value": "Florida Steel Frame & Truss Manufacturing LLC'ya Hoş Geldiniz",
             "keys": [
               "onboarding.welcome_title"
             ]
           },
           {
-            "value": "OpenConstructionERP'ye Hoş Geldiniz",
+            "value": "Florida Steel Frame & Truss Manufacturing LLC'ye Hoş Geldiniz",
             "keys": [
               "dashboard.welcome_title"
             ]

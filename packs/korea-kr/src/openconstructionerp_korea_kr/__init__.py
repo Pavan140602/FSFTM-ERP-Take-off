@@ -1,4 +1,4 @@
-"""OpenConstructionERP - South Korea Construction partner pack (KBIM + KS + MOLIT).
+"""Florida Steel Frame & Truss Manufacturing LLC - South Korea Construction partner pack (KBIM + KS + MOLIT).
 
 This package exports a module-level ``MANIFEST`` instance of
 :class:`PartnerPackManifest` referenced from ``pyproject.toml``::

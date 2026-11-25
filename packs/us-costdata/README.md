@@ -1,6 +1,6 @@
 # US Construction Pack
 
-Pre-configures OpenConstructionERP for United States general contracting: the
+Pre-configures Florida Steel Frame & Truss Manufacturing LLC for United States general contracting: the
 CSI classification structures, the AIA owner-contractor agreement family, OSHA
 construction safety, the IBC code editions the states actually adopt, and a
 city cost index structure for localizing rates per metro.
@@ -27,7 +27,7 @@ city cost index structure for localizing rates per metro.
 
 ## Install
 
-This pack ships inside OpenConstructionERP. Activate it from Modules then
+This pack ships inside Florida Steel Frame & Truss Manufacturing LLC. Activate it from Modules then
 Partner Packs: click Rescan, find "US Construction Pack", then Activate pack.
 
 To run a workspace that boots straight into it:

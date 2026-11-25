@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "OpenConstructionERP",
+    "name": "Florida Steel Frame & Truss Manufacturing LLC",
     "tagline": "اوپن سورس تعمیراتی لاگت تخمینہ"
   },
   "nav": {
@@ -164,7 +164,7 @@
     "update": "اپ ڈیٹ کریں"
   },
   "dashboard": {
-    "welcome": "OpenConstructionERP میں خوش آمدید",
+    "welcome": "Florida Steel Frame & Truss Manufacturing LLC میں خوش آمدید",
     "subtitle": "آپ کا تعمیراتی تخمینہ ورک اسپیس",
     "recent_projects": "حالیہ پروجیکٹس",
     "system_status": "سسٹم اسٹیٹس",

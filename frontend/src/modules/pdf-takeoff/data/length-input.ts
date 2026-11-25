@@ -1,4 +1,4 @@
-// OE-DELIVERY: 2026-11-12-revu-ui (scale input)
+// OE-DELIVERY: 2026-11-12-fsftm-ui (scale input)
 /**
  * Read a length typed any way an estimator writes it, to inches:
  *   12        12.0      12.5          (in the default unit)

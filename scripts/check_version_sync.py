@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """‌⁠‍Verify backend and frontend​‌‍⁠​‌‍⁠​‌‍⁠​‌‍⁠ version literals are in sync.
 
-The OpenConstructionERP frontend (``frontend/package.json``) and the
+The Florida Steel Frame & Truss Manufacturing LLC frontend (``frontend/package.json``) and the
 Python package (``backend/pyproject.toml``) MUST report the same version
 because the running app reads its version from the installed Python
 package via ``importlib.metadata.version("openconstructionerp")``.

@@ -1,7 +1,7 @@
 // DDC-CWICR-OE: DataDrivenConstruction · OpenConstructionERP
 // Copyright (c) 2026 Artem Boiko / DataDrivenConstruction
 /**
- * Community acknowledgments - the people who shaped OpenConstructionERP by
+ * Community acknowledgments - the people who shaped Florida Steel Frame & Truss Manufacturing LLC by
  * reporting issues, asking questions and funding the work.
  *
  * Keep this file in sync with /docs/legal/ACKNOWLEDGMENTS.md. When a new

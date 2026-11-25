@@ -1,6 +1,6 @@
 # Modular & Prefab Pack
 
-Pre-configures OpenConstructionERP for modular construction, off-site
+Pre-configures Florida Steel Frame & Truss Manufacturing LLC for modular construction, off-site
 fabrication and project management contractors. Where a country pack carries a
 jurisdiction, this one carries a delivery method: factory-line scheduling,
 dimensional tolerance control, transport logistics, inter-module assembly and
@@ -51,7 +51,7 @@ publishers' own text and tables are not reproduced here.
 
 ## Install
 
-This pack ships inside OpenConstructionERP. Activate it from Modules then
+This pack ships inside Florida Steel Frame & Truss Manufacturing LLC. Activate it from Modules then
 Partner Packs: click Rescan, find "Modular & Prefab Pack", then Activate pack.
 
 To run a workspace that boots straight into it:

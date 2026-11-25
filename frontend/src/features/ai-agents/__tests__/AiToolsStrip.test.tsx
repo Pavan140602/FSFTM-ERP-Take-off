@@ -1,6 +1,6 @@
 // DDC-CWICR-OE: DataDrivenConstruction · OpenConstructionERP
 // Copyright (c) 2026 Artem Boiko / DataDrivenConstruction
-// OpenConstructionERP - AI tools cross-link strip (CONN-82).
+// Florida Steel Frame & Truss Manufacturing LLC - AI tools cross-link strip (CONN-82).
 //
 // The four AI surfaces (Agents, Cost Advisor, Chat, Quick Estimate) are
 // siblings that never pointed at each other. AiToolsStrip renders the set with

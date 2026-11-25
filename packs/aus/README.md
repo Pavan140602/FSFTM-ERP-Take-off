@@ -1,6 +1,6 @@
-# OpenConstructionERP — Australia Partner Pack (`aus`)
+# Florida Steel Frame & Truss Manufacturing LLC — Australia Partner Pack (`aus`)
 
-Pre-configures OpenConstructionERP for **Australian** general contractors.
+Pre-configures Florida Steel Frame & Truss Manufacturing LLC for **Australian** general contractors.
 
 ## What's inside
 

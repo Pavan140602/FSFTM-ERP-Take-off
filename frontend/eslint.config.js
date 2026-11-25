@@ -1,4 +1,4 @@
-// ESLint v9 flat config for the OpenConstructionERP frontend.
+// ESLint v9 flat config for the Florida Steel Frame & Truss Manufacturing LLC frontend.
 //
 // We intentionally keep this lightweight: type-checking is already
 // covered by `tsc --noEmit` (and is enforced by `npm run typecheck`).

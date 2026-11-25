@@ -16,7 +16,7 @@ describe('takeoff-shortcuts', () => {
       expect(shortcutToTool('v')).toBe('select');
     });
 
-    it('maps the Revu single-key tool letters', () => {
+    it('maps the FSFTM single-key tool letters', () => {
       expect(shortcutToTool('L')).toBe('line');
       expect(shortcutToTool('A')).toBe('arrow');
       expect(shortcutToTool('R')).toBe('rectangle');
@@ -49,7 +49,7 @@ describe('takeoff-shortcuts', () => {
       }
     });
 
-    it('uses Revu key names', () => {
+    it('uses FSFTM key names', () => {
       for (const letter of Object.values(SHORTCUT_LETTER)) {
         expect(letter).toMatch(/^((Shift|Alt|Ctrl)\+)*[A-Z]$/);
       }

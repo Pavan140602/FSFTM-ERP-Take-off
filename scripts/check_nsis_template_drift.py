@@ -110,7 +110,7 @@ REINSTALL_DEFAULT_BEFORE = r"""    ; Check the first radio button if this the fi
     ${NSD_SetFocus} $R2
 """
 
-REINSTALL_DEFAULT_AFTER = r"""    ; OpenConstructionERP fork of the stock Tauri template, edit one of four.
+REINSTALL_DEFAULT_AFTER = r"""    ; Florida Steel Frame & Truss Manufacturing LLC fork of the stock Tauri template, edit one of four.
     ; The other three are in PageLeaveReinstall below and carry their own notes.
     ; scripts/check_nsis_template_drift.py proves the set is exactly these four
     ; by fetching the template at the CLI version pinned in
@@ -128,7 +128,7 @@ REINSTALL_DEFAULT_AFTER = r"""    ; OpenConstructionERP fork of the stock Tauri 
     ; process-stop step called nsExec with no /TIMEOUT, and nsExec without a
     ; timeout waits for its child forever. When that child is a PowerShell that
     ; never returns, the uninstaller never returns, the installer waits on the
-    ; uninstaller, and the upgrade stops dead on "Closing OpenConstructionERP..."
+    ; uninstaller, and the upgrade stops dead on "Closing Florida Steel Frame & Truss Manufacturing LLC..."
     ; with nothing to do but the task manager. Those calls are bounded from
     ; v15.9.0 onwards, but a fix to them only reaches a machine one update after
     ; it is installed. That is also why this cannot live in windows/hooks.nsh:
@@ -194,7 +194,7 @@ WIX_SELECTION_BEFORE = r"""  ; If migrating from Wix, always uninstall
     Goto reinst_uninstall
 """
 
-WIX_SELECTION_AFTER = r"""  ; OpenConstructionERP fork, edit two of four. Upstream sent every WiX
+WIX_SELECTION_AFTER = r"""  ; Florida Steel Frame & Truss Manufacturing LLC fork, edit two of four. Upstream sent every WiX
   ; migration to reinst_uninstall without reading $R1, so the page offered a
   ; choice and then ignored it: a user who picked "Do not uninstall" watched the
   ; MSI uninstaller start anyway, and if it then failed the upgrade stopped on a
@@ -225,7 +225,7 @@ UNINSTALL_TIMEOUT_BEFORE = r"""      StrCpy $R1 "$R1 _?=$4" ; append uninstall d
 """
 
 UNINSTALL_TIMEOUT_AFTER = r"""      StrCpy $R1 "$R1 _?=$4" ; append uninstall directory
-      ; OpenConstructionERP fork, edit four of four. ExecWait blocks forever
+      ; Florida Steel Frame & Truss Manufacturing LLC fork, edit four of four. ExecWait blocks forever
       ; when the old uninstaller hangs, and every release from v11.7.1 to v15.8.0
       ; shipped an uninstaller whose process-stop hooks called nsExec without
       ; /TIMEOUT. On a machine where PowerShell never returns (antivirus, PowerToys,
@@ -270,7 +270,7 @@ LEFTOVER_FILE_BEFORE = r"""    ${IfThen} ${Errors} ${|} StrCpy $0 2 ${|} ; ExecW
       MessageBox MB_ICONEXCLAMATION "$(unableToUninstall)"
 """
 
-LEFTOVER_FILE_AFTER = r"""    ; OpenConstructionERP fork, edit three of four (was three of three before
+LEFTOVER_FILE_AFTER = r"""    ; Florida Steel Frame & Truss Manufacturing LLC fork, edit three of four (was three of three before
     ; the timeout guard above). Three things change here, all of them about when
     ; an upgrade is allowed to stop and what the person in front of it is told
     ; when it does.
@@ -324,7 +324,7 @@ LEFTOVER_FILE_AFTER = r"""    ; OpenConstructionERP fork, edit three of four (wa
         Abort
       ${EndIf}
 
-      ; OpenConstructionERP fork. When the old uninstaller fails for any reason
+      ; Florida Steel Frame & Truss Manufacturing LLC fork. When the old uninstaller fails for any reason
       ; other than user cancellation (codes 1 / 1602 above), continue with the
       ; install instead of aborting. The install writes over every file in
       ; $INSTDIR, NSIS_HOOK_PREINSTALL stops running processes, and the new

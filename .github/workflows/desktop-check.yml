@@ -1,4 +1,4 @@
-# OpenConstructionERP Desktop, compile check.
+# Florida Steel Frame & Truss Manufacturing LLC Desktop, compile check.
 #
 # Compiles desktop/src-tauri on Windows, macOS and Linux on every push to main
 # that touches it. It packages nothing, signs nothing and publishes nothing.

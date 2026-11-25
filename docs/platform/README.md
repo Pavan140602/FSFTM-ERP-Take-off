@@ -1,6 +1,6 @@
-# Build on OpenConstructionERP
+# Build on Florida Steel Frame & Truss Manufacturing LLC
 
-OpenConstructionERP is an open platform for building construction software. The
+Florida Steel Frame & Truss Manufacturing LLC is an open platform for building construction software. The
 same modular core that runs the shipped product, projects, bills of quantities,
 takeoff, cost databases, validation, tendering and more than 150 other modules,
 is the core you build on. Adding a capability means writing a module, not

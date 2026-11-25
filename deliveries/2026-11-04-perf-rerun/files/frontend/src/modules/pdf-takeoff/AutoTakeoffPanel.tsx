@@ -83,7 +83,7 @@ export interface AutoTakeoffPanelProps {
   highlightAll: boolean;
   onToggleHighlight: (on: boolean) => void;
   /** Draw the auto column markers on the sheet (off: the highlighted
-   *  profile text marks them, like Revu). */
+   *  profile text marks them, like FSFTM). */
   showColumns: boolean;
   onToggleColumns: (on: boolean) => void;
 }
@@ -93,7 +93,7 @@ interface StatusResponse {
   ai: { configured: boolean; provider?: string; model?: string; message?: string };
 }
 
-// v2: no profile text on the sheet by default - the highlight shows it (OE-DELIVERY 2026-11-02-revu-markups-list).
+// v2: no profile text on the sheet by default - the highlight shows it (OE-DELIVERY 2026-11-02-fsftm-markups-list).
 // v3: auto markups show profile + length on the line (OE-DELIVERY 2026-11-04-auto-labels).
 const STYLE_KEY = 'takeoff.autoTakeoff.v3';
 
@@ -273,9 +273,9 @@ export default function AutoTakeoffPanel(props: AutoTakeoffPanelProps) {
       return { ...p, types, cats: memberScope(types).cats };
     });
 
-  /** Live look (OE-DELIVERY 2026-11-02-revu-workspace): every slider move
+  /** Live look (OE-DELIVERY 2026-11-02-fsftm-workspace): every slider move
    *  restyles the auto markups on the sheet at once (one frame-coalesced
-   *  update), like dragging a property in Revu's Properties panel. */
+   *  update), like dragging a property in FSFTM's Properties panel. */
   const liveTimer = useRef<number | null>(null);
   const pendingStyle = useRef<AutoStyle | null>(null);
   const setStyle = (patch: Partial<AutoStyle>) => {
@@ -575,7 +575,7 @@ export default function AutoTakeoffPanel(props: AutoTakeoffPanelProps) {
         <label className="flex items-center gap-1.5 cursor-pointer">
           <input type="checkbox" checked={showColumns} onChange={(e) => onToggleColumns(e.target.checked)} data-testid="auto-show-columns" />
           <span>
-            Show column markers on the sheet <span className="text-content-tertiary">(off: only the profile highlight, like Revu)</span>
+            Show column markers on the sheet <span className="text-content-tertiary">(off: only the profile highlight, like FSFTM)</span>
           </span>
         </label>
       )}

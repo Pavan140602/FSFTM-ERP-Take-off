@@ -1,6 +1,6 @@
 # macOS notarization for the desktop app
 
-This guide explains how to turn on Apple notarization for the OpenConstructionERP desktop app. Today the macOS build ships ad-hoc signed but not notarized, so users have to clear quarantine once by hand. Everything described here is ready to activate. The moment a real Apple Developer ID certificate and credentials exist, notarization can be switched on with a small, well-defined diff. Nothing in this document is active yet. It is the plan and the artifacts, not the live configuration.
+This guide explains how to turn on Apple notarization for the Florida Steel Frame & Truss Manufacturing LLC desktop app. Today the macOS build ships ad-hoc signed but not notarized, so users have to clear quarantine once by hand. Everything described here is ready to activate. The moment a real Apple Developer ID certificate and credentials exist, notarization can be switched on with a small, well-defined diff. Nothing in this document is active yet. It is the plan and the artifacts, not the live configuration.
 
 This is a developer and maintainer document. If you are a user trying to open the app, read `docs/desktop/INSTALL.md` instead.
 

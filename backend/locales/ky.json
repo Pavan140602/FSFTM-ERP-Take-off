@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "OpenConstructionERP",
+    "name": "Florida Steel Frame & Truss Manufacturing LLC",
     "tagline": "Ачык баштапкы код менен курулуш сметасын эсептөө"
   },
   "nav": {
@@ -164,7 +164,7 @@
     "update": "Жаңыртуу"
   },
   "dashboard": {
-    "welcome": "OpenConstructionERPге кош келиңиз",
+    "welcome": "Florida Steel Frame & Truss Manufacturing LLCге кош келиңиз",
     "subtitle": "Сиздин курулуш сметасын эсептөө мейкиндигиңиз",
     "recent_projects": "Акыркы долбоорлор",
     "system_status": "Тутум абалы",

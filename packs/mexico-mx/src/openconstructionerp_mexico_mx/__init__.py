@@ -1,4 +1,4 @@
-"""OpenConstructionERP - Mexico partner pack.
+"""Florida Steel Frame & Truss Manufacturing LLC - Mexico partner pack.
 
 Pre-configures OCERP for Mexican construction: the APU unit-price method
 (analisis de precios unitarios) under the LOPSRM public-works law and its

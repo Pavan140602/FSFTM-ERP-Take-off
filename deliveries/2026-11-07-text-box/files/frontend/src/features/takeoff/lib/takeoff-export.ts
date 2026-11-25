@@ -37,10 +37,10 @@ import {
   toRealDistance,
 } from '../../../modules/pdf-takeoff/data/scale-helpers';
 import { ANNOTATION_TYPES } from './takeoff-groups';
-// OE-DELIVERY: 2026-10-30-revu-markup-tools
-import { drawRevuMarkup, isRevuMarkupType, revuLabelAnchor } from '../../../modules/pdf-takeoff/data/revu-markups';
-// Export parity with the canvas (OE-DELIVERY 2026-11-02-revu-export).
-import { labelParts, lineDashFor } from '../../../modules/pdf-takeoff/data/revu-style';
+// OE-DELIVERY: 2026-10-30-fsftm-markup-tools
+import { drawFSFTMMarkup, isFSFTMMarkupType, fsftmLabelAnchor } from '../../../modules/pdf-takeoff/data/fsftm-markups';
+// Export parity with the canvas (OE-DELIVERY 2026-11-02-fsftm-export).
+import { labelParts, lineDashFor } from '../../../modules/pdf-takeoff/data/fsftm-style';
 import { circleFrom3Points } from '../../../modules/pdf-takeoff/data/hit-test';
 import { drawTextBox, layoutTextBox, resolveTextStyle } from '../../../modules/pdf-takeoff/data/text-box';
 import { effectiveQuantity, effectiveUnit, isWallMeasurement, reportingType } from './takeoff-quantity';
@@ -267,7 +267,7 @@ export function renderMeasurementsOnCanvas(
   ctx.lineWidth = 2 * dpr;
   ctx.font = `${12 * dpr}px sans-serif`;
 
-  /** Label mode of the measurement being exported (OE-DELIVERY 2026-11-02-revu-export). */
+  /** Label mode of the measurement being exported (OE-DELIVERY 2026-11-02-fsftm-export). */
   let curParts = labelParts(undefined);
   const drawLabel = (text: string, lx: number, ly: number, color: string): void => {
     if (!curParts.name || !text) return;
@@ -318,7 +318,7 @@ export function renderMeasurementsOnCanvas(
     // so the export matches the on-screen canvas. Scales with zoom (issue #321)
     // to stay in document space, keeping the export a mirror of the overlay.
     ctx.lineWidth = (m.strokeWidth ?? 2) * dpr * zoom;
-    // Revu properties (OE-DELIVERY 2026-11-02-revu-export): fill colour, line
+    // FSFTM properties (OE-DELIVERY 2026-11-02-fsftm-export): fill colour, line
     // pattern and which label parts print, exactly as on screen.
     ctx.fillStyle = m.fillColor ?? color;
     ctx.setLineDash(lineDashFor(m.lineStyle, (m.strokeWidth ?? 2) * dpr * zoom));
@@ -411,7 +411,7 @@ export function renderMeasurementsOnCanvas(
       continue;
     }
 
-    /* Measure types the export used to skip (OE-DELIVERY 2026-11-02-revu-export):
+    /* Measure types the export used to skip (OE-DELIVERY 2026-11-02-fsftm-export):
      * perimeter, polygon cutout, dynamic fill, diameter, radius (centre and
      * 3-point), ellipse cutout and angle. Drawn like the canvas. */
     {
@@ -696,11 +696,11 @@ export function renderMeasurementsOnCanvas(
       continue;
     }
 
-    // Revu markups + arc (OE-DELIVERY 2026-10-30-revu-markup-tools): same
+    // FSFTM markups + arc (OE-DELIVERY 2026-10-30-fsftm-markup-tools): same
     // painter as the on-screen overlay so the export matches the canvas.
-    if (isRevuMarkupType(m.type) || m.type === 'arc') {
+    if (isFSFTMMarkupType(m.type) || m.type === 'arc') {
       ctx.setLineDash([]);
-      const drawn = drawRevuMarkup(ctx, m, {
+      const drawn = drawFSFTMMarkup(ctx, m, {
         k: dpr * zoom,
         dpr,
         color: annoColor,
@@ -708,7 +708,7 @@ export function renderMeasurementsOnCanvas(
         fillAlpha: m.fillAlpha,
         strokeAlpha: m.strokeAlpha,
       });
-      const anchor = drawn && m.type === 'arc' ? revuLabelAnchor(m) : null;
+      const anchor = drawn && m.type === 'arc' ? fsftmLabelAnchor(m) : null;
       if (anchor) {
         ctx.font = `${12 * dpr}px sans-serif`;
         valueText(measurementLabel(m, scale, system), anchor.x * dpr * zoom + 6 * dpr, anchor.y * dpr * zoom - 6 * dpr);
@@ -1066,7 +1066,7 @@ export async function buildTakeoffWorkbook(
   const ExcelJsMod = await import('exceljs');
   const ExcelJsCtor = (ExcelJsMod.Workbook ?? ExcelJsMod.default.Workbook) as typeof ExcelJS.Workbook;
   const wb = new ExcelJsCtor();
-  wb.creator = 'OpenConstructionERP';
+  wb.creator = 'Florida Steel Frame & Truss Manufacturing LLC';
   wb.created = ctx.exportDate ?? new Date();
   // Stored quantities are metric-canonical (D-TKC-016); convert values +
   // units to the user's system at the export boundary. Metric is a

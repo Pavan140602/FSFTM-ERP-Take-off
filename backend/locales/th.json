@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "OpenConstructionERP",
+    "name": "Florida Steel Frame & Truss Manufacturing LLC",
     "tagline": "การประมาณราคาก่อสร้างแบบโอเพนซอร์ส"
   },
   "nav": {
@@ -164,7 +164,7 @@
     "update": "อัปเดต"
   },
   "dashboard": {
-    "welcome": "ยินดีต้อนรับสู่ OpenConstructionERP",
+    "welcome": "ยินดีต้อนรับสู่ Florida Steel Frame & Truss Manufacturing LLC",
     "subtitle": "พื้นที่ทำงานประมาณราคาก่อสร้างของคุณ",
     "recent_projects": "โครงการล่าสุด",
     "system_status": "สถานะระบบ",

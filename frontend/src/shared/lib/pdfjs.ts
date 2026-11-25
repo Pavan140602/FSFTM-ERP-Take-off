@@ -59,7 +59,7 @@ export const PDFJS_ASSET_ROOT = `${import.meta.env.BASE_URL}assets/pdfjs/${pdfjs
  * as `getDocument` has always done; do not read it again after this call.
  */
 /**
- * Faster drawing for CAD plots (OE-DELIVERY 2026-11-12-revu-ui thumbnail fix).
+ * Faster drawing for CAD plots (OE-DELIVERY 2026-11-12-fsftm-ui thumbnail fix).
  * Many CAD-plotted sheets carry a title-block logo split into ~1,800 one-pixel
  * image strips per page. With OffscreenCanvas on, the worker turns every
  * strip into its own ImageBitmap, which made a page take ~2-3 s to draw (a
@@ -111,7 +111,7 @@ export function openPdfUrl(
 }
 
 /**
- * Open a second copy of a PDF on its OWN worker (OE-DELIVERY 2026-11-12-revu-ui).
+ * Open a second copy of a PDF on its OWN worker (OE-DELIVERY 2026-11-12-fsftm-ui).
  * Thumbnails use it so they never queue behind the main viewer's worker
  * (page render, title-block text, snap lines) and run on another CPU core.
  * Close it with `closeSidePdf`.

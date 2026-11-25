@@ -535,7 +535,7 @@ async def test_email(
             to=body.to,
             subject="ERP test email",
             html_body=(
-                "<p>This is a test email from OpenConstructionERP.</p>"
+                "<p>This is a test email from Florida Steel Frame & Truss Manufacturing LLC.</p>"
                 "<p>If you received this, SMTP is configured correctly.</p>"
             ),
             tags=["test_email"],

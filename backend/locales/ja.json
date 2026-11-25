@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "OpenConstructionERP",
+    "name": "Florida Steel Frame & Truss Manufacturing LLC",
     "tagline": "オープンソース建設コスト見積"
   },
   "nav": {
@@ -164,7 +164,7 @@
     "update": "更新"
   },
   "dashboard": {
-    "welcome": "OpenConstructionERP へようこそ",
+    "welcome": "Florida Steel Frame & Truss Manufacturing LLC へようこそ",
     "subtitle": "オープンソース建設コスト見積プラットフォーム",
     "recent_projects": "最近のプロジェクト",
     "system_status": "システム状態",

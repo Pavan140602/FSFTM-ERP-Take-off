@@ -40,9 +40,9 @@ const GITHUB_SPONSORS_URL = 'https://github.com/sponsors/datadrivenconstruction'
 const G2_REVIEWS_URL = 'https://www.g2.com/products/openconstructionerp/reviews';
 const CASE_STUDY_EMAIL = 'info@datadrivenconstruction.io';
 const CASE_STUDY_MAILTO = `mailto:${CASE_STUDY_EMAIL}?subject=${encodeURIComponent(
-  'Case study / article - OpenConstructionERP',
+  'Case study / article - Florida Steel Frame & Truss Manufacturing LLC',
 )}&body=${encodeURIComponent(
-  'Hi DDC team,\n\nI have a case study / video / article about how we use OpenConstructionERP that you may want to share.\n\nLink / attachment:\n\nA few lines about the project:\n\n- ',
+  'Hi DDC team,\n\nI have a case study / video / article about how we use Florida Steel Frame & Truss Manufacturing LLC that you may want to share.\n\nLink / attachment:\n\nA few lines about the project:\n\n- ',
 )}`;
 
 const SHARE_TEXT =
@@ -355,7 +355,7 @@ function SupportUsModal({ onClose, copied, setCopied }: ModalProps) {
               className="text-xl sm:text-2xl font-bold text-content-primary leading-tight"
             >
               {t('support.modal_title', {
-                defaultValue: 'Help OpenConstructionERP grow',
+                defaultValue: 'Help Florida Steel Frame & Truss Manufacturing LLC grow',
               })}
             </h2>
             <p className="mt-3 mx-auto max-w-[560px] text-sm text-content-secondary leading-relaxed">
@@ -567,7 +567,7 @@ function SupportUsModal({ onClose, copied, setCopied }: ModalProps) {
                 <p className="mt-0.5 text-xs text-content-secondary leading-relaxed">
                   {t('support.action_donate_body', {
                     defaultValue:
-                      'Donations keep OpenConstructionERP free and open for everyone. They fund new regional cost data, AI estimation and support for more CAD and file formats.',
+                      'Donations keep Florida Steel Frame & Truss Manufacturing LLC free and open for everyone. They fund new regional cost data, AI estimation and support for more CAD and file formats.',
                   })}
                 </p>
                 {/* Perk line - additive, inline-default only (do not fold into

@@ -24,15 +24,15 @@ export interface PageScales {
   defaultScale: ScaleConfig;
   /** Per-page overrides. A page present here was calibrated on that page. */
   byPage: Record<number, ScaleConfig>;
-  /** Bluebeam-style viewports: rectangles on a page that carry their own
+  /** FSFTM-style viewports: rectangles on a page that carry their own
    *  scale (a 1:20 detail on a 1:100 sheet). A measurement whose first point
    *  falls inside one reads that viewport's scale instead of the page's.
    *  Optional so every pre-viewport payload stays valid.
-   *  OE-DELIVERY: 2026-11-02-revu-viewports-sketch */
+   *  OE-DELIVERY: 2026-11-02-fsftm-viewports-sketch */
   viewports?: Record<number, Viewport[]>;
 }
 
-/** A scaled region of a page, in PDF user units (OE-DELIVERY 2026-11-02-revu-viewports-sketch). */
+/** A scaled region of a page, in PDF user units (OE-DELIVERY 2026-11-02-fsftm-viewports-sketch). */
 export interface Viewport {
   id: string;
   name: string;
@@ -86,7 +86,7 @@ export function setPageScale(
   };
 }
 
-/* ── Viewports (OE-DELIVERY 2026-11-02-revu-viewports-sketch) ─────────── */
+/* ── Viewports (OE-DELIVERY 2026-11-02-fsftm-viewports-sketch) ─────────── */
 
 /** Upper bound per page, mirrored by the backend size guard. */
 export const MAX_VIEWPORTS_PER_PAGE = 50;
@@ -118,7 +118,7 @@ export function viewportAt(
 
 /**
  * The scale a measurement reads: the viewport holding its FIRST point (as in
- * Revu, where a measurement belongs to the viewport it starts in), else the
+ * FSFTM, where a measurement belongs to the viewport it starts in), else the
  * page scale. Every per-measurement conversion should go through this.
  */
 export function scaleForMeasurement(
@@ -306,7 +306,7 @@ export function reconcilePageScales(
     local.defaultScale.pixelsPerUnit !== defaultScaleConfig().pixelsPerUnit;
   const defaultScale = localDefaultExplicit ? local.defaultScale : server.defaultScale;
   // Viewports merge page by page the same way: the local list wins a page
-  // both sides have (OE-DELIVERY 2026-11-02-revu-viewports-sketch).
+  // both sides have (OE-DELIVERY 2026-11-02-fsftm-viewports-sketch).
   const viewports = { ...(server.viewports ?? {}), ...(local.viewports ?? {}) };
   return Object.keys(viewports).length ? { defaultScale, byPage, viewports } : { defaultScale, byPage };
 }

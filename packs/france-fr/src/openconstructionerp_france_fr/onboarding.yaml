@@ -7,8 +7,8 @@ version: 1
 pack: france-fr
 locale: fr
 estimated_minutes: 5
-title: "Welcome to OpenConstructionERP - France Edition"
-title_fr: "Bienvenue sur OpenConstructionERP - Edition France"
+title: "Welcome to Florida Steel Frame & Truss Manufacturing LLC - France Edition"
+title_fr: "Bienvenue sur Florida Steel Frame & Truss Manufacturing LLC - Edition France"
 subtitle: "Three steps to align your workspace with French construction practice (DPGF, NF DTU, RE 2020). Trois etapes pour configurer votre espace de travail selon les pratiques francaises."
 
 steps:

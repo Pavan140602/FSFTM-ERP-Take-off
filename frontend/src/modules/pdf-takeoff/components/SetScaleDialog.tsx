@@ -1,6 +1,6 @@
-// OE-DELIVERY: 2026-11-12-revu-ui (Set Scale / Calibrate, Revu layout - update 14)
+// OE-DELIVERY: 2026-11-12-fsftm-ui (Set Scale / Calibrate, FSFTM layout - update 14)
 /**
- * Revu's "Apply Scale to Pages" / "Calibrate" window:
+ * FSFTM's "Apply Scale to Pages" / "Calibrate" window:
  *   Pages:     [Current (4)            v]   e.g. 3-5 or 1,5
  *   Scale:     (o) Preset (o) Custom          [Recalibrate] [+ Add Preset]
  *              [0.125   ] [in      v]  =  [1'-0"   ] [ft' in" v]
@@ -18,7 +18,7 @@ import { formatFtIn, parseLengthInches, type LengthUnit } from '../data/length-i
 const PT_PER_IN = 72;
 const M_PER_IN = 0.0254;
 
-/** Revu's unit list (both sides of the custom scale). */
+/** FSFTM's unit list (both sides of the custom scale). */
 export const SCALE_UNITS = [
   { id: 'in', label: 'in', perIn: 1 },
   { id: 'ft', label: 'ft', perIn: 12 },
@@ -34,7 +34,7 @@ export const SCALE_UNITS = [
 export type ScaleUnitId = (typeof SCALE_UNITS)[number]['id'];
 
 /** A typed value in the chosen unit -> inches. Marks typed in the text
- *  (', ", ft, in, mm, m ...) win over the unit list, like Revu. */
+ *  (', ", ft, in, mm, m ...) win over the unit list, like FSFTM. */
 export function unitTextToInches(text: string, unit: ScaleUnitId): number | null {
   const t = (text || '').trim();
   if (!t) return null;

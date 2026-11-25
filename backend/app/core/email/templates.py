@@ -19,7 +19,7 @@ import html as _html
 from functools import lru_cache
 
 _LOGO_URL = "https://openconstructionerp.com/logo-128.png"
-_APP_NAME = "OpenConstructionERP"
+_APP_NAME = "Florida Steel Frame & Truss Manufacturing LLC"
 
 
 @lru_cache(maxsize=1)
@@ -249,7 +249,7 @@ def template_transmittal_sent(
         "<p style='text-align:center; font-size:15px; color:#333; margin:8px 0;'>"
         "Please acknowledge receipt by clicking the button above.</p>"
         "<p style='text-align:center; font-size:14px; color:#6e6e73; margin:0 0 24px;'>"
-        "Sent by OpenConstructionERP</p>"
+        "Sent by Florida Steel Frame & Truss Manufacturing LLC</p>"
         "<div style='background:#f2f2f2; padding:12px 16px; font-size:12px; "
         "color:#6e6e73; border-radius:0 0 8px 8px;'>"
         "This is an automated message from FSFTM ERP. Do not reply to this email.</div>"
@@ -278,7 +278,7 @@ def template_password_reset(
     to copy-paste or forwarded-email attack paths.
     """
     greeting = f"Hi {recipient_name}," if recipient_name else "Hello,"
-    subject = "Reset your OpenConstructionERP password"
+    subject = "Reset your Florida Steel Frame & Truss Manufacturing LLC password"
     body = (
         f"<p>{greeting}</p>"
         f"<p>We received a request to reset the password on your "

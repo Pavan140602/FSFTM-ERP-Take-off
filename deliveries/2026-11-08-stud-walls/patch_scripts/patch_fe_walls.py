@@ -81,7 +81,7 @@ rep("""  /** Profiles to suggest while typing (the ones on this drawing). */
   profileOptions: string[];
 }""", """  /** Profiles to suggest while typing (the ones on this drawing). */
   profileOptions: string[];
-  /** Recolour markups from the Revu colour picklist (OE-DELIVERY 2026-11-08-stud-walls). */
+  /** Recolour markups from the FSFTM colour picklist (OE-DELIVERY 2026-11-08-stud-walls). */
   onRecolor?: (ids: string[], colour: string) => void;
   /** Walls shown: one role only (Shear Wall ...) or all (null). The sheet
    *  shows the same walls as the list. */
@@ -248,13 +248,13 @@ rep("""                  onSetProfile: setAutoProfile,
                 }}""")
 p.write_text(s, encoding="utf-8")
 
-# ── TextFormatBar: Revu colour picklist ───────────────────────────────
+# ── TextFormatBar: FSFTM colour picklist ───────────────────────────────
 p = base / "components" / "TextFormatBar.tsx"
 s = p.read_text(encoding="utf-8")
 rep("""function Swatch({ value, title, onPick, testId, none }: { value: string | null; title: string; onPick: (v: string | null) => void; testId: string; none?: boolean }) {
   return (
     <span className="flex items-center gap-0.5" title={title}>""", """function Swatch({ value, title, onPick, testId, none }: { value: string | null; title: string; onPick: (v: string | null) => void; testId: string; none?: boolean }) {
-  // Revu-style colour picklist (OE-DELIVERY 2026-11-08-stud-walls).
+  // FSFTM-style colour picklist (OE-DELIVERY 2026-11-08-stud-walls).
   return <ColorPicklist value={value} onChange={onPick} allowNone={none} title={title} testId={testId} />;
 }
 
@@ -265,8 +265,8 @@ rep("""import { TEXT_FONTS, TEXT_SIZES } from '../data/text-box';""", """import 
 import ColorPicklist from './ColorPicklist';""")
 p.write_text(s, encoding="utf-8")
 
-# ── RevuPropertiesBar: colour + fill picklists ────────────────────────
-p = base / "components" / "RevuPropertiesBar.tsx"
+# ── FSFTMPropertiesBar: colour + fill picklists ────────────────────────
+p = base / "components" / "FSFTMPropertiesBar.tsx"
 s = p.read_text(encoding="utf-8")
 rep("""      <Field label="Colour">
         <input
@@ -281,7 +281,7 @@ rep("""      <Field label="Colour">
         {off ? (
           <input type="color" disabled value={value.color ?? defaults.color} readOnly className="h-6 w-7 rounded border border-border bg-transparent p-0 opacity-40" data-testid="props-color" />
         ) : (
-          // Revu-style colour picklist (OE-DELIVERY 2026-11-08-stud-walls).
+          // FSFTM-style colour picklist (OE-DELIVERY 2026-11-08-stud-walls).
           <ColorPicklist value={value.color ?? defaults.color} onChange={(c) => c && onPatch({ color: c })} title="Colour" testId="props-color" size={22} />
         )}
       </Field>""")

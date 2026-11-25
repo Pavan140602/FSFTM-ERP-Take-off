@@ -1,7 +1,7 @@
-// OE-DELIVERY: 2026-11-02-revu-left-panel
+// OE-DELIVERY: 2026-11-02-fsftm-left-panel
 /**
  * Sheet index: read each page's sheet number and title from its own text
- * (the title block), like Revu's page labels / bookmarks built from the
+ * (the title block), like FSFTM's page labels / bookmarks built from the
  * drawing. The user can edit every entry; edits win over detection.
  *
  * Pure: the viewer feeds pdf.js text items already mapped to page space
@@ -48,7 +48,7 @@ export function detectSheet(items: TextItemLite[], pageW: number, pageH: number)
 
   // The sheet number: the largest sheet-number-shaped text in the title block.
   // Numbers split into pieces ("A" + "000", "A-" + "101") or written with a
-  // space ("A 101") are joined first (OE-DELIVERY 2026-11-12-revu-ui u19).
+  // space ("A 101") are joined first (OE-DELIVERY 2026-11-12-fsftm-ui u19).
   const tb = clean.filter(inTitleBlock).sort((a, b) => a.y - b.y || a.x - b.x);
   const pool: TextItemLite[] = [...clean];
   for (let i = 0; i < tb.length; i++) {

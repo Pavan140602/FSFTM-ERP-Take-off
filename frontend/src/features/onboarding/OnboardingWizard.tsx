@@ -1134,7 +1134,7 @@ function StepWelcome({
       </Badge>
 
       <h1 className="text-2xl sm:text-3xl font-bold text-content-primary tracking-tight">
-        {t('onboarding.welcome_title', { defaultValue: 'Welcome to OpenConstructionERP' })}
+        {t('onboarding.welcome_title', { defaultValue: 'Welcome to Florida Steel Frame & Truss Manufacturing LLC' })}
       </h1>
 
       <p className="mt-2 max-w-md text-sm sm:text-base text-content-secondary leading-relaxed">
@@ -4651,7 +4651,7 @@ export function OnboardingWizard() {
   );
 
   /* ONBOARD-MODAL: the wizard itself had NO completed-flag guard — it
-     always rendered step 0 ("Welcome to OpenConstructionERP"). It is only
+     always rendered step 0 ("Welcome to Florida Steel Frame & Truss Manufacturing LLC"). It is only
      mounted at the /onboarding route, but anything that routes there
      (the dashboard first-run redirect, a stale bookmark, a back-button,
      QA navigation) re-showed the welcome modal even for users who already
@@ -4810,7 +4810,7 @@ export function OnboardingWizard() {
 
   // Onboarding already finished: render nothing while the effect above
   // redirects to the app. Returning null (instead of the wizard) is what
-  // actually stops the "Welcome to OpenConstructionERP" modal from
+  // actually stops the "Welcome to Florida Steel Frame & Truss Manufacturing LLC" modal from
   // flashing on top of /settings & friends. (ONBOARD-MODAL)
   if (alreadyCompleted) {
     return null;

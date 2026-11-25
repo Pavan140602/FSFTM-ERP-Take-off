@@ -5,7 +5,7 @@ Issue #138 — "Chat IA no responde"
 A user connected an OpenRouter LLM key. The OpenRouter dashboard showed
 real token consumption (136 requests, 6.41M tokens) — proving the backend
 reached the provider and the completion was billed — yet **no response
-text ever appeared** in the OpenConstructionERP chat UI.
+text ever appeared** in the Florida Steel Frame & Truss Manufacturing LLC chat UI.
 
 Two independent v3.6.1 defects produced that exact "tokens spent, UI
 empty" symptom (both fixed by task #249, both pinned here):

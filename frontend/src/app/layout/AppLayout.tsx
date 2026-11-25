@@ -59,7 +59,7 @@ export function AppLayout({ title, children }: AppLayoutProps) {
 
   // When the user has white-labelled the workspace with their own company
   // name, the browser tab follows the same brand as the sidebar so the whole
-  // experience reads as "their" tool. Falls back to OpenConstructionERP.
+  // experience reads as "their" tool. Falls back to Florida Steel Frame & Truss Manufacturing LLC.
   const brandName = useBrandingStore((s) => (s.companyName.trim() ? s.companyName.trim() : null));
 
   // Count today towards "distinct days the app was opened". This has to run

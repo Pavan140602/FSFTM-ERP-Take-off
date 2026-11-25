@@ -2,7 +2,7 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in OpenConstructionERP,
+If you discover a security vulnerability in Florida Steel Frame & Truss Manufacturing LLC,
 please report it responsibly.
 
 **DO NOT** open a public GitHub issue for security vulnerabilities.
@@ -89,7 +89,7 @@ DataDrivenConstruction.
 
 ## Self-Hosting Security Checklist
 
-If you deploy OpenConstructionERP on your own infrastructure:
+If you deploy Florida Steel Frame & Truss Manufacturing LLC on your own infrastructure:
 
 - [ ] Change `JWT_SECRET` from the default value
 - [ ] Use HTTPS (TLS 1.2+) in production - never expose HTTP

@@ -1,4 +1,4 @@
-"""OpenConstructionERP - Spain Construction partner pack (BC3/FIEBDC-3 + CTE + IVA).
+"""Florida Steel Frame & Truss Manufacturing LLC - Spain Construction partner pack (BC3/FIEBDC-3 + CTE + IVA).
 
 This package exports a module-level ``MANIFEST`` instance of
 :class:`PartnerPackManifest` referenced from ``pyproject.toml``::

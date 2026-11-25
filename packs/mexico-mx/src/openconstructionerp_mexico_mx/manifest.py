@@ -3,7 +3,7 @@
 Kept in its own module so unit tests can import the manifest without
 triggering the package ``__init__`` side-effects.
 
-This pack pre-configures OpenConstructionERP for Mexican construction. It is
+This pack pre-configures Florida Steel Frame & Truss Manufacturing LLC for Mexican construction. It is
 built entirely from public Mexican standards, laws and tax rules: the APU
 unit-price method under the LOPSRM public-works law and its reglamento, IVA
 with the border-region rate and IVA/ISR retenciones, CFDI 4.0 invoicing, the

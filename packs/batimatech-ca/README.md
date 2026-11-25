@@ -1,4 +1,4 @@
-# OpenConstructionERP × Canada Batimatech
+# Florida Steel Frame & Truss Manufacturing LLC × Canada Batimatech
 
 Partner pack pre-configuring [OpenConstructionERP](https://github.com/DataDrivenConstruction/openconstructionerp)
 for Canadian construction companies.

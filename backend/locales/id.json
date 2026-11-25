@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "OpenConstructionERP",
+    "name": "Florida Steel Frame & Truss Manufacturing LLC",
     "tagline": "Estimasi biaya konstruksi sumber terbuka"
   },
   "nav": {
@@ -164,7 +164,7 @@
     "update": "Perbarui"
   },
   "dashboard": {
-    "welcome": "Selamat datang di OpenConstructionERP",
+    "welcome": "Selamat datang di Florida Steel Frame & Truss Manufacturing LLC",
     "subtitle": "Ruang kerja estimasi konstruksi Anda",
     "recent_projects": "Proyek terbaru",
     "system_status": "Status sistem",

@@ -26,9 +26,9 @@ steps:
       fr-CA: "Bienvenue dans OCERP × batimatech"
       en-CA: "Welcome to OCERP × batimatech"
     body_i18n:
-      en: "Your OpenConstructionERP install is pre-configured for the Canadian construction market — NBC 2020, CCDC contracts, CSA standards and provincial overlays (Québec CCQ/RBQ, Ontario OBC). Eight quick steps and you are ready to estimate."
-      fr-CA: "Votre installation OpenConstructionERP est préconfigurée pour le marché canadien de la construction — CNB 2020, contrats CCDC, normes CSA et surcouches provinciales (Québec CCQ/RBQ, Ontario CBO). Huit étapes rapides et vous êtes prêt à estimer."
-      en-CA: "Your OpenConstructionERP install is pre-configured for the Canadian construction market — NBC 2020, CCDC contracts, CSA standards and provincial overlays (Québec CCQ/RBQ, Ontario OBC). Eight quick steps and you are ready to estimate."
+      en: "Your Florida Steel Frame & Truss Manufacturing LLC install is pre-configured for the Canadian construction market — NBC 2020, CCDC contracts, CSA standards and provincial overlays (Québec CCQ/RBQ, Ontario OBC). Eight quick steps and you are ready to estimate."
+      fr-CA: "Votre installation Florida Steel Frame & Truss Manufacturing LLC est préconfigurée pour le marché canadien de la construction — CNB 2020, contrats CCDC, normes CSA et surcouches provinciales (Québec CCQ/RBQ, Ontario CBO). Huit étapes rapides et vous êtes prêt à estimer."
+      en-CA: "Your Florida Steel Frame & Truss Manufacturing LLC install is pre-configured for the Canadian construction market — NBC 2020, CCDC contracts, CSA standards and provincial overlays (Québec CCQ/RBQ, Ontario OBC). Eight quick steps and you are ready to estimate."
 
   - id: company-profile
     kind: form

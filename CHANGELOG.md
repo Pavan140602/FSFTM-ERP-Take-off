@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to OpenConstructionERP are documented here.
+All notable changes to Florida Steel Frame & Truss Manufacturing LLC are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -2424,7 +2424,7 @@ Every one of these new screens ships translated across all supported languages, 
 
 ## [11.18.0] - 2026-07-18
 
-OpenConstructionERP now exports a bill of quantities back to FIEBDC-3 (BC3), the standard construction budget format used across Spain and Latin America. Open a BOQ, choose Export and pick FIEBDC-3. The file carries the full chapter and item hierarchy with codes, units, quantities, unit rates and long texts, and it re-imports through our own BC3 reader without losing anything, so a budget can travel out to the Spanish desktop estimating tools and come back cleanly. It is written in Windows-1252 by default for the widest tool compatibility and switches to UTF-8 only when a character needs it, with the charset named in the file header. This sits alongside the existing GAEB XML, Excel, CSV and PDF exports, and there is no database change.
+Florida Steel Frame & Truss Manufacturing LLC now exports a bill of quantities back to FIEBDC-3 (BC3), the standard construction budget format used across Spain and Latin America. Open a BOQ, choose Export and pick FIEBDC-3. The file carries the full chapter and item hierarchy with codes, units, quantities, unit rates and long texts, and it re-imports through our own BC3 reader without losing anything, so a budget can travel out to the Spanish desktop estimating tools and come back cleanly. It is written in Windows-1252 by default for the widest tool compatibility and switches to UTF-8 only when a character needs it, with the charset named in the file header. This sits alongside the existing GAEB XML, Excel, CSV and PDF exports, and there is no database change.
 
 The in-app error log that backs the bug-report tool now scrubs a wider set of secrets before anything reaches local storage or a downloaded report. It already stripped emails, API keys and bearer tokens. It now also removes a bare session token in the platform's own format and a fuller set of token, secret, cookie and session fields, so an authentication token cannot end up in a report that gets shared.
 
@@ -3890,7 +3890,7 @@ A security and data-integrity hardening release from a deep internal audit.
   retained.
 - **Packaging** - removed stale "openestimate" branding from the
   PyPI-facing metadata (keywords) so the project page reads as
-  OpenConstructionERP throughout.
+  Florida Steel Frame & Truss Manufacturing LLC throughout.
 
 ## [5.9.1] - 2026-05-30
 
@@ -4021,7 +4021,7 @@ enable, default modules, and a custom onboarding script. Single-tenant
 `OE_PARTNER_PACK` or the first registered entry.
 
 Co-branding contract: every UI surface shows
-`Powered by OpenConstructionERP · In partnership with <Partner>`.
+`Powered by Florida Steel Frame & Truss Manufacturing LLC · In partnership with <Partner>`.
 The badge mounts on the dashboard (top) and in the top nav bar
 (absolute-centered, only at xl+ width). Users can dismiss per
 browser session - the badge reappears on next browser launch
@@ -4289,7 +4289,7 @@ sweep with 22 screenshots committed under `docs/qa/`.
   can verify the stack is fully open without reading the source.
 - **`/geo` + `/projects` - one-click 2D/3D toggle** wired into both
   the Geo Hub viewer and every project card's map preview.
-- **News pages: "More from the OpenConstructionERP blog" widget** -
+- **News pages: "More from the Florida Steel Frame & Truss Manufacturing LLC blog" widget** -
   inline closing strip on every article + sticky right-rail at
   `min-width:1500px`, vanilla JS, no dependencies, no tracking. 15
   article pages covered.
@@ -4636,7 +4636,7 @@ HTTP stack - `requests` would introduce a parallel dependency).
 revival across three modules (CRM orphan tests, QMS audit-log infrastructure,
 EAC tenant-scoped hardening), QuickEstimatePage accessibility debt cleared,
 QA browser-screenshot harness parameterized for locale / theme / viewport,
-and the OpenConstructionERP concept paper published as a news article.
+and the Florida Steel Frame & Truss Manufacturing LLC concept paper published as a news article.
 
 ### Added
 - `qms`: new `QMSAuditLog` SQLAlchemy model (alembic `v3140_qms_audit_log`)
@@ -4653,7 +4653,7 @@ and the OpenConstructionERP concept paper published as a news article.
 - 5 CRM R7 orphan test files restored (~59 tests, 1,155 lines) - covers
   GDPR forget, lead dedupe, money decimal, PII redaction, win role gate.
   These were parked by the v4.7.2 triage and never re-committed. (dd24aa1c)
-- Marketing site: OpenConstructionERP concept paper published as standalone
+- Marketing site: Florida Steel Frame & Truss Manufacturing LLC concept paper published as standalone
   news article at `/news/open-erp-own-your-stack.html` with banner,
   back-to-news nav, 7 inline images, 3 fonts, and downloadable PDF. Featured
   card on `/news.html`. (cee9e5f9)
@@ -5092,9 +5092,9 @@ Cumulative test count this release: 21 backend unit + 37 coordination_hub + 47 c
 
 - **Scheduling - CPM Slice 1.** First-class Critical Path Method engine on top of the existing schedule + schedule_advanced modules. Pure-Python forward + backward pass (no scipy / networkx) at `backend/app/modules/schedule_advanced/cpm.py` computes ES / EF / LS / LF, total float, free float, and critical-path marking on a `TaskNetwork`; cycles are detected via DFS and surface the offending node path through `CycleError`; disconnected sub-networks are scheduled per island. Companion `leveling.py` ships a serial-greedy `level_by_resource_max` heuristic (priority = LS asc → total_float asc → id asc) that shifts activities forward (never backward) to honour per-resource ceilings. New `WeeklyCommitment` table (alembic v40_cpm_weekly) backs the lightweight Last-Planner commit flow with auto-computed PPC = actual / planned clamped to [0, 1]. Four additive endpoints under `/api/v1/schedule-advanced/{schedule_id}/…`: `compute-cpm` (persists ES / EF / LS / LF / float / critical onto each Activity row and returns project_duration + critical path), `level-resources`, `commitments`, `ppc?week=`. New `frontend/src/features/schedule/CPMView.tsx` renders an ES / EF / LS / LF / float column grid with a red "CRITICAL" badge on critical rows plus toolbar buttons to recompute CPM or open a resource-leveling modal. EN / DE / RU translations under `schedule.cpm.*`. 8 new tests in `backend/tests/modules/schedule_advanced/test_cpm.py` (textbook 6-activity AOA critical path A → C → F = 11d, forward pass, backward pass, total float, cycle detection, disconnected sub-network, leveling ceiling enforcement, PPC math) - all green; existing 61 schedule_advanced unit tests stay passing. FS-only in Slice 1; SS / FF / SF dependency types and parallel-SGS leveling are wired as TODO comments for Slice 2.
 - **AI Agents framework - Slice 1.** New `backend/app/modules/ai_agents/` module adds a generic ReAct-style agent loop on top of the existing single-call `ai` LLM client. Ships a `Tool` protocol + `ToolRegistry`, a declarative `Agent` dataclass, and an `AgentRunner` that loops "LLM -> tool_call -> observation -> repeat" until a final answer or `max_iterations` (defaults to 8, then `status=failed reason=iter_limit`). LLM is abstracted behind an `LLMBridge` protocol - production `CallAILLM` wraps `ai.ai_client.call_ai` with a deterministic `<tool_call>{json}</tool_call>` text-protocol parser (no provider-specific tool-use APIs); tests use `ScriptedLLM` for offline replay. Per-run history persists to two new strictly-additive tables (`oe_ai_agents_run` + `oe_ai_agents_step`, alembic `v40_ai_agents`) so the UI can render every thought / tool_call / observation / answer as a vertical timeline. Endpoints: `GET /api/v1/ai-agents/agents/`, `GET /tools/`, `POST /runs/`, `GET /runs/`, `GET /runs/{id}`. Sample `boq_drafter` agent declares three tools: `search_costs(q, region)` (proxies `costs.matcher.match_cwicr_items` with a deterministic mock fallback), `suggest_assembly(description)` (mock stub, TODO to wire to `assemblies.repository`), and `create_position(...)` which returns a structured PROPOSAL payload - never writes the BOQ (the architecture guide "AI-augmented, human-confirmed"). 9 pytest tests cover scripted-LLM happy path, iter-limit cap, registry dispatch, unknown-tool error step, BOQ-drafter end-to-end, DB persistence, text-protocol parser, and `on_step` callback. New `frontend/src/features/ai-agents/AgentsPage.tsx` renders the agent catalogue + run launcher + live polling timeline; EN/DE/RU `agents.*` keys.
-- **Mobile PWA - Slice 1.** OpenConstructionERP is now installable as a Progressive Web App on Android / iOS / desktop Chromium browsers.
+- **Mobile PWA - Slice 1.** Florida Steel Frame & Truss Manufacturing LLC is now installable as a Progressive Web App on Android / iOS / desktop Chromium browsers.
   - `vite-plugin-pwa` wired into `frontend/vite.config.ts` with workbox `generateSW`: precaches the app shell (`index.html` + JS/CSS/HTML/SVG/WOFF2 bundles), `NavigationRoute` falls back to `/index.html` so offline deep-links still resolve, and three runtime cache lanes - `oce-static-assets` (CacheFirst for fonts/images/hashed asset chunks), `oce-i18n-locales` (StaleWhileRevalidate for `assets/i18n-<code>-*.js`), and `oce-api` (NetworkFirst with 8 s timeout, GET-only, cached only as offline fallback for idempotent reads).
-  - Web App Manifest declares name "OpenConstructionERP", short_name "OCERP", `theme_color` sky-600 (`#0284c7`), `background_color` `#f7fbff`, `display: standalone`, scope `/`, start_url `/`, plus 192/256/384/512 SVG icons + a 512 maskable variant under `frontend/public/pwa/` (modern browsers accept SVG icons in a manifest directly; an optional `frontend/scripts/build-pwa-icons.mjs` helper rasterizes to PNG when `sharp` is installed).
+  - Web App Manifest declares name "Florida Steel Frame & Truss Manufacturing LLC", short_name "OCERP", `theme_color` sky-600 (`#0284c7`), `background_color` `#f7fbff`, `display: standalone`, scope `/`, start_url `/`, plus 192/256/384/512 SVG icons + a 512 maskable variant under `frontend/public/pwa/` (modern browsers accept SVG icons in a manifest directly; an optional `frontend/scripts/build-pwa-icons.mjs` helper rasterizes to PNG when `sharp` is installed).
   - New `<PWAInstallPrompt />` (`frontend/src/shared/ui/PWAInstallPrompt.tsx`) mounted once in `App.tsx`: discrete bottom-right toast that captures `beforeinstallprompt`, persists 30-day dismissal in localStorage, and replaces itself with a one-time "Add to Home Screen via Share menu" hint on iOS Safari (UA-sniffed; iOS Chrome/Edge correctly excluded). Hides automatically when already in `display-mode: standalone`.
   - New `<OfflineFallback />` (`frontend/src/shared/ui/OfflineFallback.tsx`) - minimal full-page "You're offline" surface with a best-effort "last synced N minutes ago" line backed by an `oce.pwa.lastSyncAt` localStorage key, ready to be wired into workbox's NavigationRoute fallback or rendered inline by feature pages.
   - Touch-friendly tweaks on Daily Diary, Punch List, and Photo Gallery: bottom-anchored FAB visible only on viewports `≤sm` (≥44×44 tap target via `min-h-[44px] min-w-[44px]`) that fires each page's primary action (new diary / new punch item / upload photo), so site crews on phones reach the verb without scrolling past header + filter chrome.
@@ -5223,7 +5223,7 @@ Identical to 3.12.1: no migration steps required. Existing 3.12.x installs upgra
   - Community card - Telegram featured on its own row (cyan-tinted + "Live" badge + 2-line copy), LinkedIn + X each on their own full-width row with longer descriptions, so the card stretches to match Platform Capabilities.
   - Documentation card - enriched with "Popular topics" 2×3 deep-link grid (Quick start · BIM import · GAEB · Takeoff · Module SDK · VPS deployment).
   - License card - restructured into "You can / You must" 2-col bullets + badges + "Commercial licensing" CTA at bottom (parallel button position to Documentation's "Open Docs").
-  - Support OpenConstructionERP right column - 4 impact-stat KPI tiles on top mirror the visual weight of the left hero, then the existing "Your support enables" bullet list below.
+  - Support Florida Steel Frame & Truss Manufacturing LLC right column - 4 impact-stat KPI tiles on top mirror the visual weight of the left hero, then the existing "Your support enables" bullet list below.
   - Free Guidebook - book cover 1/3 → 2/5 column (max-w 200px → 320px) with 10-part TOC column narrowed to 3/5.
 
 ### Fixed
@@ -6189,7 +6189,7 @@ Source: https://github.com/datadrivenconstruction/OpenConstructionERP
   - `fr / es / pt / zh / hi / ja` each filled 80 missing keys (had 57/137).
   - `tr / it / nl / pl / cs / ko / sv / no / da / fi / bg / hr / id / ro / th / vi` each gained the full 137-key block (had 0).
   - **Total: ~2 737 strings across 22 locales.** All 26 supported locales now have full `files.*` coverage.
-- Tone follows the authoritative German + Russian blocks; brand and format names (BIM, IFC, DWG, PDF, GAEB, OpenConstructionERP, `.ocep`) preserved verbatim.
+- Tone follows the authoritative German + Russian blocks; brand and format names (BIM, IFC, DWG, PDF, GAEB, Florida Steel Frame & Truss Manufacturing LLC, `.ocep`) preserved verbatim.
 
 ## [2.9.15] - 2026-05-06
 

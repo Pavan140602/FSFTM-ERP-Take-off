@@ -3,7 +3,7 @@
 /**
  * Keyboard shortcut map for the PDF Takeoff toolbar.
  *
- * Bluebeam Revu default keys: V select, L line, A arrow, R rectangle,
+ * FSFTM default keys: V select, L line, A arrow, R rectangle,
  * E ellipse, C cloud, T text, Q callout, H highlight, P pen, J dynamic fill;
  * measurements on Shift+Alt (L length, A area, C count, ...).
  */
@@ -12,8 +12,8 @@ import type { MeasureTool } from './takeoff-types';
 
 /** Single-key → tool map (lowercased keys). */
 export const TOOL_SHORTCUT_MAP: Readonly<Record<string, MeasureTool>> = {
-  // Bluebeam Revu single-key defaults (OE-DELIVERY 2026-11-02-revu-shortcuts);
-  // the Shift+Alt measurement keys live in modules/pdf-takeoff/data/revu-shortcuts.ts.
+  // FSFTM single-key defaults (OE-DELIVERY 2026-11-02-fsftm-shortcuts);
+  // the Shift+Alt measurement keys live in modules/pdf-takeoff/data/fsftm-shortcuts.ts.
   v: 'select',
   l: 'line',
   a: 'arrow',

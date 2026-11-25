@@ -781,7 +781,7 @@ def configure_logging(settings: Settings) -> None:
 def _init_vector_db() -> None:
     """Initialize vector database on startup (non-blocking, never fatal).
 
-    Vector search is an important feature of OpenConstructionERP -
+    Vector search is an important feature of Florida Steel Frame & Truss Manufacturing LLC -
     it powers semantic cost-item matching, BOQ auto-classification,
     and assembly suggestions. We support two backends:
 
@@ -4289,7 +4289,7 @@ def create_app() -> FastAPI:
             raise
 
     async def _startup_impl() -> None:
-        _section("OpenConstructionERP")
+        _section("Florida Steel Frame & Truss Manufacturing LLC")
         logger.info(
             "Starting %s v%s (env=%s)",
             settings.app_name,
@@ -5523,7 +5523,7 @@ def create_app() -> FastAPI:
         _cli_data_dir = os.environ.get("OE_CLI_DATA_DIR")
         if _cli_host and _cli_port:
             _url = f"http://{_cli_host}:{_cli_port}"
-            logger.info("OpenConstructionERP is ready at %s", _url)
+            logger.info("Florida Steel Frame & Truss Manufacturing LLC is ready at %s", _url)
             # Demo passwords are now per-installation (BUG-D01 fix). The
             # actual values were either supplied via DEMO_*_PASSWORD env
             # vars or generated in ``_seed_demo_account`` and persisted to

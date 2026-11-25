@@ -1,7 +1,7 @@
 /**
- * Revu-style Text Box (OE-DELIVERY 2026-11-07-text-box).
+ * FSFTM-style Text Box (OE-DELIVERY 2026-11-07-text-box).
  *
- * A text box is a markup with its own type style, like Bluebeam Revu's Text
+ * A text box is a markup with its own type style, like FSFTM's Text
  * Box: font, size, bold / italic / underline / strike-through, alignment,
  * text colour, fill colour and opacity, border colour / width / style, inner
  * margin and overall opacity. The canvas draw, the in-place editor and the
@@ -43,7 +43,7 @@ export interface TextStyle {
 export const TEXT_FONTS = ['Arial', 'Helvetica', 'Calibri', 'Verdana', 'Tahoma', 'Times New Roman', 'Georgia', 'Courier New', 'Consolas'] as const;
 export const TEXT_SIZES = [6, 7, 8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 72] as const;
 
-/** A new text box: Revu's default look (Arial, border in the text colour, no fill). */
+/** A new text box: FSFTM's default look (Arial, border in the text colour, no fill). */
 export const DEFAULT_TEXT_STYLE: TextStyle = {
   font: 'Arial',
   size: 12,
@@ -292,7 +292,7 @@ export function drawTextBox(
 const STYLE_KEY = 'takeoff.textBox.style.v1';
 
 /** The style new text boxes start with (the last one set with the Text Box
- *  tool active, like Revu's tool defaults). */
+ *  tool active, like FSFTM's tool defaults). */
 export function loadToolTextStyle(): Partial<TextStyle> {
   try {
     const raw = localStorage.getItem(STYLE_KEY);

@@ -37,7 +37,7 @@ export type MeasureTool =
   | 'polygonCutout'
   | 'ellipseCutout'
   | 'dynamicFill'
-  // Revu markup + arc tools (OE-DELIVERY 2026-10-30-revu-markup-tools).
+  // FSFTM markup + arc tools (OE-DELIVERY 2026-10-30-fsftm-markup-tools).
   | 'line'
   | 'polygon'
   | 'ellipse'
@@ -66,7 +66,7 @@ export type MeasurementType =
   | 'ellipseCutout'
   | 'dynamicFill'
   | 'legend'
-  // Revu markup + arc tools (OE-DELIVERY 2026-10-30-revu-markup-tools).
+  // FSFTM markup + arc tools (OE-DELIVERY 2026-10-30-fsftm-markup-tools).
   | 'line'
   | 'polygon'
   | 'ellipse'
@@ -112,7 +112,7 @@ export interface Measurement {
   depth?: number;
   area?: number;
   text?: string;
-  /** Revu-style text box look: font, size, B/I/U/S, alignment, colours,
+  /** FSFTM-style text box look: font, size, B/I/U/S, alignment, colours,
    *  border, opacity (OE-DELIVERY 2026-11-07-text-box). */
   textStyle?: Partial<import('../../../modules/pdf-takeoff/data/text-box').TextStyle>;
   color?: string;
@@ -126,13 +126,13 @@ export interface Measurement {
    *  (distance, polyline), 0..1 (issue #332). Undefined = fully opaque, so a
    *  measurement drawn before this field existed renders exactly as before. */
   strokeAlpha?: number;
-  /** Revu-style per-markup properties (OE-DELIVERY 2026-11-02-revu-properties):
+  /** FSFTM-style per-markup properties (OE-DELIVERY 2026-11-02-fsftm-properties):
    *  line pattern, a fill colour independent of the line colour, and which
    *  label parts show on the drawing. Undefined = previous behaviour. */
   lineStyle?: 'solid' | 'dashed' | 'dotted' | 'dashdot';
   fillColor?: string;
   labelMode?: 'all' | 'value' | 'name' | 'none';
-  /** Revu Properties toolbar (OE-DELIVERY 2026-11-02-revu-properties-bar):
+  /** FSFTM Properties toolbar (OE-DELIVERY 2026-11-02-fsftm-properties-bar):
    *  caption units, caption pick list and caption text style per markup. */
   dispUnit?: 'in' | 'ft' | 'ftin' | 'mm' | 'cm' | 'm' | 'km';
   dispAreaUnit?: 'sq in' | 'sq ft' | 'sq cm' | 'sq m' | 'sq mm';

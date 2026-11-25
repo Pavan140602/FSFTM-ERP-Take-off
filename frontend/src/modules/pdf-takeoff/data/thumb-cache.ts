@@ -1,4 +1,4 @@
-// OE-DELIVERY: 2026-11-12-revu-ui (thumbnail speed fix)
+// OE-DELIVERY: 2026-11-12-fsftm-ui (thumbnail speed fix)
 /**
  * Page thumbnails kept in the browser (IndexedDB), so reopening a drawing
  * shows its thumbnails at once instead of rendering every page again.

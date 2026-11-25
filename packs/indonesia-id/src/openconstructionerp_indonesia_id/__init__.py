@@ -1,4 +1,4 @@
-"""OpenConstructionERP - Indonesia country pack (AHSP/SNI, RAB, IDR)."""
+"""Florida Steel Frame & Truss Manufacturing LLC - Indonesia country pack (AHSP/SNI, RAB, IDR)."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""OpenConstructionERP — Saudi Vision 2030 partner pack (SBC + MoMRAH + Aramco + NEOM).
+"""Florida Steel Frame & Truss Manufacturing LLC — Saudi Vision 2030 partner pack (SBC + MoMRAH + Aramco + NEOM).
 
 This package exports a module-level ``MANIFEST`` instance of
 :class:`PartnerPackManifest` referenced from ``pyproject.toml``::

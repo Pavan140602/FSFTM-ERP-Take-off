@@ -577,7 +577,7 @@ export function LoginPageNext() {
             >
               Artem Boiko
             </a>{' '}
-            · OpenConstructionERP
+            · Florida Steel Frame &amp; Truss Manufacturing LLC
             · <a href="mailto:info@datadrivenconstruction.io" className="hover:text-content-secondary transition-colors">info@datadrivenconstruction.io</a>
           </div>
         </div>

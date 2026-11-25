@@ -1,4 +1,4 @@
-"""OpenConstructionERP - Ireland country pack (ARM/NRM, SCSI, RIAI)."""
+"""Florida Steel Frame & Truss Manufacturing LLC - Ireland country pack (ARM/NRM, SCSI, RIAI)."""
 
 from __future__ import annotations
 

@@ -1,7 +1,7 @@
 // DDC-CWICR-OE: DataDrivenConstruction · OpenConstructionERP
 // Copyright (c) 2026 Artem Boiko / DataDrivenConstruction
 //
-// Company branding: the default OpenConstructionERP mark is replaced with
+// Company branding: the default Florida Steel Frame & Truss Manufacturing LLC mark is replaced with
 // the Florida Steel Frame & Truss Manufacturing logo (public/brand/company-logo.png).
 import clsx from 'clsx';
 

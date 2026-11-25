@@ -1,6 +1,6 @@
 # Architecture overview
 
-OpenConstructionERP is an open, modular platform for construction estimating and
+Florida Steel Frame & Truss Manufacturing LLC is an open, modular platform for construction estimating and
 construction management, published by DataDrivenConstruction under AGPL-3.0 with a
 commercial option for enterprises. This page is the entry point to the architecture
 docs. It explains how the codebase fits together: the monorepo layout, the module

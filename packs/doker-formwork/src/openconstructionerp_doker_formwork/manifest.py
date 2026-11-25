@@ -1,6 +1,6 @@
 """Manifest for the Doker formwork partner pack.
 
-Pre-configures OpenConstructionERP for formwork (Schalung) and
+Pre-configures Florida Steel Frame & Truss Manufacturing LLC for formwork (Schalung) and
 concrete contractors operating in the DACH region. Activates DIN-, EN-,
 VOB/C- and DGUV-compliant validation rule packs, ships a curated
 catalogue of common formwork systems with their DIN 18218
@@ -82,7 +82,7 @@ MANIFEST = PartnerPackManifest(
         accent_color="#FEDC00",  # Doka yellow
         logo_path="logo.png",
         favicon_path=None,
-        powered_by_text="Powered by OpenConstructionERP, in partnership with Doka Formwork",
+        powered_by_text="Powered by Florida Steel Frame & Truss Manufacturing LLC, in partnership with Doka Formwork",
     ),
     onboarding_script_path="onboarding.yaml",
     metadata={

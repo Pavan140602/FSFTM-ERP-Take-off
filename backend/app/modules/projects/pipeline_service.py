@@ -1005,7 +1005,7 @@ async def _send_completion_email(
         <table role="presentation" cellpadding="0" cellspacing="0"><tr>
           <td style="background:#2563eb;border-radius:7px"><a href="{html.escape(project_url)}" style="display:inline-block;padding:10px 20px;font-family:Arial,sans-serif;font-size:14px;font-weight:bold;color:#ffffff;text-decoration:none">Open Project in ERP</a></td>
         </tr></table>
-        <div style="border-top:1px solid #e2e6ee;margin-top:18px;padding-top:12px;font-size:12px;color:#888888">Sent via OpenConstructionERP · Post-Award Pipeline</div>
+        <div style="border-top:1px solid #e2e6ee;margin-top:18px;padding-top:12px;font-size:12px;color:#888888">Sent via Florida Steel Frame & Truss Manufacturing LLC · Post-Award Pipeline</div>
       </td></tr>
     </table>
   </td></tr>
@@ -2252,7 +2252,7 @@ async def send_invoice_email(
           <td style="background:#2563eb;border-radius:7px"><a href="{html.escape(project_url)}" style="display:inline-block;padding:10px 20px;font-family:Arial,sans-serif;font-size:14px;font-weight:bold;color:#ffffff;text-decoration:none">Open Project in ERP</a></td>
         </tr></table>
         <div style="font-size:12.5px;color:#666666;margin-top:10px">Once issued, please <b>reply to this email with the invoice number</b> for our records.</div>
-        <div style="border-top:1px solid #e2e6ee;margin-top:18px;padding-top:12px;font-size:12px;color:#888888">Sent via OpenConstructionERP · Post-Award Pipeline · {stamp_text}</div>
+        <div style="border-top:1px solid #e2e6ee;margin-top:18px;padding-top:12px;font-size:12px;color:#888888">Sent via Florida Steel Frame & Truss Manufacturing LLC · Post-Award Pipeline · {stamp_text}</div>
       </td></tr>
     </table>
   </td></tr>

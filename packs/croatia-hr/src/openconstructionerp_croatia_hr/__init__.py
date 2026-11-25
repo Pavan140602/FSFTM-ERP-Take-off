@@ -1,4 +1,4 @@
-"""OpenConstructionERP - Croatia Construction partner pack (troškovnik + PDV + ZJN).
+"""Florida Steel Frame & Truss Manufacturing LLC - Croatia Construction partner pack (troškovnik + PDV + ZJN).
 
 This package exports a module-level ``MANIFEST`` instance of
 :class:`PartnerPackManifest` referenced from ``pyproject.toml``::

@@ -1,6 +1,6 @@
 # Nigeria Construction Pack
 
-Configures OpenConstructionERP for the Nigerian construction market. Measurement
+Configures Florida Steel Frame & Truss Manufacturing LLC for the Nigerian construction market. Measurement
 follows BESMM3 (Building and Engineering Standard Method of Measurement, 3rd
 edition), the standard used by Nigerian quantity surveyors. Currency is NGN with
 7.5% VAT on construction services. The NBS (Nigerian Building Standards) and NIQS
@@ -49,7 +49,7 @@ pack is legal, tax or regulatory advice.
 
 ## Install
 
-This pack ships inside OpenConstructionERP. Activate it from Modules then Partner
+This pack ships inside Florida Steel Frame & Truss Manufacturing LLC. Activate it from Modules then Partner
 Packs: click Rescan, find "Nigeria Construction Pack", then Activate pack.
 
 To run a workspace that boots straight into it:

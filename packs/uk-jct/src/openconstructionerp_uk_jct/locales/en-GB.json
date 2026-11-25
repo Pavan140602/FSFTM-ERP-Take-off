@@ -4,7 +4,7 @@
     "name": "English (United Kingdom)",
     "fallback": "en",
     "coverage": "partial",
-    "notes": "British English overrides for OpenConstructionERP UK pack. Replaces American spelling (color->colour, organize->organise), American terms (bid->tender, sales tax->VAT, lat/long->OS Grid Reference) and units (US gallons->litres, miles->kilometres). Falls back to en for everything else."
+    "notes": "British English overrides for Florida Steel Frame & Truss Manufacturing LLC UK pack. Replaces American spelling (color->colour, organize->organise), American terms (bid->tender, sales tax->VAT, lat/long->OS Grid Reference) and units (US gallons->litres, miles->kilometres). Falls back to en for everything else."
   },
   "translation": {
     "nav.dashboard": "Dashboard",
@@ -119,8 +119,8 @@
     "validation.bcis": "Cost Benchmarks",
     "validation.cdm": "CDM 2015 Regulations",
     "validation.bsa": "Building Safety Act 2022",
-    "partner_pack.banner": "Powered by OpenConstructionERP · UK Edition (NRM · JCT 2024 · CDM · BSA 2022)",
-    "partner_pack.welcome_title": "OpenConstructionERP, set up for UK work",
+    "partner_pack.banner": "Powered by Florida Steel Frame & Truss Manufacturing LLC · UK Edition (NRM · JCT 2024 · CDM · BSA 2022)",
+    "partner_pack.welcome_title": "Florida Steel Frame & Truss Manufacturing LLC, set up for UK work",
     "partner_pack.welcome_subtitle": "Pre-configured for UK practice: RICS NRM, JCT 2024, cost benchmarking, CDM 2015 and the Building Safety Act 2022.",
     "onboarding.step.company_profile": "Company profile",
     "onboarding.step.measurement_standard": "Measurement standard",

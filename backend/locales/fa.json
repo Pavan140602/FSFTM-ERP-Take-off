@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "OpenConstructionERP",
+    "name": "Florida Steel Frame & Truss Manufacturing LLC",
     "tagline": "برآورد متن‌باز هزینه ساخت‌وساز"
   },
   "nav": {
@@ -164,7 +164,7 @@
     "update": "به‌روزرسانی"
   },
   "dashboard": {
-    "welcome": "به OpenConstructionERP خوش آمدید",
+    "welcome": "به Florida Steel Frame & Truss Manufacturing LLC خوش آمدید",
     "subtitle": "فضای کاری برآورد ساخت‌وساز شما",
     "recent_projects": "پروژه‌های اخیر",
     "system_status": "وضعیت سیستم",

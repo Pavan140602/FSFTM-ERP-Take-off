@@ -1,7 +1,7 @@
 // DDC-CWICR-OE: DataDrivenConstruction · OpenConstructionERP
 // Copyright (c) 2026 Artem Boiko / DataDrivenConstruction
 /**
- * ArchitectureMapPage — Interactive visual map of the OpenConstructionERP system architecture.
+ * ArchitectureMapPage — Interactive visual map of the Florida Steel Frame & Truss Manufacturing LLC system architecture.
  *
  * Uses @xyflow/react (React Flow) to render modules, models, routes, and their relationships
  * as an interactive node graph with 4 view levels.

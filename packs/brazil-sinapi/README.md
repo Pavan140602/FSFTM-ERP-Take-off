@@ -1,6 +1,6 @@
 # Brazil Construction Pack
 
-Pre-configures OpenConstructionERP for Brazilian construction firms: the ABNT
+Pre-configures Florida Steel Frame & Truss Manufacturing LLC for Brazilian construction firms: the ABNT
 structural and accessibility codes, the CUB unit-cost standard, the 2021
 public procurement law, municipal ISS taxation and the RPS/NFS-e service
 receipt.
@@ -56,7 +56,7 @@ publishers' own text and tables are not reproduced here.
 
 ## Install
 
-This pack ships inside OpenConstructionERP. Activate it from Modules then
+This pack ships inside Florida Steel Frame & Truss Manufacturing LLC. Activate it from Modules then
 Partner Packs: click Rescan, find "Brazil Construction Pack", then Activate
 pack.
 

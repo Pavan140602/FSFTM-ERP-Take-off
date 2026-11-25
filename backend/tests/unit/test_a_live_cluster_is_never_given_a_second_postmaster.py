@@ -1,6 +1,6 @@
 """A data directory with a live postmaster must not get a second one.
 
-Two OpenConstructionERP processes on one machine share ``~/.openestimate``, and
+Two Florida Steel Frame & Truss Manufacturing LLC processes on one machine share ``~/.openestimate``, and
 the desktop launcher can decide to start a backend while another one is already
 running. Whether that is survivable comes down to a single property of
 :mod:`app.core.embedded_pg`: a bring-up aimed at an occupied data directory

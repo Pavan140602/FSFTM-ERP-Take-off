@@ -1,6 +1,6 @@
 // OE-DELIVERY: 2026-10-08-manage-columns-safe
 /**
- * Bluebeam-style "Manage Columns" dialog for the Markups List.
+ * FSFTM-style "Manage Columns" dialog for the Markups List.
  *
  * Two tabs:
  *  - Display Order: checkbox list of built-in columns with show/hide toggles.

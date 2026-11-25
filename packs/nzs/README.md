@@ -1,6 +1,6 @@
-# OpenConstructionERP — New Zealand Partner Pack (`nzs`)
+# Florida Steel Frame & Truss Manufacturing LLC — New Zealand Partner Pack (`nzs`)
 
-Pre-configures OpenConstructionERP for **New Zealand** contractors.
+Pre-configures Florida Steel Frame & Truss Manufacturing LLC for **New Zealand** contractors.
 
 ## What's inside
 

@@ -1,6 +1,6 @@
-# OpenConstructionERP HTTP API
+# Florida Steel Frame & Truss Manufacturing LLC HTTP API
 
-A practical guide to the OpenConstructionERP REST API. The backend is a Python 3.12+ FastAPI application (Pydantic v2, async). Every business module exposes its own router, and all of them are served from a single origin under one version prefix.
+A practical guide to the Florida Steel Frame & Truss Manufacturing LLC REST API. The backend is a Python 3.12+ FastAPI application (Pydantic v2, async). Every business module exposes its own router, and all of them are served from a single origin under one version prefix.
 
 ## Base URL and version prefix
 

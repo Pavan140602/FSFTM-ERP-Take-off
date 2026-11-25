@@ -1,6 +1,6 @@
 # Belgium Construction Pack
 
-Configures OpenConstructionERP for the Belgian construction market. Belgium is
+Configures Florida Steel Frame & Truss Manufacturing LLC for the Belgian construction market. Belgium is
 a bilingual market where specifications and bills are written in Dutch (bestek /
 meetstaat) in Flanders and French (cahier des charges / metrage) in Wallonia,
 with Brussels using both. The pack defaults to Dutch and supports both languages
@@ -48,7 +48,7 @@ pack is legal, tax or regulatory advice.
 
 ## Install
 
-This pack ships inside OpenConstructionERP. Activate it from Modules then Partner
+This pack ships inside Florida Steel Frame & Truss Manufacturing LLC. Activate it from Modules then Partner
 Packs: click Rescan, find "Belgium Construction Pack", then Activate pack.
 
 To run a workspace that boots straight into it:

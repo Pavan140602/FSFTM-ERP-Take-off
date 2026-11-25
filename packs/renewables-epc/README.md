@@ -1,6 +1,6 @@
 # Renewables EPC Pack
 
-Pre-configures OpenConstructionERP for solar, wind and battery storage EPC
+Pre-configures Florida Steel Frame & Truss Manufacturing LLC for solar, wind and battery storage EPC
 contractors: PV array takeoff, turbine bill of materials, medium-voltage cable
 schedules, levelised cost templates and the grid compliance regimes on both
 sides of the Atlantic.
@@ -55,7 +55,7 @@ publishers' own text and tables are not reproduced here.
 
 ## Install
 
-This pack ships inside OpenConstructionERP. Activate it from Modules then
+This pack ships inside Florida Steel Frame & Truss Manufacturing LLC. Activate it from Modules then
 Partner Packs: click Rescan, find "Renewables EPC Pack", then Activate pack.
 
 To run a workspace that boots straight into it:

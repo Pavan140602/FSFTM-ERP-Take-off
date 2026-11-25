@@ -54,8 +54,8 @@
 // DDC-CWICR-OE-2026
 import { useState, useRef, useCallback, useEffect, useLayoutEffect, useMemo, lazy, Suspense, type PointerEvent as ReactPointerEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-// Revu Properties (OE-DELIVERY 2026-11-02-revu-properties).
-import { RevuStyleFields, type StyleField } from './RevuStyleFields';
+// FSFTM Properties (OE-DELIVERY 2026-11-02-fsftm-properties).
+import { FSFTMStyleFields, type StyleField } from './FSFTMStyleFields';
 import {
   type ToolStyle,
   type ToolStyles,
@@ -67,7 +67,7 @@ import {
   styleFieldsFor,
   wheelZoomFactor,
   TYPE_LABELS,
-} from './data/revu-style';
+} from './data/fsftm-style';
 import { openPdf, openPdfUrl, type PDFDocumentProxy } from '@/shared/lib/pdfjs';
 import {
   Ruler,
@@ -80,14 +80,14 @@ import {
   Hand,
   Spline,
   Magnet,
-  // Revu markup tools (OE-DELIVERY 2026-10-30-revu-markup-tools).
+  // FSFTM markup tools (OE-DELIVERY 2026-10-30-fsftm-markup-tools).
   Slash,
   Octagon,
   Egg,
   PenLine,
   MessageSquareText,
   Stamp,
-  // Viewports (OE-DELIVERY 2026-11-02-revu-viewports-sketch).
+  // Viewports (OE-DELIVERY 2026-11-02-fsftm-viewports-sketch).
   Frame,
   Copy,
   Grid2x2,
@@ -238,7 +238,7 @@ import {
   type ScaleConfig,
   type CalibrationUnit,
   DRAWING_SCALE_PRESETS,
-  // Viewport scale dialog (OE-DELIVERY 2026-11-02-revu-viewports-sketch).
+  // Viewport scale dialog (OE-DELIVERY 2026-11-02-fsftm-viewports-sketch).
   presetScale,
   ratioFromScale,
   pixelDistance,
@@ -259,7 +259,7 @@ import {
   scaleForPage,
   setPageScale as setPageScaleIn,
   pageIsCalibrated,
-  // Viewports (OE-DELIVERY 2026-11-02-revu-viewports-sketch).
+  // Viewports (OE-DELIVERY 2026-11-02-fsftm-viewports-sketch).
   type Viewport,
   viewportAt,
   viewportsForPage,
@@ -269,7 +269,7 @@ import {
   scaleForMeasurement,
   hasAnyViewport,
 } from './data/page-scales';
-// Deep zoom + Zoom tool (OE-DELIVERY 2026-11-02-revu-zoom).
+// Deep zoom + Zoom tool (OE-DELIVERY 2026-11-02-fsftm-zoom).
 import {
   bitmapZoomCap,
   needsRegionRendering,
@@ -311,19 +311,19 @@ import {
   type SnapIndex,
 } from './data/content-snap';
 import { dynamicFill } from './data/dynamic-fill';
-// OE-DELIVERY: 2026-10-30-revu-markup-tools
+// OE-DELIVERY: 2026-10-30-fsftm-markup-tools
 import {
   STAMP_PRESETS,
   arcLengthPx,
   buildStampText,
   calloutBoxSize,
-  drawRevuMarkup,
-  drawRevuPreview,
-  isRevuMarkupType,
-  revuLabelAnchor,
+  drawFSFTMMarkup,
+  drawFSFTMPreview,
+  isFSFTMMarkupType,
+  fsftmLabelAnchor,
   simplifyStroke,
   stampBoxSize,
-} from './data/revu-markups';
+} from './data/fsftm-markups';
 import {
   filterMarkups,
   totalsByType,
@@ -339,14 +339,14 @@ import {
 } from './data/tool-chest-library';
 import { CollapsedEdgeTab } from './components/CollapsedEdgeTab';
 import { FullscreenToastStack } from './components/FullscreenToastStack';
-import { RevuMenuBar } from './components/RevuMenuBar';
-// Revu Properties toolbar + Revu shortcuts (OE-DELIVERY 2026-11-02-revu-properties-bar).
-import { RevuPropertiesBar, type PropsBarPatch } from './components/RevuPropertiesBar';
-import { RevuToolStrip, type StripTool } from './components/RevuToolStrip';
-import { REVU_SHORTCUTS, REVU_EXTRA_HELP, matchRevuShortcut, revuKeyForTool } from './data/revu-shortcuts';
-import { fontPrefix, selectionTotals } from '../../features/takeoff/lib/takeoff-revu-props';
+import { FSFTMMenuBar } from './components/FSFTMMenuBar';
+// FSFTM Properties toolbar + FSFTM shortcuts (OE-DELIVERY 2026-11-02-fsftm-properties-bar).
+import { FSFTMPropertiesBar, type PropsBarPatch } from './components/FSFTMPropertiesBar';
+import { FSFTMToolStrip, type StripTool } from './components/FSFTMToolStrip';
+import { FSFTM_SHORTCUTS, FSFTM_EXTRA_HELP, matchFSFTMShortcut, fsftmKeyForTool } from './data/fsftm-shortcuts';
+import { fontPrefix, selectionTotals } from '../../features/takeoff/lib/takeoff-fsftm-props';
 import { formatInUnits, formatMarkupQuantity, splitQuantityText } from '../../features/takeoff/lib/takeoff-display-units';
-import { RevuToolChest } from './components/RevuToolChest';
+import { FSFTMToolChest } from './components/FSFTMToolChest';
 import { FramingLayoutDialog, type FramingRequest } from './components/FramingLayoutDialog';
 import { layoutMembers } from './data/framing-layout';
 import {
@@ -381,7 +381,7 @@ import {
 /** Local shortcut letters (inlined to avoid type-sync issues with the
  *  external shortcuts file). */
 const SHORTCUT_LETTER: Record<string, string> = {
-  // Revu default keys (OE-DELIVERY 2026-11-02-revu-shortcuts).
+  // FSFTM default keys (OE-DELIVERY 2026-11-02-fsftm-shortcuts).
   select: 'V', distance: 'Shift+Alt+L', polyline: 'Shift+Alt+Q', area: 'Shift+Alt+A',
   volume: 'Shift+Alt+V', count: 'Shift+Alt+C', perimeter: 'Shift+Alt+P', diameter: 'Shift+Alt+D',
   radiusCenter: 'Shift+Alt+U', angle: 'Shift+Alt+G', dynamicFill: 'J', arc: 'Shift+C',
@@ -394,7 +394,7 @@ import {
   computeFitZoom,
   computeZoomToBox,
   boundingBoxOfPoints,
-  // wheelZoomStep replaced by wheelZoomFactor (OE-DELIVERY 2026-11-02-revu-properties).
+  // wheelZoomStep replaced by wheelZoomFactor (OE-DELIVERY 2026-11-02-fsftm-properties).
   orthoSnap,
   orthoSnapVertexDrag,
   dropTrailingDuplicateVertex,
@@ -494,7 +494,7 @@ import {
   type DisplayUnitPref,
   setGlobalDisplayUnit,
 } from '../../features/takeoff/lib/takeoff-display-units';
-// Revu left panel / sheet index (OE-DELIVERY 2026-11-02-revu-left-panel).
+// FSFTM left panel / sheet index (OE-DELIVERY 2026-11-02-fsftm-left-panel).
 import { type SheetEntry, type TextItemLite, detectSheet, sheetCaption } from './data/sheet-index';
 import { ElementCostMatchPanel } from '@/features/match';
 import { openLink } from '@/shared/lib/desktop';
@@ -524,7 +524,7 @@ type MeasureTool = 'select' | 'distance' | 'polyline' | 'area' | 'rectarea' | 'v
   | 'cloud' | 'arrow' | 'text' | 'rectangle' | 'highlight'
   | 'perimeter' | 'diameter' | 'radiusCenter' | 'radius3Point' | 'angle'
   | 'polygonCutout' | 'ellipseCutout' | 'dynamicFill'
-  // Revu markup + arc tools (OE-DELIVERY 2026-10-30-revu-markup-tools).
+  // FSFTM markup + arc tools (OE-DELIVERY 2026-10-30-fsftm-markup-tools).
   | 'line' | 'polygon' | 'ellipse' | 'pen' | 'callout' | 'stamp' | 'arc';
 
 /** Annotation-specific tool types */
@@ -682,7 +682,7 @@ interface Measurement {
     | 'cloud' | 'arrow' | 'text' | 'rectangle' | 'highlight'
     | 'perimeter' | 'diameter' | 'radiusCenter' | 'radius3Point' | 'angle'
     | 'polygonCutout' | 'ellipseCutout' | 'dynamicFill' | 'legend'
-    // Revu markup + arc tools (OE-DELIVERY 2026-10-30-revu-markup-tools).
+    // FSFTM markup + arc tools (OE-DELIVERY 2026-10-30-fsftm-markup-tools).
     | 'line' | 'polygon' | 'ellipse' | 'pen' | 'callout' | 'stamp' | 'arc';
   points: Point[];
   value: number;
@@ -714,13 +714,13 @@ interface Measurement {
    *  metadata as ``stroke_width_real``. */
   strokeWidthReal?: number;
   strokeAlpha?: number; // Per-measurement LINE opacity 0..1 for linear types (issue #332)
-  /** Revu-style per-markup properties (OE-DELIVERY 2026-11-02-revu-properties):
+  /** FSFTM-style per-markup properties (OE-DELIVERY 2026-11-02-fsftm-properties):
    *  line pattern, a fill colour independent of the line colour, and which
    *  label parts show on the drawing. Undefined = previous behaviour. */
   lineStyle?: 'solid' | 'dashed' | 'dotted' | 'dashdot';
   fillColor?: string;
   labelMode?: 'all' | 'value' | 'name' | 'none';
-  /** Revu Properties toolbar (OE-DELIVERY 2026-11-02-revu-properties-bar):
+  /** FSFTM Properties toolbar (OE-DELIVERY 2026-11-02-fsftm-properties-bar):
    *  caption units, caption pick list and caption text style per markup. */
   dispUnit?: 'in' | 'ft' | 'ftin' | 'mm' | 'cm' | 'm' | 'km';
   dispAreaUnit?: 'sq in' | 'sq ft' | 'sq cm' | 'sq m' | 'sq mm';
@@ -780,7 +780,7 @@ interface Measurement {
   /** User-defined ledger columns: column name → cell text (e.g. Subject,
    *  Material from the tool chest). Round-trips via the metadata blob. */
   customFields?: Record<string, string>;
-  /** Revu-style lock (Step 3): selectable/inspectable, not editable,
+  /** FSFTM-style lock (Step 3): selectable/inspectable, not editable,
    *  movable or deletable. Round-trips via metadata as ``locked``. */
   locked?: boolean;
   /** Workflow status (Step 3), shown in the ledger Status column.
@@ -905,7 +905,7 @@ export const CFS_EXPORT_TARGETS: Array<{
   { id: 'nonLoadBearingWalls', groupName: 'Non Load Bearing Walls', tabLabel: 'Wall Studs' },
 ];
 
-/* ── Tool Chest (Bluebeam-style custom tools) ───────────────────────────
+/* ── Tool Chest (FSFTM-style custom tools) ───────────────────────────
  * A saved tool captures the current measuring setup — tool type, markup
  * color and active group — under a name. Clicking it restores the setup
  * instantly. Persisted in localStorage so the chest survives reloads. */
@@ -915,11 +915,11 @@ export interface SavedTool {
   tool: MeasureTool;
   color: string;
   group: string;
-  /** Bluebeam subject (e.g. Howe) — shown as its own field, stamped onto measurements. */
+  /** FSFTM subject (e.g. Howe) — shown as its own field, stamped onto measurements. */
   subject?: string;
-  /** Bluebeam label/material (e.g. 362S162-43) — shown as its own field, becomes the annotation. */
+  /** FSFTM label/material (e.g. 362S162-43) — shown as its own field, becomes the annotation. */
   label?: string;
-  /** Bluebeam tool set this came from (e.g. Truss, CFS). */
+  /** FSFTM tool set this came from (e.g. Truss, CFS). */
   toolSet?: string;
 }
 
@@ -971,7 +971,7 @@ const TOOL_LABELS: Record<MeasureTool, string> = {
   arc: 'Arc',
 };
 
-/** Bluebeam-style legend (placed on the PDF) geometry, in PDF user units.
+/** FSFTM-style legend (placed on the PDF) geometry, in PDF user units.
  *  The box height grows with the row count; the viewer hit-tests and paints
  *  from these same constants so the two can never disagree. */
 const LEGEND_WIDTH = 230;
@@ -1423,7 +1423,7 @@ function toCalibrationUnit(label: string): 'm' | 'mm' | 'ft' | 'in' {
   return 'ft';
 }
 
-/** Parse a Bluebeam-style distance string into metres.
+/** Parse a FSFTM-style distance string into metres.
  *  Accepts `1'-6"`, `1'6"`, `18"`, `1.5'` as well as plain decimals
  *  (interpreted in `fallbackUnit`). Returns null when unparsable. */
 function parseDistanceToMeters(raw: string, fallbackUnit: 'm' | 'mm' | 'ft' | 'in' | 'ft-in'): number | null {
@@ -1597,9 +1597,9 @@ const LEGEND_POS_KEY = 'oe.takeoff.legend-pos';
  * column. Widths persist in localStorage like the other takeoff view
  * preferences. Bounds mirror the previous fixed widths (w-32 = 128px,
  * w-72 = 288px) so the defaults look identical to before. */
-const LEFT_STRIP_DEFAULT = 230; // Revu-like default panel (OE-DELIVERY 2026-11-02-revu-left-panel-v2)
+const LEFT_STRIP_DEFAULT = 230; // FSFTM-like default panel (OE-DELIVERY 2026-11-02-fsftm-left-panel-v2)
 const LEFT_STRIP_MIN = 96;
-/** Panels resize freely (OE-DELIVERY 2026-11-02-revu-workspace): the only
+/** Panels resize freely (OE-DELIVERY 2026-11-02-fsftm-workspace): the only
  *  limit is leaving ~320 px of drawing visible. */
 const leftStripMax = (): number => Math.max(LEFT_STRIP_MIN + 40, (typeof window !== 'undefined' ? window.innerWidth : 1600) - 320);
 const RIGHT_PANEL_DEFAULT = 288;
@@ -1640,12 +1640,12 @@ function readPanelWidth(key: string, fallback: number, min: number, max: number)
  *  element is fullscreen — without this, no notification is visible in
  *  fullscreen measuring mode. */
 /** Second split-screen pane: an independent read-only view of the same PDF
- *  document (Bluebeam-style split view). It has its own page, zoom and
+ *  document (FSFTM-style split view). It has its own page, zoom and
  *  scroll position; measurements on its page are drawn as a lightweight
  *  read-only overlay. All measuring stays in the main pane. */
-/** High-quality downscale (OE-DELIVERY 2026-11-02-revu-left-panel-v2): halve step by step with
+/** High-quality downscale (OE-DELIVERY 2026-11-02-fsftm-left-panel-v2): halve step by step with
  *  smoothing so thin drawing lines stay crisp instead of aliasing away in
- *  one big drawImage jump - Revu-clean thumbnails. */
+ *  one big drawImage jump - FSFTM-clean thumbnails. */
 /** A mouse-wheel notch (not a trackpad pinch / glide) - OE-DELIVERY 2026-11-04-page-flip. */
 function isWheelNotch(e: WheelEvent): boolean {
   return e.deltaMode !== 0 || Math.abs(e.deltaY) >= 50;
@@ -1701,12 +1701,12 @@ function SplitPane({
   onPageChange: (p: number) => void;
   onZoomChange: (z: number) => void;
   onClose: () => void;
-  /** Revu Sync (OE-DELIVERY 2026-11-02-revu-left-panel): centre on this fraction of the sheet. */
+  /** FSFTM Sync (OE-DELIVERY 2026-11-02-fsftm-left-panel): centre on this fraction of the sheet. */
   syncTo?: { fx: number; fy: number; seq: number } | null;
-  /** Revu Sync, the other way: this pane's centre as a fraction of the sheet. */
+  /** FSFTM Sync, the other way: this pane's centre as a fraction of the sheet. */
   onViewChange?: (fx: number, fy: number) => void;
 }) {
-  /* Revu-style split pane (OE-DELIVERY 2026-11-02-revu-zoom-anchor):
+  /* FSFTM-style split pane (OE-DELIVERY 2026-11-02-fsftm-zoom-anchor):
    * the wheel zooms at the cursor, the point under the cursor stays put
    * (scroll first, then the sheet itself shifts for whatever the scrollbars
    * cannot absorb), the page CSS-resizes instantly while the crisp bitmap
@@ -1726,7 +1726,7 @@ function SplitPane({
   shiftRef.current = shift;
   const anchorRef = useRef<{ fracX: number; fracY: number; clientX: number; clientY: number } | null>(null);
   const dragRef = useRef<{ x: number; y: number } | null>(null);
-  // Revu Sync: follow the main view's position (OE-DELIVERY 2026-11-02-revu-left-panel).
+  // FSFTM Sync: follow the main view's position (OE-DELIVERY 2026-11-02-fsftm-left-panel).
   const syncIgnoreUntilRef = useRef(0);
   const onViewChangeRef = useRef(onViewChange);
   onViewChangeRef.current = onViewChange;
@@ -2041,7 +2041,7 @@ function SplitPane({
         </button>
       </div>
       {/* Pane canvas: wheel = zoom at the cursor, left/middle drag = pan,
-          double-click = fit width (OE-DELIVERY 2026-11-02-revu-zoom-anchor). */}
+          double-click = fit width (OE-DELIVERY 2026-11-02-fsftm-zoom-anchor). */}
       <div
         ref={scrollRef}
         className="relative flex min-h-0 flex-1 cursor-grab overflow-auto active:cursor-grabbing"
@@ -2425,19 +2425,19 @@ export default function TakeoffViewerModule({
   /* ── Resizable side panels + fullscreen measuring mode ──────────────── */
   const viewerRootRef = useRef<HTMLDivElement>(null);
   const [isTakeoffFullscreen, setIsTakeoffFullscreen] = useState(false);
-  /** Revu-style full-window workspace (OE-DELIVERY 2026-11-02-revu-workspace): the takeoff
+  /** FSFTM-style full-window workspace (OE-DELIVERY 2026-11-02-fsftm-workspace): the takeoff
    *  fills the browser window (ERP header, banners and tabs covered) with
-   *  its own menu bar, panels and status bar - Revu's window layout. */
-  const [revuWorkspace, setRevuWorkspace] = useState<boolean>(() => {
-    try { return localStorage.getItem('takeoff.revuWorkspace') !== '0'; } catch { return true; }
+   *  its own menu bar, panels and status bar - FSFTM's window layout. */
+  const [fsftmWorkspace, setFSFTMWorkspace] = useState<boolean>(() => {
+    try { return localStorage.getItem('takeoff.fsftmWorkspace') !== '0'; } catch { return true; }
   });
   useEffect(() => {
-    try { localStorage.setItem('takeoff.revuWorkspace', revuWorkspace ? '1' : '0'); } catch { /* ignore */ }
-  }, [revuWorkspace]);
+    try { localStorage.setItem('takeoff.fsftmWorkspace', fsftmWorkspace ? '1' : '0'); } catch { /* ignore */ }
+  }, [fsftmWorkspace]);
   /** The workspace covers the window only while a drawing is open; with no
    *  drawing the normal page (Current & recent drawings, upload) shows
    *  instead of a blank white window (OE-DELIVERY 2026-11-05-upload-progress). */
-  const workspaceOn = revuWorkspace && !!pdfDoc;
+  const workspaceOn = fsftmWorkspace && !!pdfDoc;
   /** Pin the workspace to the browser window. An ancestor of the viewer
    *  acts as the containing block for fixed elements (the page is offset a
    *  few pixels), so `inset: 0` alone leaves a strip of the ERP header
@@ -2584,7 +2584,7 @@ export default function TakeoffViewerModule({
         pointerId: e.pointerId,
         startX: e.clientX,
         startWidth,
-        // A panel docked on the other side (OE-DELIVERY 2026-11-02-revu-dock) drags mirrored.
+        // A panel docked on the other side (OE-DELIVERY 2026-11-02-fsftm-dock) drags mirrored.
         rtl: (typeof document !== 'undefined' && document.documentElement.dir === 'rtl') !== mirrored,
         latest: startWidth,
         fromCollapsed: startWidthOverride !== undefined,
@@ -2881,7 +2881,7 @@ export default function TakeoffViewerModule({
   const pageModeRef = useRef(pageMode);
   pageModeRef.current = pageMode;
 
-  /* Split-screen view (Bluebeam-style): a second independent read-only pane
+  /* Split-screen view (FSFTM-style): a second independent read-only pane
    * showing the same PDF. 'vertical' = panes side by side, 'horizontal' =
    * panes stacked. The second pane has its own page + zoom. */
   const [splitMode, setSplitMode] = useState<'off' | 'horizontal' | 'vertical'>('off');
@@ -2905,7 +2905,7 @@ export default function TakeoffViewerModule({
   /** Wrapper around the page canvas(es) - the CSS-transform smooth zoom
    *  target and the safe-centering box. */
   const zoomWrapRef = useRef<HTMLDivElement>(null);
-  /* Deep zoom (OE-DELIVERY 2026-11-02-revu-zoom): page size in PDF units
+  /* Deep zoom (OE-DELIVERY 2026-11-02-fsftm-zoom): page size in PDF units
    * (set by the page render, independent of the bitmap's capped zoom), the
    * zoom the page bitmap was actually rendered at, and the visible-region
    * canvases used above the full-page bitmap limit. */
@@ -2964,7 +2964,7 @@ export default function TakeoffViewerModule({
   useEffect(() => {
     try { localStorage.setItem('takeoff.labelTextSize', String(labelTextSize)); } catch { /* ignore */ }
   }, [labelTextSize]);
-  /** Material-line size (defaults to 88% of the name size, Bluebeam-like). */
+  /** Material-line size (defaults to 88% of the name size, FSFTM-like). */
   const [labelMaterialSize, setLabelMaterialSize] = useState<number>(() => {
     try {
       const v = Number(localStorage.getItem('takeoff.labelMaterialSize'));
@@ -3013,12 +3013,12 @@ export default function TakeoffViewerModule({
   useEffect(() => {
     try { localStorage.setItem('takeoff.labelDimColor', labelDimColor); } catch { /* ignore */ }
   }, [labelDimColor]);
-  /** Label look (OE-DELIVERY 2026-11-02-revu-labels): 'revu' = plain text in the
+  /** Label look (OE-DELIVERY 2026-11-02-fsftm-labels): 'fsftm' = plain text in the
    *  markup's colour, no box, sized in drawing space so it scales with zoom
-   *  like Revu captions (default); 'badge' = the previous filled pills. */
+   *  like FSFTM captions (default); 'badge' = the previous filled pills. */
   /** Highlight the profile text of every auto markup on the sheet (OE-DELIVERY 2026-11-02-auto-takeoff-columns). */
-  /** Auto column markers on the sheet (OE-DELIVERY 2026-11-02-revu-markups-list): off by default -
-   *  the highlighted profile text marks each column, like Revu. A click on
+  /** Auto column markers on the sheet (OE-DELIVERY 2026-11-02-fsftm-markups-list): off by default -
+   *  the highlighted profile text marks each column, like FSFTM. A click on
    *  the spot still selects the column. */
   const [autoShowColumns, setAutoShowColumns] = useState<boolean>(() => {
     try { return localStorage.getItem('takeoff.autoShowColumns') === '1'; } catch { return false; }
@@ -3032,9 +3032,9 @@ export default function TakeoffViewerModule({
   useEffect(() => {
     try { localStorage.setItem('takeoff.autoHighlight', autoHighlightAll ? '1' : '0'); } catch { /* ignore */ }
   }, [autoHighlightAll]);
-  const [labelStyle, setLabelStyle] = useState<'revu' | 'badge'>(() => {
-    try { return localStorage.getItem('takeoff.labelStyle') === 'badge' ? 'badge' : 'revu'; }
-    catch { return 'revu'; }
+  const [labelStyle, setLabelStyle] = useState<'fsftm' | 'badge'>(() => {
+    try { return localStorage.getItem('takeoff.labelStyle') === 'badge' ? 'badge' : 'fsftm'; }
+    catch { return 'fsftm'; }
   });
   useEffect(() => {
     try { localStorage.setItem('takeoff.labelStyle', labelStyle); } catch { /* ignore */ }
@@ -3197,7 +3197,7 @@ export default function TakeoffViewerModule({
 
   // Measurement state
   const [activeTool, setActiveTool] = useState<MeasureTool>('select');
-  /** Bluebeam-style area tool settings popup: display units + depth + slope.
+  /** FSFTM-style area tool settings popup: display units + depth + slope.
    *  Shown when the Area tool is active; depth/slope are stamped onto new
    *  area measurements. */
   const [areaLengthUnit, setAreaLengthUnit] = useState('mm');
@@ -3343,9 +3343,9 @@ export default function TakeoffViewerModule({
   // the *current* page; the rest of the module reads it unchanged.
   const [pageScales, setPageScales] = useState<PageScales>(emptyPageScales);
   // While a shape is in progress, ``scale`` is the scale of the viewport its
-  // first point sits in (Revu: a measurement belongs to the viewport it
+  // first point sits in (FSFTM: a measurement belongs to the viewport it
   // starts in), so live readouts and the create paths read the right ratio
-  // (OE-DELIVERY 2026-11-02-revu-viewports-sketch). Identity is stable: it is always
+  // (OE-DELIVERY 2026-11-02-fsftm-viewports-sketch). Identity is stable: it is always
   // one of the stored ScaleConfig objects.
   const scale = useMemo(
     () => viewportAt(pageScales, currentPage, activePoints[0])?.scale ?? scaleForPage(pageScales, currentPage),
@@ -3435,7 +3435,7 @@ export default function TakeoffViewerModule({
   }, [sidebarTab]);
 
   /* Tool Chest state — the saved custom tools, persisted across reloads. */
-  // v1 chest kept read-only; loadChestSets migrates it into "My Tools" (OE-DELIVERY 2026-11-02-revu-tool-chest).
+  // v1 chest kept read-only; loadChestSets migrates it into "My Tools" (OE-DELIVERY 2026-11-02-fsftm-tool-chest).
   const [toolChest] = useState<SavedTool[]>(loadToolChest);
   useEffect(() => {
     try { localStorage.setItem(TOOL_CHEST_KEY, JSON.stringify(toolChest)); } catch { /* ignore */ }
@@ -3452,7 +3452,7 @@ export default function TakeoffViewerModule({
 
 
   /* Pending annotation label from an applied chest tool (e.g. 362S162-43).
-   * Sticky like a Bluebeam tool: every measurement drawn while the tool is
+   * Sticky like a FSFTM tool: every measurement drawn while the tool is
    * active gets this annotation. Cleared when the user switches tools
    * manually via selectTool. A ref (not state) so nextAnnotation can read it
    * without re-subscribing. */
@@ -3517,7 +3517,7 @@ export default function TakeoffViewerModule({
     return toolSet;
   };
 
-  /* Revu Tool Chest (OE-DELIVERY 2026-11-02-revu-tool-chest): tool sets in
+  /* FSFTM Tool Chest (OE-DELIVERY 2026-11-02-fsftm-tool-chest): tool sets in
    * localStorage; the armed chest tool's properties ride on every new markup;
    * tools you draw with land in Recent Tools. */
   const [chestSets, setChestSets] = useState<ChestSet[]>(() => withStructuralSets(loadChestSets(), STRUCTURAL_TOOLSETS));
@@ -3541,9 +3541,9 @@ export default function TakeoffViewerModule({
     const subject = toolSubjectRef.current;
     const material = toolLabelRef.current;
     const stamp: Partial<Measurement> = {
-      // The armed tool's Revu-style properties (OE-DELIVERY 2026-11-02-revu-properties).
+      // The armed tool's FSFTM-style properties (OE-DELIVERY 2026-11-02-fsftm-properties).
       ...styleFieldsFor(toolStylesRef.current, sketchCtxRef.current.activeTool),
-      // An armed Tool Chest tool's own properties win (Revu).
+      // An armed Tool Chest tool's own properties win (FSFTM).
       ...(chestStyleRef.current ?? {}),
       author: useAuthStore.getState().userFullName || undefined,
       createdAt: new Date().toISOString(),
@@ -3631,8 +3631,8 @@ export default function TakeoffViewerModule({
   const [vertexSnap, setVertexSnap] = useState(false);
   const vertexSnapRef = useRef(vertexSnap);
   vertexSnapRef.current = vertexSnap;
-  /** Snap to PDF drawing content (vector geometry). Bluebeam-style.
-   *  ON by default (Revu behaviour) and remembered across sessions:
+  /** Snap to PDF drawing content (vector geometry). FSFTM-style.
+   *  ON by default (FSFTM behaviour) and remembered across sessions:
    *  picking near a drawing line locks onto its endpoints, centers,
    *  intersections and midpoints. */
   const [contentSnap, setContentSnap] = useState(() => {
@@ -3652,9 +3652,9 @@ export default function TakeoffViewerModule({
   const [snapIsContent, setSnapIsContent] = useState(false);
   /** What the current content snap hit (endpoint / center /
    *  intersection / midpoint / edge), so the cue can draw the
-   *  Bluebeam-style marker for it. Null for markup-vertex snaps. */
+   *  FSFTM-style marker for it. Null for markup-vertex snaps. */
   const [snapKind, setSnapKind] = useState<string | null>(null);
-  /** Line weights off (Bluebeam View > Line Weights): render the
+  /** Line weights off (FSFTM View > Line Weights): render the
    *  sheet with hairline strokes so dense plans stay readable and
    *  individual lines stay pickable. Remembered across sessions. */
   const [lineWeightsOff, setLineWeightsOff] = useState(() => {
@@ -3754,7 +3754,7 @@ export default function TakeoffViewerModule({
     setPanOffset({ x: 0, y: 0 });
     if (panWrapRef.current) panWrapRef.current.style.transform = '';
   }, [currentPage]);
-  /* ── Marquee (rubber-band) multi-select, Bluebeam-style ───────────────
+  /* ── Marquee (rubber-band) multi-select, FSFTM-style ───────────────
    * In select mode, dragging on empty canvas draws a selection box; every
    * measurement intersecting it joins `selectedLedgerIds`. Shift+click
    * toggles a single measurement in/out of the set. The rect lives in PDF
@@ -3765,12 +3765,12 @@ export default function TakeoffViewerModule({
    *  rectangle and zooms to fit it. The button lives in the bottom pager bar. */
   const [zoomAreaArmed, setZoomAreaArmed] = useState(false);
   const [zoomAreaRect, setZoomAreaRect] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
-  // ``out``: Alt/Shift press of the Zoom tool zooms out (OE-DELIVERY 2026-11-02-revu-zoom).
+  // ``out``: Alt/Shift press of the Zoom tool zooms out (OE-DELIVERY 2026-11-02-fsftm-zoom).
   const zoomAreaRef = useRef<{ start: Point; current: Point; out?: boolean } | null>(null);
   const zoomAreaArmedRef = useRef(zoomAreaArmed);
   zoomAreaArmedRef.current = zoomAreaArmed;
 
-  /** Bluebeam-style legend placement: when armed (via the Legend panel's
+  /** FSFTM-style legend placement: when armed (via the Legend panel's
    *  "Place Legend" button), the next canvas click drops a legend box at
    *  that point on the current page. Read through a ref inside the click
    *  handler so it never enters the dependency array. */
@@ -3835,7 +3835,7 @@ export default function TakeoffViewerModule({
   /** Live pointer position in PDF units while a measure tool is active,
    *  drives the running-length HUD. Null when the pointer is off-canvas. */
   const [liveCursor, setLiveCursor] = useState<Point | null>(null);
-  /* Viewports + Sketch to Scale (OE-DELIVERY 2026-11-02-revu-viewports-sketch).
+  /* Viewports + Sketch to Scale (OE-DELIVERY 2026-11-02-fsftm-viewports-sketch).
    * viewportDraft: null = not drawing; {start:null} = armed, waiting for the
    * first corner; {start, cursor} = rubber-banding the second corner. */
   const [viewportDraft, setViewportDraft] = useState<{ start: Point | null; cursor: Point | null } | null>(null);
@@ -3855,7 +3855,7 @@ export default function TakeoffViewerModule({
   const [sketchInput, setSketchInput] = useState<string | null>(null);
   /** One-shot exact vertex for the next click (bypasses snap + ortho). */
   const exactPointRef = useRef<Point | null>(null);
-  /* Revu Properties (OE-DELIVERY 2026-11-02-revu-properties): per-tool style for the
+  /* FSFTM Properties (OE-DELIVERY 2026-11-02-fsftm-properties): per-tool style for the
    * next markup, and show/hide by markup type. */
   const [toolStyles, setToolStyles] = useState<ToolStyles>(() => loadToolStyles());
   const toolStylesRef = useRef(toolStyles);
@@ -3899,9 +3899,9 @@ export default function TakeoffViewerModule({
     y: number;
     measurementId: string;
   } | null>(null);
-  /** Multiply dialog: linear Bluebeam-style copy. Null when closed; carries
+  /** Multiply dialog: linear FSFTM-style copy. Null when closed; carries
    *  the source measurement id. Direction/Distance/Copies/Preview mirror
-   *  Bluebeam Revu's Multiply dialog. */
+   *  FSFTM's Multiply dialog. */
   const [multiplyDialog, setMultiplyDialog] = useState<{ measurementId: string } | null>(null);
   const multiplyDialogRef = useRef(multiplyDialog);
   multiplyDialogRef.current = multiplyDialog;
@@ -3914,7 +3914,7 @@ export default function TakeoffViewerModule({
   multiplyCopiesRef.current = multiplyCopies;
   const multiplyDirectionRef = useRef(multiplyDirection);
   multiplyDirectionRef.current = multiplyDirection;
-  /** Unit pick list for the multiply distance (Bluebeam-style). */
+  /** Unit pick list for the multiply distance (FSFTM-style). */
   const [multiplyUnit, setMultiplyUnit] = useState<'ft' | 'ft-in' | 'in' | 'mm' | 'm'>('ft');
   const multiplyUnitRef = useRef(multiplyUnit);
   multiplyUnitRef.current = multiplyUnit;
@@ -3940,7 +3940,7 @@ export default function TakeoffViewerModule({
   const [offsetUnit, setOffsetUnit] = useState<'ft' | 'ft-in' | 'in' | 'mm' | 'm'>('ft');
   const offsetUnitRef = useRef(offsetUnit);
   offsetUnitRef.current = offsetUnit;
-  /** Interactive offset tool (Bluebeam-style): hover shows ghost, click commits.
+  /** Interactive offset tool (FSFTM-style): hover shows ghost, click commits.
    *  Toggle via the toolbar button. */
   const [offsetTool, setOffsetTool] = useState(false);
   const offsetToolRef = useRef(false);
@@ -4022,7 +4022,7 @@ export default function TakeoffViewerModule({
       }
       return next;
     });
-    // The selection's fields show in the top Properties bar (OE-DELIVERY 2026-11-02-revu-tool-strip).
+    // The selection's fields show in the top Properties bar (OE-DELIVERY 2026-11-02-fsftm-tool-strip).
     setRightPanelWidth((w) => {
       if (w !== 0) return w;
       const last = lastOpenRightWidthRef.current;
@@ -4104,7 +4104,7 @@ export default function TakeoffViewerModule({
   showTextInputRef.current = showTextInput;
   const [rectStartPoint, setRectStartPoint] = useState<Point | null>(null);
   const [isDraggingRect, setIsDraggingRect] = useState(false);
-  /* ── Revu markup tools (OE-DELIVERY 2026-10-30-revu-markup-tools) ──── */
+  /* ── FSFTM markup tools (OE-DELIVERY 2026-10-30-fsftm-markup-tools) ──── */
   /** Active stamp preset id, or 'custom' to type the stamp text. */
   const [stampPresetId, setStampPresetId] = useState<string>(STAMP_PRESETS[0]!.id);
   /** Text prompt for a Callout (tip + box anchor placed) or a custom Stamp. */
@@ -4135,7 +4135,7 @@ export default function TakeoffViewerModule({
   /** Imperial fraction precision (Step 2) + the store's generic setter. */
   const imperialDenominator = usePreferencesStore((s) => s.imperialDenominator);
   const setPreference = usePreferencesStore((s) => s.setPreference);
-  /** User-saved scale presets (Revu-style Add Preset), this machine. */
+  /** User-saved scale presets (FSFTM-style Add Preset), this machine. */
   const [customScales, setCustomScales] = useState<{ label: string; pixelsPerUnit: number }[]>(() => {
     try {
       const raw = window.localStorage.getItem('oe-custom-scales');
@@ -4421,7 +4421,7 @@ export default function TakeoffViewerModule({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [measurements, ledgerDocKey]);
 
-  /* ── Revu left panel, sheet index, overlay, sync, units, text (OE-DELIVERY 2026-11-02-revu-left-panel) ── */
+  /* ── FSFTM left panel, sheet index, overlay, sync, units, text (OE-DELIVERY 2026-11-02-fsftm-left-panel) ── */
   const [leftTab, setLeftTab] = useState<'thumbs' | 'index' | 'layers' | 'side' | 'measure' | 'scale'>(() => {
     try {
       const v = localStorage.getItem('takeoff.leftTab');
@@ -4439,8 +4439,8 @@ export default function TakeoffViewerModule({
   }, []);
 
 
-  /* ── Revu dock (OE-DELIVERY 2026-11-02-revu-dock): every panel docks on the LEFT behind one vertical
-   * icon rail, like Revu. Clicking the open panel's icon closes it (the rail
+  /* ── FSFTM dock (OE-DELIVERY 2026-11-02-fsftm-dock): every panel docks on the LEFT behind one vertical
+   * icon rail, like FSFTM. Clicking the open panel's icon closes it (the rail
    * stays at the edge); clicking any icon opens that panel. */
   const [panelSide, setPanelSide] = useState<'left' | 'right'>(() => {
     try { return localStorage.getItem('takeoff.panelSide') === 'right' ? 'right' : 'left'; } catch { return 'left'; }
@@ -4458,7 +4458,7 @@ export default function TakeoffViewerModule({
     if (sidebarTabPrevRef.current === sidebarTab) return;
     sidebarTabPrevRef.current = sidebarTab;
     if (panelSide !== 'left') return;
-    // Settings / Colours / Layers left the Revu rail; never pop them open.
+    // Settings / Colours / Layers left the FSFTM rail; never pop them open.
     if (sidebarTab === 'properties' || sidebarTab === 'colours') return;
     setLeftTab('side');
     setShowThumbnails(true);
@@ -4467,14 +4467,14 @@ export default function TakeoffViewerModule({
   }, [sidebarTab]);
   const sideLeftOpen = panelSide === 'left' && showThumbnails && leftTab === 'side' && showSidebar;
   const sideVisible = panelSide === 'left' ? sideLeftOpen : showSidebar;
-  const openRevuPanel = useCallback(
+  const openFSFTMPanel = useCallback(
     (key: 'thumbs' | 'index' | 'layers' | 'measure' | 'scale' | 'properties' | 'tools' | 'colours' | 'ai' | 'auto') => {
       const isSide = key !== 'thumbs' && key !== 'index' && key !== 'layers' && key !== 'measure' && key !== 'scale';
       const isActive = isSide
         ? (panelSide === 'left' ? leftTab === 'side' && showThumbnails && showSidebar : showSidebar) && sidebarTab === key
         : leftTab === key && showThumbnails;
       if (isActive) {
-        // Revu: clicking the open panel's tab closes the panel.
+        // FSFTM: clicking the open panel's tab closes the panel.
         if (isSide && panelSide === 'right') setShowSidebar(false);
         else setShowThumbnails(false);
         return;
@@ -4496,8 +4496,8 @@ export default function TakeoffViewerModule({
     [panelSide, leftTab, showThumbnails, showSidebar, sidebarTab],
   );
   /** Open a panel (never toggles it shut) - for menus and commands
-   *  (OE-DELIVERY 2026-11-03-revu-wrapup). */
-  const showRevuPanel = useCallback(
+   *  (OE-DELIVERY 2026-11-03-fsftm-wrapup). */
+  const showFSFTMPanel = useCallback(
     (key: 'thumbs' | 'index' | 'measure' | 'scale' | 'tools' | 'ai' | 'auto') => {
       const isSide = key === 'tools' || key === 'ai' || key === 'auto';
       if (isSide) {
@@ -4516,7 +4516,7 @@ export default function TakeoffViewerModule({
     },
     [panelSide],
   );
-  /** Thumbnail whose sheet number is being typed (OE-DELIVERY 2026-11-02-revu-left-panel-v2). */
+  /** Thumbnail whose sheet number is being typed (OE-DELIVERY 2026-11-02-fsftm-left-panel-v2). */
   const [editingThumb, setEditingThumb] = useState<number | null>(null);
   /** Sheet number + title read from each page's title block. */
   const [detectedSheets, setDetectedSheets] = useState<Record<number, SheetEntry>>({});
@@ -4600,7 +4600,7 @@ export default function TakeoffViewerModule({
     return arr.some(Boolean) ? arr.map((x, i) => x || `p.${i + 1}`) : pageLabels;
   }, [totalPages, pageLabels, sheetFor]);
 
-  /** Overlay Pages (Revu compare): another page drawn over this one in a
+  /** Overlay Pages (FSFTM compare): another page drawn over this one in a
    *  colour, with opacity and an alignment nudge. */
   const [overlayCfg, setOverlayCfg] = useState<{ page: number; color: 'red' | 'blue' | 'green'; opacity: number; dx: number; dy: number } | null>(null);
   const [overlayPanelOpen, setOverlayPanelOpen] = useState(false);
@@ -4661,7 +4661,7 @@ export default function TakeoffViewerModule({
   useEffect(() => {
     try { localStorage.setItem('takeoff.displayUnit', displayUnitPref); } catch { /* ignore */ }
   }, [displayUnitPref]);
-  /** Label text format: font, bold, italic (Revu caption text). */
+  /** Label text format: font, bold, italic (FSFTM caption text). */
   const [labelFont, setLabelFont] = useState<string>(() => {
     try { return localStorage.getItem('takeoff.labelFont') || 'Arial'; } catch { return 'Arial'; }
   });
@@ -4681,12 +4681,12 @@ export default function TakeoffViewerModule({
   const labelFontCss = `"${labelFont}", Arial, Helvetica, sans-serif`;
   const labelFontStyle = `${labelItalic ? 'italic ' : ''}${labelBold ? 'bold ' : ''}`;
 
-  /** Revu Sync: the split pane follows the main view (page offset, zoom,
+  /** FSFTM Sync: the split pane follows the main view (page offset, zoom,
    *  scroll position) for checking two sheets / revisions together. */
   const [syncViews, setSyncViews] = useState(false);
   const syncDeltaRef = useRef(0);
   /** While the main view follows the split pane, its own scroll must not
-   *  echo back (OE-DELIVERY 2026-11-02-revu-dock). */
+   *  echo back (OE-DELIVERY 2026-11-02-fsftm-dock). */
   const mainSyncIgnoreUntilRef = useRef(0);
   /** The split pane's last reported centre (sheet fractions). */
   const lastSplitViewRef = useRef<{ fx: number; fy: number } | null>(null);
@@ -4695,7 +4695,7 @@ export default function TakeoffViewerModule({
   const [customColumns, setCustomColumns] = useState<string[]>([]);
   /** Manage Columns dialog visibility. */
   const [manageColumnsOpen, setManageColumnsOpen] = useState(false);
-  /** Hidden built-in ledger columns (Bluebeam-style Manage Columns). */
+  /** Hidden built-in ledger columns (FSFTM-style Manage Columns). */
   const [hiddenLedgerColumns, setHiddenLedgerColumns] = useState<ReadonlySet<string>>(new Set());
   // Load the document's custom columns (on mount and when the document changes).
   useEffect(() => {
@@ -4740,7 +4740,7 @@ export default function TakeoffViewerModule({
   const handleLedgerFieldChange = useCallback(
     (id: string, field: 'annotation' | 'group' | 'qty' | 'label' | 'material' | 'subject', value: string) => {
       // Bulk edit: when the edited row is part of a multi-selection, apply
-      // the change to every selected row (Bluebeam-style). Otherwise just
+      // the change to every selected row (FSFTM-style). Otherwise just
       // the single row.
       const ids =
         selectedLedgerIds.size > 1 && selectedLedgerIds.has(id)
@@ -4753,8 +4753,8 @@ export default function TakeoffViewerModule({
             const n = parseInt(value, 10);
             return Number.isFinite(n) && n >= 1 ? { ...m, multiplier: n } : m;
           }
-          // Revu Markups list: Subject = category, Label = the text on the sheet
-          // (OE-DELIVERY 2026-11-02-revu-markups-units).
+          // FSFTM Markups list: Subject = category, Label = the text on the sheet
+          // (OE-DELIVERY 2026-11-02-fsftm-markups-units).
           if (field === 'subject') {
             return { ...m, customFields: { ...m.customFields, Subject: value } };
           }
@@ -4773,7 +4773,7 @@ export default function TakeoffViewerModule({
           }
           if (field === 'material') {
             // An auto markup's profile edited in the Markups list moves it to
-            // that size, exactly like the Auto Takeoff list edit (OE-DELIVERY 2026-11-02-revu-markups-list).
+            // that size, exactly like the Auto Takeoff list edit (OE-DELIVERY 2026-11-02-fsftm-markups-list).
             const prof = normalizeProfile(value);
             if (m.auto && prof) {
               return {
@@ -4796,7 +4796,7 @@ export default function TakeoffViewerModule({
    *  whole multi-selection when the row is part of one, mirroring the
    *  field-change handler. Flags normalise to undefined when cleared
    *  so stored objects stay clean. Not undoable (a property toggle,
-   *  like Revu) — but it persists and syncs like any other edit. */
+   *  like FSFTM) — but it persists and syncs like any other edit. */
   const handleLedgerFlagsChange = useCallback(
     (id: string, patch: { locked?: boolean; status?: string; flattened?: boolean }) => {
       const ids =
@@ -5431,7 +5431,7 @@ export default function TakeoffViewerModule({
         // Bitmap renders at the settled (debounced) zoom for crispness;
         // the element CSS-scales with the LIVE zoom so the page tracks a
         // zoom gesture smoothly while the bitmap catches up.
-        // Deep zoom (OE-DELIVERY 2026-11-02-revu-zoom): the full-page bitmap
+        // Deep zoom (OE-DELIVERY 2026-11-02-fsftm-zoom): the full-page bitmap
         // never exceeds the canvas limits; above that the detail canvas
         // renders the visible region sharp.
         const unitVp = page.getViewport({ scale: 1 });
@@ -5527,9 +5527,9 @@ export default function TakeoffViewerModule({
     };
   }, [pdfDoc, canvasReady, currentPage, renderZoom, pageMode, lineWeightsOff]);
 
-  /* Layout effects (OE-DELIVERY 2026-11-02-revu-properties): the canvas size, the
+  /* Layout effects (OE-DELIVERY 2026-11-02-fsftm-properties): the canvas size, the
    * cursor anchor and the markup repaint all land before the browser paints,
-   * so a zoom step is one clean frame (Revu feel) instead of a drift-and-snap. */
+   * so a zoom step is one clean frame (FSFTM feel) instead of a drift-and-snap. */
   /* ── Live-zoom CSS follow ────────────────────────────────────────────
    * While a zoom gesture is in flight the bitmap re-render is debounced
    * (see renderZoom); this keeps the canvas ELEMENT glued to the live zoom
@@ -5542,7 +5542,7 @@ export default function TakeoffViewerModule({
     // Don't size from a stale bitmap while a page change is in flight.
     if (mainRenderedPageRef.current !== currentPage) return;
     // Page size in PDF units from the render, not the (possibly capped)
-    // bitmap (OE-DELIVERY 2026-11-02-revu-zoom).
+    // bitmap (OE-DELIVERY 2026-11-02-fsftm-zoom).
     const pageSz = pageSizePdfRef.current;
     if (!pageSz || pageSz.page !== currentPage || canvas.width === 0) return;
     const pageW = pageSz.w;
@@ -5573,13 +5573,13 @@ export default function TakeoffViewerModule({
     // (OE-DELIVERY 2026-11-02-render-serialize).
     const dpr = window.devicePixelRatio || 1;
     // Page size in PDF units from the render, not the (possibly capped)
-    // bitmap (OE-DELIVERY 2026-11-02-revu-zoom).
+    // bitmap (OE-DELIVERY 2026-11-02-fsftm-zoom).
     const pageSz = pageSizePdfRef.current;
     if (!pageSz || pageSz.page !== currentPage || canvas.width === 0) return;
     const pageW = pageSz.w;
     const pageH = pageSz.h;
     if (!Number.isFinite(pageW) || pageW <= 0 || !Number.isFinite(pageH) || pageH <= 0) return;
-    // Deep zoom (OE-DELIVERY 2026-11-02-revu-zoom): above the bitmap limit the
+    // Deep zoom (OE-DELIVERY 2026-11-02-fsftm-zoom): above the bitmap limit the
     // full-size overlay keeps taking pointer events (so every pointer->PDF
     // mapping is unchanged) with a 1x1 bitmap; markups draw into the
     // visible-region canvas instead.
@@ -5754,7 +5754,7 @@ export default function TakeoffViewerModule({
     try {
       const page = await doc.getPage(n);
       // Render at 2x for sharp thumbnails on retina displays (displayed at ~120px CSS).
-      // Supersample at 2x the stored size, then downscale cleanly (OE-DELIVERY 2026-11-02-revu-left-panel-v2).
+      // Supersample at 2x the stored size, then downscale cleanly (OE-DELIVERY 2026-11-02-fsftm-left-panel-v2).
       // Rendered straight at the stored size (2x the display width) - the 3x
       // supersample + downscale cost seconds on big sets (OE-DELIVERY 2026-11-04-perf-rerun).
       const scale = computeThumbScale(page.getViewport({ scale: 1 }).width, THUMB_MAX_WIDTH * 2);
@@ -5784,7 +5784,7 @@ export default function TakeoffViewerModule({
     thumbPumpRunningRef.current = true;
     (async () => {
       try {
-        // Large files (OE-DELIVERY 2026-11-02-revu-left-panel-v2): the page on screen is drawn
+        // Large files (OE-DELIVERY 2026-11-02-fsftm-left-panel-v2): the page on screen is drawn
         // first; thumbnails only start once it is, then come one by one.
         for (let w = 0; w < 80 && mainRenderedPageRef.current !== currentPageRef.current; w++) {
           await new Promise<void>((r) => setTimeout(r, 150));
@@ -5897,7 +5897,7 @@ export default function TakeoffViewerModule({
   useLayoutEffect(() => {
     if (!overlayRef.current) return;
     const dpr = window.devicePixelRatio;
-    // Deep zoom (OE-DELIVERY 2026-11-02-revu-zoom): draw into the visible-region
+    // Deep zoom (OE-DELIVERY 2026-11-02-fsftm-zoom): draw into the visible-region
     // canvas, shifted so all the page-space maths below is unchanged.
     const deepRegion = deepModeRef.current ? deepRegionRef.current : null;
     const deepCanvas = deepCanvasRef.current;
@@ -5929,7 +5929,7 @@ export default function TakeoffViewerModule({
      * the label remains legible regardless of theme.
      */
     const isDark = document.documentElement.classList.contains('dark');
-    /** Label mode of the measurement being painted (OE-DELIVERY 2026-11-02-revu-properties). */
+    /** Label mode of the measurement being painted (OE-DELIVERY 2026-11-02-fsftm-properties). */
     let curLabelMode: Measurement['labelMode'];
     const drawAnnotationLabel = (
       text: string,
@@ -5941,11 +5941,11 @@ export default function TakeoffViewerModule({
       // Names view toggle: the name badges (and the count badge, which carries
       // the running total) are the names layer and hide together (#314).
       if (!showLabels || curLabelMode === 'none' || curLabelMode === 'value') return;
-      if (labelStyle === 'revu') {
-        // Revu caption: plain text in the markup colour, drawing-space size.
-        const fsRevu = 11 * dpr * zoom;
+      if (labelStyle === 'fsftm') {
+        // FSFTM caption: plain text in the markup colour, drawing-space size.
+        const fsFSFTM = 11 * dpr * zoom;
         ctx.save();
-        ctx.font = `${labelFontStyle}${fsRevu}px ${labelFontCss}`;
+        ctx.font = `${labelFontStyle}${fsFSFTM}px ${labelFontCss}`;
         ctx.textAlign = alignRight ? 'right' : 'left';
         ctx.textBaseline = 'alphabetic';
         ctx.fillStyle = color;
@@ -5998,15 +5998,15 @@ export default function TakeoffViewerModule({
       cy: number,
     ) => {
       // An auto markup's sheet label is its profile; its Subject ("Beam")
-      // lives in the Markups list only (OE-DELIVERY 2026-11-02-revu-markups-list).
+      // lives in the Markups list only (OE-DELIVERY 2026-11-02-fsftm-markups-list).
       const name = m.auto
         ? displayDesignation(m.annotation?.trim() || m.auto.des)
         : (m.customFields?.Subject?.trim() || m.annotation?.trim() || '');
       const material = m.auto ? '' : (m.customFields?.Material?.trim() || '');
       const value = measurementLabel(m, scaleForMeasurement(pageScales, m.page, m.points), measurementSystem, areaAreaUnitRef.current, imperialDenominator);
-      // Per-markup label mode narrows the global switches (OE-DELIVERY 2026-11-02-revu-properties).
+      // Per-markup label mode narrows the global switches (OE-DELIVERY 2026-11-02-fsftm-properties).
       const parts = labelParts(m.labelMode);
-      // Caption pick list (Revu Properties toolbar): 'label' shows the name line.
+      // Caption pick list (FSFTM Properties toolbar): 'label' shows the name line.
       const showName = labelShowName && (m.captions ? m.captions.includes('label') : parts.name) && name.length > 0;
       const showMaterial = labelShowMaterial && parts.material && material.length > 0;
       const showValue = showDimensions && labelShowDimension && (m.captions ? m.captions.some((c) => c !== 'label') : parts.value) && value.length > 0;
@@ -6061,19 +6061,19 @@ export default function TakeoffViewerModule({
       }
       // Per-markup size overrides win; otherwise the global Colours-tab sizes.
       // Three independent lines: name, material, dimension.
-      // Revu captions live in drawing space, so every size scales with zoom
-      // (OE-DELIVERY 2026-11-02-revu-labels); badges keep their fixed screen size.
-      const revu = labelStyle === 'revu';
-      const zs = revu ? zoom : 1;
+      // FSFTM captions live in drawing space, so every size scales with zoom
+      // (OE-DELIVERY 2026-11-02-fsftm-labels); badges keep their fixed screen size.
+      const fsftm = labelStyle === 'fsftm';
+      const zs = fsftm ? zoom : 1;
       const fsName = (m.labelTextSize ?? labelTextSize) * dpr * zs;
       const fsMat = (m.labelMaterialSize ?? labelMaterialSize) * dpr * zs;
       const fsDim = (m.labelDimSize ?? labelDimSize) * dpr * zs;
-      const gap = (revu ? 1 : 4) * dpr * zs;
+      const gap = (fsftm ? 1 : 4) * dpr * zs;
       const lift = 2 * dpr * zs; // stack bottom sits tight above the line (no floating gap)
-      const padX = (revu ? 0 : 6) * dpr * zs;
-      const padY = (revu ? 0 : 4) * dpr * zs;
-      const fontFamily = m.labelFont ? `"${m.labelFont}", Arial, Helvetica, sans-serif` : revu ? labelFontCss : 'sans-serif';
-      const weight = revu ? fontPrefix(m, labelBold, labelItalic) : fontPrefix(m, true, false);
+      const padX = (fsftm ? 0 : 6) * dpr * zs;
+      const padY = (fsftm ? 0 : 4) * dpr * zs;
+      const fontFamily = m.labelFont ? `"${m.labelFont}", Arial, Helvetica, sans-serif` : fsftm ? labelFontCss : 'sans-serif';
+      const weight = fsftm ? fontPrefix(m, labelBold, labelItalic) : fontPrefix(m, true, false);
       const matStyle = m.labelItalic ? 'italic ' : '';
       const underline = (text: string, x: number, y: number, fs: number) => {
         if (!m.labelUnderline) return;
@@ -6119,7 +6119,7 @@ export default function TakeoffViewerModule({
         ctx.translate(-rcx, -rcy);
       }
       // Pill background in the user's label colour (badge style only).
-      if (!revu) {
+      if (!fsftm) {
         ctx.fillStyle = labelBgColor;
         const r = Math.min(6 * dpr, boxH / 2);
         ctx.beginPath();
@@ -6128,12 +6128,12 @@ export default function TakeoffViewerModule({
         ctx.fill();
       }
       // Text lines, top to bottom: name, material, dimension — each with its
-      // own size and colour (per-markup overrides win). Revu captions default
+      // own size and colour (per-markup overrides win). FSFTM captions default
       // to the markup's own colour.
       const markupColor = resolveMeasurementColor(m, groupColorMap);
-      const colName = m.labelNameColor ?? (revu ? markupColor : labelNameColor);
-      const colMat = m.labelMaterialColor ?? (revu ? markupColor : labelMaterialColor);
-      const colDim = m.labelDimColor ?? (revu ? markupColor : labelDimColor);
+      const colName = m.labelNameColor ?? (fsftm ? markupColor : labelNameColor);
+      const colMat = m.labelMaterialColor ?? (fsftm ? markupColor : labelMaterialColor);
+      const colDim = m.labelDimColor ?? (fsftm ? markupColor : labelDimColor);
       let ty = by + padY;
       if (showName) {
         ctx.font = `${weight}${fsName}px ${fontFamily}`;
@@ -6250,7 +6250,7 @@ export default function TakeoffViewerModule({
       // (issue #299); annotation markups already resolve `m.color` below.
       const color = resolveMeasurementColor(m, groupColorMap);
       ctx.strokeStyle = color;
-      // Revu fill colour, independent of the line colour (OE-DELIVERY 2026-11-02-revu-properties).
+      // FSFTM fill colour, independent of the line colour (OE-DELIVERY 2026-11-02-fsftm-properties).
       ctx.fillStyle = m.fillColor ?? color;
       curLabelMode = m.labelMode;
       // Optional per-measurement stroke width (issues #312/#339). A real-world
@@ -6376,15 +6376,15 @@ export default function TakeoffViewerModule({
         // measurement system; stored metric per D-TKC-016).
         const cx = m.points.reduce((s, p) => s + p.x, 0) / m.points.length * dpr * zoom;
         const cy = m.points.reduce((s, p) => s + p.y, 0) / m.points.length * dpr * zoom;
-        ctx.font = labelStyle === 'revu' ? `${labelFontStyle}${12 * dpr * zoom}px ${labelFontCss}` : `${12 * dpr}px sans-serif`;
+        ctx.font = labelStyle === 'fsftm' ? `${labelFontStyle}${12 * dpr * zoom}px ${labelFontCss}` : `${12 * dpr}px sans-serif`;
         // The fill pass left fillStyle on the fill colour; the text reads in
-        // the markup colour (OE-DELIVERY 2026-11-02-revu-labels).
+        // the markup colour (OE-DELIVERY 2026-11-02-fsftm-labels).
         ctx.fillStyle = isVoid ? '#ef4444' : color;
         // Prefix a minus so the on-canvas number reads as a subtraction.
         const areaLabel = measurementLabel(m, scaleForMeasurement(pageScales, m.page, m.points), measurementSystem, areaAreaUnitRef.current, imperialDenominator);
         if (showDimensions) ctx.fillText(isVoid ? `- ${areaLabel}` : areaLabel, cx, cy);
         // Annotation above centroid
-        drawAnnotationLabel(m.annotation, cx, cy - 14 * dpr * (labelStyle === 'revu' ? zoom : 1), color);
+        drawAnnotationLabel(m.annotation, cx, cy - 14 * dpr * (labelStyle === 'fsftm' ? zoom : 1), color);
       }
 
       if (m.type === 'perimeter' && m.points.length >= 3) {
@@ -6660,11 +6660,11 @@ export default function TakeoffViewerModule({
         drawAnnotationLabel(m.annotation, x0 + 8 * dpr, y0 - 8 * dpr, annoColor);
       }
 
-      // Revu markup + arc tools (OE-DELIVERY 2026-10-30-revu-markup-tools).
+      // FSFTM markup + arc tools (OE-DELIVERY 2026-10-30-fsftm-markup-tools).
       // Markups paint in their own colour and carry no floating label (as in
-      // Revu); the arc is a measurement and gets the normal label stack.
-      if (isRevuMarkupType(m.type) || m.type === 'arc') {
-        const drawn = drawRevuMarkup(ctx, m, {
+      // FSFTM); the arc is a measurement and gets the normal label stack.
+      if (isFSFTMMarkupType(m.type) || m.type === 'arc') {
+        const drawn = drawFSFTMMarkup(ctx, m, {
           k: dpr * zoom,
           dpr,
           color: m.type === 'arc' ? color : annoColor,
@@ -6673,13 +6673,13 @@ export default function TakeoffViewerModule({
           strokeAlpha: m.strokeAlpha,
         });
         if (drawn && m.type === 'arc') {
-          const anchor = revuLabelAnchor(m);
+          const anchor = fsftmLabelAnchor(m);
           if (anchor) drawLabelStack(m, anchor.x * dpr * zoom, anchor.y * dpr * zoom);
         }
       }
 
       if (m.type === 'text' && m.points.length >= 1) {
-        // Revu-style text box: wrapped text inside a stored-width box,
+        // FSFTM-style text box: wrapped text inside a stored-width box,
         // anchor at the box's top-left. While this text is open in the
         // editor the textarea shows the content, so the canvas skips it.
         if (!(showTextInput && editingTextId === m.id)) {
@@ -6722,7 +6722,7 @@ export default function TakeoffViewerModule({
         }
       }
 
-      // Bluebeam-style placed legend: white box with a table of
+      // FSFTM-style placed legend: white box with a table of
       // (swatch, type label, + visible legend columns) rows. Selection-based
       // legends show their snapshot; "all" legends stay live.
       // Column set follows the panel's visibility toggles.
@@ -6959,7 +6959,7 @@ export default function TakeoffViewerModule({
     // into the in-progress drawing below.
     ctx.lineWidth = 2 * dpr;
 
-    // Viewports (OE-DELIVERY 2026-11-02-revu-viewports-sketch): dashed purple frame
+    // Viewports (OE-DELIVERY 2026-11-02-fsftm-viewports-sketch): dashed purple frame
     // with a name + scale tag, plus the rubber-band while drawing one.
     {
       const vk = dpr * zoom;
@@ -7001,9 +7001,9 @@ export default function TakeoffViewerModule({
         ctx.arc(p.x * dpr * zoom, p.y * dpr * zoom, 4 * dpr, 0, Math.PI * 2);
         ctx.fill();
       }
-      // Revu markup + arc previews (OE-DELIVERY 2026-10-30-revu-markup-tools).
+      // FSFTM markup + arc previews (OE-DELIVERY 2026-10-30-fsftm-markup-tools).
       if (activeTool === 'line' || activeTool === 'polygon' || activeTool === 'callout' || activeTool === 'arc' || activeTool === 'pen') {
-        drawRevuPreview(ctx, activeTool, activePoints, activeTool === 'pen' || panning ? null : liveCursor, {
+        drawFSFTMPreview(ctx, activeTool, activePoints, activeTool === 'pen' || panning ? null : liveCursor, {
           k: dpr * zoom,
           dpr,
           color: activeTool === 'arc' ? '#2563EB' : annotationColor,
@@ -7198,7 +7198,7 @@ export default function TakeoffViewerModule({
         if (hiddenGroups.has(m.group) || hiddenMeasurements.has(m.id) || hiddenTypes.has(m.type)) continue;
         const isSel = sel.has(m.id);
         if (!isSel && !autoHighlightAll) continue;
-        // Revu highlighter (OE-DELIVERY 2026-11-02-revu-workspace): a
+        // FSFTM highlighter (OE-DELIVERY 2026-11-02-fsftm-workspace): a
         // translucent yellow band over the profile text, following the text
         // direction, no outline - the text stays readable.
         const lq = m.auto.lq;
@@ -7453,12 +7453,12 @@ export default function TakeoffViewerModule({
       ctx.restore();
     }
 
-    /* ── Multi-select highlight + marquee box (Bluebeam-style) ──────────
+    /* ── Multi-select highlight + marquee box (FSFTM-style) ──────────
      * Every id in selectedLedgerIds that is not the primary selection gets a
      * dashed blue outline around its bounding box. The live marquee rubber-
      * band is drawn on top while the drag is in flight. */
     // The zoom box draws in every tool, not only alongside a selection
-    // marquee (OE-DELIVERY 2026-11-02-revu-zoom).
+    // marquee (OE-DELIVERY 2026-11-02-fsftm-zoom).
     if ((activeTool === 'select' && (selectedLedgerIds.size > 0 || marqueeRect)) || zoomAreaRect) {
       ctx.save();
       ctx.setLineDash([6 * dpr, 4 * dpr]);
@@ -7679,7 +7679,7 @@ export default function TakeoffViewerModule({
   const nextAnnotation = useCallback(
     (type: string) => {
       // A chest tool's sticky label wins over the auto "Distance 1" style
-      // annotation, Bluebeam-style. Built as "{Type} {Material}" — e.g.
+      // annotation, FSFTM-style. Built as "{Type} {Material}" — e.g.
       // "Howe truss 800S200-33", "CFS joist 800S200-43",
       // "CFS load bearing wall 600S200-54".
       if (toolLabelRef.current || toolSubjectRef.current) {
@@ -7720,10 +7720,10 @@ export default function TakeoffViewerModule({
     [t],
   );
 
-  /* ── Revu stamp / callout / pen commits (OE-DELIVERY 2026-10-30-revu-markup-tools) ── */
+  /* ── FSFTM stamp / callout / pen commits (OE-DELIVERY 2026-10-30-fsftm-markup-tools) ── */
 
   /** Drop a stamp (title, then date · author) with its top-left at `anchor`. */
-  /** Sketch to Scale (OE-DELIVERY 2026-11-02-revu-viewports-sketch): place the next
+  /** Sketch to Scale (OE-DELIVERY 2026-11-02-fsftm-viewports-sketch): place the next
    *  vertex exactly the typed length (and optional angle) from the last one,
    *  through the normal click path so every tool finishes as if clicked. */
   const confirmSketch = useCallback(
@@ -8038,7 +8038,7 @@ export default function TakeoffViewerModule({
       if (hiddenMeasurements.has(m.id)) continue;
       if (isAnnotationType(m.type) && hiddenGroups.has('__annotations__')) continue;
       for (const p of m.points) out.push(p);
-      // Bluebeam's Snap to Markup also takes segment midpoints and
+      // FSFTM's Snap to Markup also takes segment midpoints and
       // shape centers, not only corners: midpoints let a run lock
       // onto the middle of an existing markup edge, and the average
       // of a closed shape's corners is its center. (For a 2-point
@@ -8148,7 +8148,7 @@ export default function TakeoffViewerModule({
       const y = (e.clientY - rect.top) / zoom;
       let point: Point = { x, y };
       // Sketch to Scale: a typed exact vertex replaces the synthetic click
-      // position and skips snap / ortho below (OE-DELIVERY 2026-11-02-revu-viewports-sketch).
+      // position and skips snap / ortho below (OE-DELIVERY 2026-11-02-fsftm-viewports-sketch).
       const exactPoint = pendingExactPoint;
       if (exactPoint) point = exactPoint;
       // Viewport drawing: two corner clicks, then the scale dialog.
@@ -8174,7 +8174,7 @@ export default function TakeoffViewerModule({
         return;
       }
 
-      // Bluebeam-style legend placement: drop a legend box at the click
+      // FSFTM-style legend placement: drop a legend box at the click
       // point on the current page, then disarm. The legend's rows are
       // derived live at render time, so nothing type-specific is stored.
       if (legendPlacingRef.current) {
@@ -8276,7 +8276,7 @@ export default function TakeoffViewerModule({
       // snaps ONLY to committed markups and drawing content — never
       // to the in-progress shape's own points (snapPool) — so a
       // 2-point calibration can lock exactly onto dimension ticks
-      // and grid crossings the way Bluebeam does, without the
+      // and grid crossings the way FSFTM does, without the
       // #343 hijack.
       const vsnap = !exactPoint && vertexSnapRef.current && canVertexSnap
         ? snapToVertex(point, settingScale ? snapVerticesRef.current : snapPool, zoom, VERTEX_SNAP_SCREEN_PX)
@@ -8302,7 +8302,7 @@ export default function TakeoffViewerModule({
           return;
         }
       } else {
-        // PDF-content snap (Bluebeam-style): snap to the drawing's own vector
+        // PDF-content snap (FSFTM-style): snap to the drawing's own vector
         // geometry (endpoints, centers, intersections, midpoints, edges)
         // when markup-vertex snap misses. Also live while calibrating:
         // the scale clicks take the snapped point (committed pool only).
@@ -8710,7 +8710,7 @@ export default function TakeoffViewerModule({
         return;
       }
 
-      /* ── Revu markup + arc tools (OE-DELIVERY 2026-10-30-revu-markup-tools) ── */
+      /* ── FSFTM markup + arc tools (OE-DELIVERY 2026-10-30-fsftm-markup-tools) ── */
 
       // Line (2 clicks), Callout (tip, then box), Arc (start, a point on the
       // arc, end). A callout asks for its text once both points are down.
@@ -9003,7 +9003,7 @@ export default function TakeoffViewerModule({
       return;
     }
 
-    // Polygon markup (OE-DELIVERY 2026-10-30-revu-markup-tools): close it.
+    // Polygon markup (OE-DELIVERY 2026-10-30-fsftm-markup-tools): close it.
     if (activeTool === 'polygon' && pts.length >= 3) {
       const newMeasurement: Measurement = {
         id: `m_${Date.now()}`,
@@ -9086,7 +9086,7 @@ export default function TakeoffViewerModule({
    *  measurement context menu for the shape under the cursor (issue #302). */
   const handleCanvasContextMenu = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
-      // Revu Zoom tool: right-click zooms out around the cursor (OE-DELIVERY 2026-11-02-revu-zoom).
+      // FSFTM Zoom tool: right-click zooms out around the cursor (OE-DELIVERY 2026-11-02-fsftm-zoom).
       if (zoomAreaArmedRef.current) {
         e.preventDefault();
         zoomToRef.current((zoomRef.current || 1) / ZOOM_TOOL_STEP, { x: e.clientX, y: e.clientY });
@@ -9134,7 +9134,7 @@ export default function TakeoffViewerModule({
   const editScaleRef = useRef(scale);
   editScaleRef.current = scale;
   // Reshape recompute reads the scale the edited shape sits in: its
-  // viewport, else its page (OE-DELIVERY 2026-11-02-revu-viewports-sketch).
+  // viewport, else its page (OE-DELIVERY 2026-11-02-fsftm-viewports-sketch).
   const editPageScalesRef = useRef(pageScales);
   editPageScalesRef.current = pageScales;
   const editScaleFor = (m: { page: number }, pts: Point[]): ScaleConfig =>
@@ -9234,10 +9234,10 @@ export default function TakeoffViewerModule({
     }
   }, [editableOnPage, addToast]);
 
-  /** Revu Zoom tool release (OE-DELIVERY 2026-11-02-revu-zoom):
+  /** FSFTM Zoom tool release (OE-DELIVERY 2026-11-02-fsftm-zoom):
    *  a click zooms in (Alt/Shift: out) by one step around the point; a drag
    *  fits the box to the viewport and centres it. The tool stays armed, as in
-   *  Revu, until Z / Esc / another tool. The old version clamped to 800%,
+   *  FSFTM, until Z / Esc / another tool. The old version clamped to 800%,
    *  ignored the page's offset inside the scroll area (so it landed off
    *  target) and disarmed after one use. */
   const finishZoomArea = useCallback(() => {
@@ -9286,7 +9286,7 @@ export default function TakeoffViewerModule({
   }, []);
 
   /** Recompute the visible part of the page for deep zoom and resize the
-   *  region canvas over it (OE-DELIVERY 2026-11-02-revu-zoom). */
+   *  region canvas over it (OE-DELIVERY 2026-11-02-fsftm-zoom). */
   const updateDeepRegion = useCallback(() => {
     const ov = overlayRef.current;
     const c = containerRef.current;
@@ -9351,7 +9351,7 @@ export default function TakeoffViewerModule({
   }, [panOffset, currentPage, pageMode]);
 
   /* Sharp PDF tile for the visible region when the page bitmap is capped
-   * (OE-DELIVERY 2026-11-02-revu-zoom). Rendered off-screen, then blitted,
+   * (OE-DELIVERY 2026-11-02-fsftm-zoom). Rendered off-screen, then blitted,
    * so the old tile never flashes; hidden during a live zoom gesture. */
   useEffect(() => {
     const dc = detailCanvasRef.current;
@@ -9407,7 +9407,7 @@ export default function TakeoffViewerModule({
     };
   }, [pdfDoc, pageMode, currentPage, zoom, renderZoom, regionNonce, lineWeightsOff]);
 
-  // Picking a tool leaves the Zoom tool, as in Revu.
+  // Picking a tool leaves the Zoom tool, as in FSFTM.
   useEffect(() => {
     setZoomAreaArmed(false);
   }, [activeTool]);
@@ -9699,9 +9699,9 @@ export default function TakeoffViewerModule({
         suppressNextClickRef.current = false;
       }
       // Drawing a viewport: the click handler takes the corners; no marquee,
-      // drag or pen stroke may start (OE-DELIVERY 2026-11-02-revu-viewports-sketch).
+      // drag or pen stroke may start (OE-DELIVERY 2026-11-02-fsftm-viewports-sketch).
       if (viewportDraftRef.current && e.button === 0) return;
-      // Revu Zoom tool (OE-DELIVERY 2026-11-02-revu-zoom): works on top of any
+      // FSFTM Zoom tool (OE-DELIVERY 2026-11-02-fsftm-zoom): works on top of any
       // tool without cancelling the shape in progress; the trailing click is
       // swallowed so it never places a point.
       if (zoomAreaArmedRef.current && e.button === 0 && !spaceHeldRef.current && !panLockRef.current) {
@@ -9732,7 +9732,7 @@ export default function TakeoffViewerModule({
         }
         return;
       }
-      // Revu Pen (OE-DELIVERY 2026-10-30-revu-markup-tools): a held press
+      // FSFTM Pen (OE-DELIVERY 2026-10-30-fsftm-markup-tools): a held press
       // draws a freehand stroke; the window mouseup commits it.
       if (activeTool === 'pen' && e.button === 0) {
         const start = pointerToPdf(e);
@@ -9958,7 +9958,7 @@ export default function TakeoffViewerModule({
 
       // Clicked empty space: start a marquee (rubber-band) selection. A plain
       // click with no drag deselects on mouseup (finishMarquee); a drag
-      // selects every intersecting markup, Bluebeam-style.
+      // selects every intersecting markup, FSFTM-style.
       // Zoom-to-area mode: draw a rectangle to zoom into instead.
       if (zoomAreaArmed) {
         activeVertexRef.current = null;
@@ -10049,7 +10049,7 @@ export default function TakeoffViewerModule({
       }
       // A pan in progress is driven by the window listener; ignore here.
       if (panRef.current) return;
-      // Live Pen stroke (OE-DELIVERY 2026-10-30-revu-markup-tools): sample
+      // Live Pen stroke (OE-DELIVERY 2026-10-30-fsftm-markup-tools): sample
       // every ~2 screen px so the stroke stays smooth without flooding state.
       if (penStrokeRef.current) {
         const ppt = pointerToPdf(e);
@@ -10569,7 +10569,7 @@ export default function TakeoffViewerModule({
         if (m.type === 'count') return m; // counts are scale-independent
         if (isAnnotationType(m.type)) return m; // annotations are scale-independent
         // Rows inside a viewport read the viewport's scale, not the page's,
-        // and the reconcile pass below keeps them right (OE-DELIVERY 2026-11-02-revu-viewports-sketch).
+        // and the reconcile pass below keeps them right (OE-DELIVERY 2026-11-02-fsftm-viewports-sketch).
         if (viewportAt(pageScales, m.page, m.points[0])) return m;
         // Each measurement uses ITS page's scale, old vs new. Skip rows on
         // pages whose effective scale did not change so we never churn a
@@ -10635,7 +10635,7 @@ export default function TakeoffViewerModule({
     );
   }, [pageScales]);
 
-  /* ── Viewport value reconciliation (OE-DELIVERY 2026-11-02-revu-viewports-sketch) ──
+  /* ── Viewport value reconciliation (OE-DELIVERY 2026-11-02-fsftm-viewports-sketch) ──
    * The create paths compute against the page scale; on a page that has
    * viewports, re-derive every scale-dependent row against the scale it
    * actually sits in. Returns the same array when nothing moved, so it
@@ -10696,10 +10696,10 @@ export default function TakeoffViewerModule({
     const dy = rect.top + a.fracY * rect.height - a.clientY;
     if (dx !== 0) container.scrollLeft = Math.max(0, container.scrollLeft + dx);
     if (dy !== 0) container.scrollTop = Math.max(0, container.scrollTop + dy);
-    // Revu zooms exactly at the cursor even when the sheet is smaller than
+    // FSFTM zooms exactly at the cursor even when the sheet is smaller than
     // the window or the point is near an edge, where the scrollbars cannot
     // move far enough. Shift the sheet itself by whatever the scroll could
-    // not absorb (OE-DELIVERY 2026-11-02-revu-zoom-anchor).
+    // not absorb (OE-DELIVERY 2026-11-02-fsftm-zoom-anchor).
     const after = a.el.getBoundingClientRect();
     const rx = after.left + a.fracX * after.width - a.clientX;
     const ry = after.top + a.fracY * after.height - a.clientY;
@@ -10722,7 +10722,7 @@ export default function TakeoffViewerModule({
    * owns the scroll (fit and framing flows set it themselves). */
   const zoomTo = useCallback((nextZoom: number, anchorClient?: { x: number; y: number }) => {
     // Continuous mode keeps one full canvas per page, so it stays at 400%;
-    // single-page mode goes to 6400% via deep zoom (OE-DELIVERY 2026-11-02-revu-zoom).
+    // single-page mode goes to 6400% via deep zoom (OE-DELIVERY 2026-11-02-fsftm-zoom).
     const target = pageModeRef.current === 'continuous'
       ? Math.min(CONTINUOUS_ZOOM_MAX, clampZoom(nextZoom))
       : clampZoom(nextZoom);
@@ -10793,7 +10793,7 @@ export default function TakeoffViewerModule({
     // Single mode uses the main canvas; continuous mode has no main canvas,
     // so read the active page's canvas instead.
     // Single mode: the render's stored page size; the bitmap may be capped
-    // under deep zoom (OE-DELIVERY 2026-11-02-revu-zoom).
+    // under deep zoom (OE-DELIVERY 2026-11-02-fsftm-zoom).
     const storedSize = pageSizePdfRef.current;
     if (canvasRef.current && storedSize && storedSize.page === currentPageRef.current) {
       return { width: storedSize.w, height: storedSize.h };
@@ -11041,7 +11041,7 @@ export default function TakeoffViewerModule({
    *  container-relative point (cx, cy). Only the document (canvas +
    *  overlay) rescales; the surrounding UI never does. */
   const applyWheelZoom = useCallback((deltaY: number, clientX: number, clientY: number, deltaMode = 0) => {
-    // Revu feel (OE-DELIVERY 2026-11-02-revu-properties): one clear 1.2x step per
+    // FSFTM feel (OE-DELIVERY 2026-11-02-fsftm-properties): one clear 1.2x step per
     // mouse-wheel notch, proportional glide for trackpads / pinch.
     const next = clampZoom(liveZoomRef.current * wheelZoomFactor(deltaY, deltaMode));
     if (next === liveZoomRef.current) return;
@@ -11239,11 +11239,11 @@ export default function TakeoffViewerModule({
     [orderedMeasurements, currentPage],
   );
 
-  /** Markups List filter (Bluebeam-style). */
+  /** Markups List filter (FSFTM-style). */
   const [markupFilter, setMarkupFilter] = useState<MarkupFilter>({});
   const [showTotals, setShowTotals] = useState(true);
 
-  /** Bluebeam-style legend panel collapsed state (sidebar). */
+  /** FSFTM-style legend panel collapsed state (sidebar). */
   const [legendCollapsed, setLegendCollapsed] = useState(false);
 
   /** Legend column visibility: set of hidden column keys. Derived from the
@@ -11286,7 +11286,7 @@ export default function TakeoffViewerModule({
     [filteredLedgerMeasurements],
   );
 
-  /** Bluebeam-style legend rows: measurements grouped by type (annotations
+  /** FSFTM-style legend rows: measurements grouped by type (annotations
    *  and placed legends excluded — a legend never lists itself), each with
    *  the group's representative color, count, and summed total. Derived
    *  live from `measurements` so the panel and any placed legend boxes
@@ -11406,7 +11406,7 @@ export default function TakeoffViewerModule({
   /** Build legend rows from a specific set of measurements. Extracted so
    *  placed legends can show a selection snapshot instead of everything. */
   /** Sheet-caption formatting for the Markups list and the legend
-   *  (OE-DELIVERY 2026-11-02-revu-markups-units). */
+   *  (OE-DELIVERY 2026-11-02-fsftm-markups-units). */
   const formatQuantityCell = useCallback(
     (m: Measurement, kind: 'length' | 'area' | 'volume', metricValue: number) =>
       splitQuantityText(
@@ -12380,7 +12380,7 @@ export default function TakeoffViewerModule({
         pdfDoc,
         measurements,
         hiddenGroups,
-        // Show/Hide-by-type also applies to the export (OE-DELIVERY 2026-11-02-revu-export).
+        // Show/Hide-by-type also applies to the export (OE-DELIVERY 2026-11-02-fsftm-export).
         hiddenMeasurements: hiddenTypes.size > 0
           ? new Set([...hiddenMeasurements, ...measurements.filter((mm) => hiddenTypes.has(mm.type)).map((mm) => mm.id)])
           : hiddenMeasurements,
@@ -12483,7 +12483,7 @@ export default function TakeoffViewerModule({
         pdfDoc,
         measurements,
         hiddenGroups,
-        // Show/Hide-by-type also applies to the export (OE-DELIVERY 2026-11-02-revu-export).
+        // Show/Hide-by-type also applies to the export (OE-DELIVERY 2026-11-02-fsftm-export).
         hiddenMeasurements: hiddenTypes.size > 0
           ? new Set([...hiddenMeasurements, ...measurements.filter((mm) => hiddenTypes.has(mm.type)).map((mm) => mm.id)])
           : hiddenMeasurements,
@@ -12953,7 +12953,7 @@ export default function TakeoffViewerModule({
     setRenderNonce((n) => n + 1);
   }, [multiplyDialog, resolveMultiply]);
 
-  /** Multiply confirm: Bluebeam-style linear copies. */
+  /** Multiply confirm: FSFTM-style linear copies. */
   const handleMultiplyConfirm = useCallback(() => {
     const resolved = resolveMultiply(true);
     if (!resolved) return;
@@ -13331,7 +13331,7 @@ export default function TakeoffViewerModule({
   }, [measurements]);
 
   /** Earlier auto markups: fill the Markups list columns and drop the
-   *  profile text from the sheet (OE-DELIVERY 2026-11-02-revu-markups-list). Runs once per markup. */
+   *  profile text from the sheet (OE-DELIVERY 2026-11-02-fsftm-markups-list). Runs once per markup. */
   useEffect(() => {
     if (!measurements.some((m) => m.auto && !m.customFields?.Material)) return;
     setMeasurements((prev) =>
@@ -13467,7 +13467,7 @@ export default function TakeoffViewerModule({
   /** Zoom so one markup fills the view (never closer than ~200 units),
    *  then centre it by measuring where it actually landed on screen - this
    *  stays right whatever pan offset or deep-zoom state the view is in
-   *  (OE-DELIVERY 2026-11-02-revu-workspace). */
+   *  (OE-DELIVERY 2026-11-02-fsftm-workspace). */
   const zoomToAutoMarkup = useCallback(
     (id: string) => {
       const m = measurementsRef.current.find((x) => x.id === id);
@@ -13501,7 +13501,7 @@ export default function TakeoffViewerModule({
     [viewportSize, zoomTo],
   );
 
-  /* Revu status bar cursor readout (OE-DELIVERY 2026-11-02-revu-statusbar): written straight into the
+  /* FSFTM status bar cursor readout (OE-DELIVERY 2026-11-02-fsftm-statusbar): written straight into the
    * DOM on pointer move (rAF-throttled) so the big viewer never re-renders
    * just because the mouse moved. */
   const statusCursorRef = useRef<HTMLSpanElement | null>(null);
@@ -13552,7 +13552,7 @@ export default function TakeoffViewerModule({
     c.scrollLeft += cr.left + fx * cr.width - (vr.left + vr.width / 2);
     c.scrollTop += cr.top + fy * cr.height - (vr.top + vr.height / 2);
   }, []);
-  /* Revu Sync effects (OE-DELIVERY 2026-11-02-revu-left-panel). */
+  /* FSFTM Sync effects (OE-DELIVERY 2026-11-02-fsftm-left-panel). */
   useEffect(() => {
     if (!syncViews || splitMode === 'off') return;
     setSplitPage(Math.min(totalPages, Math.max(1, currentPage + syncDeltaRef.current)));
@@ -13821,7 +13821,7 @@ export default function TakeoffViewerModule({
           notes: notesFor(item),
           author,
           createdAt: new Date().toISOString(),
-          // Markups list (Revu Subject / profile columns).
+          // Markups list (FSFTM Subject / profile columns).
           customFields: { Subject: subjectFor(item), Material: item.profile || item.designation, ...(item.level ? { Level: item.level } : {}) },
           // Wall height from the schedule row (feet -> metres) drives Wall Area
           // (OE-DELIVERY 2026-11-05-framing-rules).
@@ -15881,9 +15881,9 @@ export default function TakeoffViewerModule({
   }, [activeTool, finishDrag]);
 
 
-  /* ── Revu Properties toolbar (OE-DELIVERY 2026-11-02-revu-properties-bar) ──
+  /* ── FSFTM Properties toolbar (OE-DELIVERY 2026-11-02-fsftm-properties-bar) ──
    * Edits every selected markup at once; with nothing selected it edits the
-   * armed tool's defaults for the next markup, as in Revu. */
+   * armed tool's defaults for the next markup, as in FSFTM. */
   const propsSelectedIds = useMemo(() => {
     const ids = new Set<string>(selectedLedgerIds);
     if (ids.size === 0 && selectedMeasurementId) ids.add(selectedMeasurementId);
@@ -15916,7 +15916,7 @@ export default function TakeoffViewerModule({
         type: first.type as string,
         title: propsSelected.length > 1 ? `${TYPE_LABELS[first.type] ?? first.type} · ${propsSelected.length} markups` : (TYPE_LABELS[first.type] ?? first.type),
         value: first,
-        // Revu: Subject = category (Markups list Label column), Label = sheet text.
+        // FSFTM: Subject = category (Markups list Label column), Label = sheet text.
         subject: first.customFields?.Subject ?? '',
         label: first.auto ? (first.annotation?.trim() || first.auto.des) : (first.annotation ?? ''),
         totals: parts.join(' · '),
@@ -15992,7 +15992,7 @@ export default function TakeoffViewerModule({
     },
     [propsSelectedIds],
   );
-  /** Every tool for the right-hand vertical strip, Revu order. */
+  /** Every tool for the right-hand vertical strip, FSFTM order. */
   const stripTools = useMemo<StripTool[]>(() => {
     const T = (tool: string, label: string, icon: StripTool['icon'], kind: StripTool['kind']): StripTool => ({ tool, label, icon, kind, shortcut: SHORTCUT_LETTER[tool] });
     return [
@@ -16066,7 +16066,7 @@ export default function TakeoffViewerModule({
     },
     [propsSelectedIds, addToast],
   );
-  /** Revu "Add to Tool Chest": each selected markup becomes a tool in the set. */
+  /** FSFTM "Add to Tool Chest": each selected markup becomes a tool in the set. */
   const addSelectionToChest = useCallback(
     (setId: string) => {
       if (propsSelected.length === 0) return;
@@ -16153,13 +16153,13 @@ export default function TakeoffViewerModule({
     [framingArea, framingLine, pageScales, addToast, pushUndo],
   );
 
-  /** Revu default keyboard shortcuts (OE-DELIVERY 2026-11-02-revu-shortcuts).
+  /** FSFTM default keyboard shortcuts (OE-DELIVERY 2026-11-02-fsftm-shortcuts).
    *  Refreshed every render so the key handler always sees current state. */
   const [showShortcutSheet, setShowShortcutSheet] = useState(false);
-  const revuKeyRef = useRef<(e: KeyboardEvent) => boolean>(() => false);
-  revuKeyRef.current = (e: KeyboardEvent): boolean => {
+  const fsftmKeyRef = useRef<(e: KeyboardEvent) => boolean>(() => false);
+  fsftmKeyRef.current = (e: KeyboardEvent): boolean => {
     if (!shouldHandleShortcut(e.target)) return false;
-    const sc = matchRevuShortcut(e);
+    const sc = matchFSFTMShortcut(e);
     if (!sc) return false;
     if (sc.action.kind === 'tool') {
       e.preventDefault();
@@ -16190,13 +16190,13 @@ export default function TakeoffViewerModule({
       case 'unsplit': setSplitMode('off'); setSyncViews(false); break;
       case 'singlePage': setPageMode('single'); break;
       case 'continuous': setPageMode('continuous'); break;
-      case 'panelThumbnails': openRevuPanel('thumbs'); break;
-      case 'panelBookmarks': openRevuPanel('index'); break;
+      case 'panelThumbnails': openFSFTMPanel('thumbs'); break;
+      case 'panelBookmarks': openFSFTMPanel('index'); break;
       case 'panelMarkups': setShowLedger((x) => !x); break;
-      case 'panelProperties': openRevuPanel('properties'); break;
-      case 'panelToolChest': openRevuPanel('tools'); break;
-      case 'panelMeasurements': openRevuPanel('measure'); break;
-      case 'panelLayers': openRevuPanel('layers'); break;
+      case 'panelProperties': openFSFTMPanel('properties'); break;
+      case 'panelToolChest': openFSFTMPanel('tools'); break;
+      case 'panelMeasurements': openFSFTMPanel('measure'); break;
+      case 'panelLayers': openFSFTMPanel('layers'); break;
       case 'panelSearch':
       case 'find':
         setSearchOpen(true);
@@ -16406,10 +16406,10 @@ export default function TakeoffViewerModule({
         }
       }
 
-      // Revu default shortcuts first (OE-DELIVERY 2026-11-02-revu-shortcuts).
-      if (revuKeyRef.current(e)) return;
+      // FSFTM default shortcuts first (OE-DELIVERY 2026-11-02-fsftm-shortcuts).
+      if (fsftmKeyRef.current(e)) return;
 
-      // Revu / Acrobat zoom keys (OE-DELIVERY 2026-11-02-revu-zoom): Ctrl+= in,
+      // FSFTM / Acrobat zoom keys (OE-DELIVERY 2026-11-02-fsftm-zoom): Ctrl+= in,
       // Ctrl+- out, Ctrl+0 fit page. Claimed so the browser does not zoom
       // the whole app instead of the drawing.
       if ((e.ctrlKey || e.metaKey) && !e.altKey && shouldHandleShortcut(e.target)) {
@@ -16445,7 +16445,7 @@ export default function TakeoffViewerModule({
         return;
       }
 
-      // Sketch to Scale (OE-DELIVERY 2026-11-02-revu-viewports-sketch): a digit while a
+      // Sketch to Scale (OE-DELIVERY 2026-11-02-fsftm-viewports-sketch): a digit while a
       // segment is in progress opens the exact-length entry with that digit.
       if (!e.shiftKey && /^[0-9.]$/.test(e.key)) {
         const sc = sketchCtxRef.current;
@@ -16455,7 +16455,7 @@ export default function TakeoffViewerModule({
           return;
         }
       }
-      // Z = Revu Zoom tool (toggle); Esc leaves it (OE-DELIVERY 2026-11-02-revu-zoom).
+      // Z = FSFTM Zoom tool (toggle); Esc leaves it (OE-DELIVERY 2026-11-02-fsftm-zoom).
       if (!e.shiftKey && e.key.toLowerCase() === 'z') {
         e.preventDefault();
         setZoomAreaArmed((v) => !v);
@@ -17003,12 +17003,12 @@ export default function TakeoffViewerModule({
           isTakeoffFullscreen && 'bg-surface-primary p-3 overflow-auto',
           workspaceOn && !isTakeoffFullscreen && 'fixed inset-0 z-50 bg-surface-primary p-1 gap-1 overflow-hidden',
         )}
-        data-revu-workspace={workspaceOn ? '1' : '0'}
+        data-fsftm-workspace={workspaceOn ? '1' : '0'}
       >
       {/* Fullscreen-scoped notifications (the global toast stack is hidden
           while this element is fullscreen). */}
       {isTakeoffFullscreen && <FullscreenToastStack />}
-      {/* Overlay Pages panel (OE-DELIVERY 2026-11-02-revu-left-panel) */}
+      {/* Overlay Pages panel (OE-DELIVERY 2026-11-02-fsftm-left-panel) */}
       {pdfDoc && overlayPanelOpen && (
         <div className="fixed right-6 top-16 z-[70] w-72 rounded-lg border border-border bg-surface-primary p-3 text-[11px] shadow-2xl" data-testid="overlay-panel">
           <div className="mb-2 flex items-center justify-between">
@@ -17074,11 +17074,11 @@ export default function TakeoffViewerModule({
           )}
         </div>
       )}
-      {/* Revu-style menu bar (OE-DELIVERY 2026-11-02-revu-workspace): File / Edit / View / Document /
+      {/* FSFTM-style menu bar (OE-DELIVERY 2026-11-02-fsftm-workspace): File / Edit / View / Document /
           Measure / Markup / Tools / Window / Help, each calling the same
           commands as the toolbars. */}
       {pdfDoc && (
-        <RevuMenuBar
+        <FSFTMMenuBar
           title={
             <span className="mr-1 flex items-center gap-1 rounded bg-oe-blue px-1.5 py-0.5 text-[11px] font-bold text-white">
               <Ruler size={12} /> Takeoff
@@ -17095,7 +17095,7 @@ export default function TakeoffViewerModule({
                 { label: 'Export CSV', onClick: () => handleExportCSV() },
                 { label: 'Send to BOQ / Estimate…', onClick: () => { void openExportDialog(); } },
                 { separator: true },
-                { label: revuWorkspace ? 'Exit workspace (back to ERP)' : 'Open full-window workspace', onClick: () => setRevuWorkspace((w) => !w), testId: 'revu-file-workspace' },
+                { label: fsftmWorkspace ? 'Exit workspace (back to ERP)' : 'Open full-window workspace', onClick: () => setFSFTMWorkspace((w) => !w), testId: 'fsftm-file-workspace' },
               ],
             },
             {
@@ -17154,7 +17154,7 @@ export default function TakeoffViewerModule({
                 { label: 'Show Dimensions', checked: showDimensions, onClick: () => setShowDimensions((x) => !x) },
                 { separator: true },
                 { label: 'Full Screen', shortcut: 'F11', checked: isTakeoffFullscreen, onClick: () => toggleTakeoffFullscreen() },
-                { label: 'Full-window Workspace', checked: revuWorkspace, onClick: () => setRevuWorkspace((w) => !w), testId: 'revu-view-workspace' },
+                { label: 'Full-window Workspace', checked: fsftmWorkspace, onClick: () => setFSFTMWorkspace((w) => !w), testId: 'fsftm-view-workspace' },
               ],
             },
             {
@@ -17172,7 +17172,7 @@ export default function TakeoffViewerModule({
                 { label: 'Calibrate (two clicks)…', onClick: () => handleStartCalibration() },
                 { label: 'Viewports…', checked: showViewportPanel, onClick: () => setShowViewportPanel((x) => !x) },
                 { separator: true },
-                { label: 'Overlay Pages…', checked: Boolean(overlayCfg), onClick: () => setOverlayPanelOpen(true), testId: 'revu-doc-overlay' },
+                { label: 'Overlay Pages…', checked: Boolean(overlayCfg), onClick: () => setOverlayPanelOpen(true), testId: 'fsftm-doc-overlay' },
                 { label: 'Page Index', onClick: () => { setShowThumbnails(true); setLeftTab('index'); } },
               ],
             },
@@ -17183,7 +17183,7 @@ export default function TakeoffViewerModule({
                 ['Perimeter', 'perimeter'], ['Count', 'count'], ['Volume', 'volume'], ['Diameter', 'diameter'],
                 ['Radius (centre)', 'radiusCenter'], ['Radius (3 points)', 'radius3Point'], ['Angle', 'angle'], ['Arc', 'arc'],
                 ['Polygon Cutout', 'polygonCutout'], ['Ellipse Cutout', 'ellipseCutout'], ['Dynamic Fill', 'dynamicFill'],
-              ] as [string, MeasureTool][]).map(([label, tool]) => ({ label, shortcut: revuKeyForTool(tool), checked: activeTool === tool, onClick: () => selectTool(tool) })),
+              ] as [string, MeasureTool][]).map(([label, tool]) => ({ label, shortcut: fsftmKeyForTool(tool), checked: activeTool === tool, onClick: () => selectTool(tool) })),
             },
             {
               label: 'Markup',
@@ -17194,17 +17194,17 @@ export default function TakeoffViewerModule({
                   ['Line', 'line'], ['Arrow', 'arrow'], ['Text Box', 'text'], ['Callout', 'callout'], ['Cloud', 'cloud'],
                   ['Rectangle', 'rectangle'], ['Ellipse', 'ellipse'], ['Polygon', 'polygon'], ['Pen', 'pen'],
                   ['Highlight', 'highlight'], ['Stamp', 'stamp'],
-                ] as [string, MeasureTool][]).map(([label, tool]) => ({ label, shortcut: revuKeyForTool(tool), checked: activeTool === tool, onClick: () => selectTool(tool) })),
+                ] as [string, MeasureTool][]).map(([label, tool]) => ({ label, shortcut: fsftmKeyForTool(tool), checked: activeTool === tool, onClick: () => selectTool(tool) })),
               ],
             },
             {
               label: 'Tools',
               items: [
-                { label: 'Auto Takeoff…', onClick: () => showRevuPanel('auto'), testId: 'revu-tools-auto' },
-                { label: 'Lay out framing…', onClick: () => setShowFraming(true), testId: 'revu-tools-framing' },
+                { label: 'Auto Takeoff…', onClick: () => showFSFTMPanel('auto'), testId: 'fsftm-tools-auto' },
+                { label: 'Lay out framing…', onClick: () => setShowFraming(true), testId: 'fsftm-tools-framing' },
                 { label: 'Recognize this page', onClick: () => { void handleRecognize(); } },
-                { label: 'AI Assistant', onClick: () => showRevuPanel('ai') },
-                { label: 'Tool Chest', shortcut: 'Alt+X', onClick: () => showRevuPanel('tools') },
+                { label: 'AI Assistant', onClick: () => showFSFTMPanel('ai') },
+                { label: 'Tool Chest', shortcut: 'Alt+X', onClick: () => showFSFTMPanel('tools') },
                 { separator: true },
                 { label: 'Pan Lock', checked: panLock, onClick: () => setPanLock((x) => !x) },
               ],
@@ -17215,15 +17215,15 @@ export default function TakeoffViewerModule({
                 { label: 'Thumbnails', checked: showThumbnails && leftTab === 'thumbs', onClick: () => { setShowThumbnails(true); setLeftTab('thumbs'); } },
                 { label: 'Page Index', checked: showThumbnails && leftTab === 'index', onClick: () => { setShowThumbnails(true); setLeftTab('index'); } },
                 { label: 'Left Panel', checked: showThumbnails, onClick: () => setShowThumbnails((x) => !x) },
-                { label: 'Dock Panels Left (Revu)', checked: panelSide === 'left', onClick: () => setPanelSide((p) => (p === 'left' ? 'right' : 'left')) },
+                { label: 'Dock Panels Left (FSFTM)', checked: panelSide === 'left', onClick: () => setPanelSide((p) => (p === 'left' ? 'right' : 'left')) },
                 { label: 'Right Panel', checked: showSidebar, onClick: () => setShowSidebar((x) => !x) },
                 { label: 'Markups List', checked: showLedger, onClick: () => setShowLedger((x) => !x) },
                 { separator: true },
-                { label: 'Measurements', shortcut: 'Alt+U', checked: showThumbnails && leftTab === 'measure', onClick: () => openRevuPanel('measure') },
-                { label: 'Scale & Calibration', checked: showThumbnails && leftTab === 'scale', onClick: () => openRevuPanel('scale') },
-                { label: 'Tool Chest', checked: sideVisible && sidebarTab === 'tools', onClick: () => showRevuPanel('tools') },
-                { label: 'AI Assistant', checked: sideVisible && sidebarTab === 'ai', onClick: () => showRevuPanel('ai') },
-                { label: 'Auto Takeoff', checked: sideVisible && sidebarTab === 'auto', onClick: () => showRevuPanel('auto') },
+                { label: 'Measurements', shortcut: 'Alt+U', checked: showThumbnails && leftTab === 'measure', onClick: () => openFSFTMPanel('measure') },
+                { label: 'Scale & Calibration', checked: showThumbnails && leftTab === 'scale', onClick: () => openFSFTMPanel('scale') },
+                { label: 'Tool Chest', checked: sideVisible && sidebarTab === 'tools', onClick: () => showFSFTMPanel('tools') },
+                { label: 'AI Assistant', checked: sideVisible && sidebarTab === 'ai', onClick: () => showFSFTMPanel('ai') },
+                { label: 'Auto Takeoff', checked: sideVisible && sidebarTab === 'auto', onClick: () => showFSFTMPanel('auto') },
                 { separator: true },
                 {
                   label: 'Reset Panel Sizes',
@@ -17241,19 +17241,19 @@ export default function TakeoffViewerModule({
             {
               label: 'Help',
               items: [
-                { label: 'Keyboard Shortcuts (Revu)', onClick: () => setShowShortcutSheet(true), testId: 'revu-help-shortcuts' },
+                { label: 'Keyboard Shortcuts (FSFTM)', onClick: () => setShowShortcutSheet(true), testId: 'fsftm-help-shortcuts' },
               ],
             },
           ]}
           right={
             <button
               type="button"
-              onClick={() => setRevuWorkspace((w) => !w)}
+              onClick={() => setFSFTMWorkspace((w) => !w)}
               className="rounded border border-border px-2 py-0.5 text-[11px] text-content-secondary hover:bg-surface-tertiary"
-              title={revuWorkspace ? 'Back to the normal ERP page' : 'Fill the browser window like Revu'}
-              data-testid="revu-workspace-toggle"
+              title={fsftmWorkspace ? 'Back to the normal ERP page' : 'Fill the browser window like FSFTM'}
+              data-testid="fsftm-workspace-toggle"
             >
-              {revuWorkspace ? 'Exit workspace' : 'Workspace'}
+              {fsftmWorkspace ? 'Exit workspace' : 'Workspace'}
             </button>
           }
         />
@@ -17268,17 +17268,17 @@ export default function TakeoffViewerModule({
         />
       )}
       {showShortcutSheet && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4" onClick={() => setShowShortcutSheet(false)} data-testid="revu-shortcut-sheet">
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4" onClick={() => setShowShortcutSheet(false)} data-testid="fsftm-shortcut-sheet">
           <div className="max-h-[85vh] w-full max-w-3xl overflow-y-auto rounded-lg border border-border bg-surface-elevated p-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-bold text-content-primary">Keyboard Shortcuts (Bluebeam Revu defaults)</h2>
+              <h2 className="text-sm font-bold text-content-primary">Keyboard Shortcuts (FSFTM defaults)</h2>
               <button type="button" onClick={() => setShowShortcutSheet(false)} className="text-content-tertiary hover:text-content-primary" aria-label="Close"><X size={14} /></button>
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               {(['Markup', 'Measure', 'View', 'Panels', 'Edit'] as const).map((sec) => (
                 <div key={sec}>
                   <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-content-tertiary">{sec}</p>
-                  {REVU_SHORTCUTS.filter((x) => x.section === sec).map((x) => (
+                  {FSFTM_SHORTCUTS.filter((x) => x.section === sec).map((x) => (
                     <div key={x.keys} className="flex justify-between gap-2 py-0.5 text-[11px]">
                       <span className="text-content-primary">{x.label}</span>
                       <kbd className="rounded border border-border bg-surface-secondary px-1 font-mono text-[10px]">{x.keys}</kbd>
@@ -17288,7 +17288,7 @@ export default function TakeoffViewerModule({
               ))}
               <div>
                 <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-content-tertiary">Also</p>
-                {REVU_EXTRA_HELP.map((x) => (
+                {FSFTM_EXTRA_HELP.map((x) => (
                   <div key={x.keys} className="flex justify-between gap-2 py-0.5 text-[11px]">
                     <span className="text-content-primary">{x.label}</span>
                     <kbd className="rounded border border-border bg-surface-secondary px-1 font-mono text-[10px]">{x.keys}</kbd>
@@ -17306,17 +17306,17 @@ export default function TakeoffViewerModule({
         <div
           className="flex flex-1 min-h-0 min-w-0"
         >
-          {/* Revu icon rail (OE-DELIVERY 2026-11-02-revu-dock): one vertical strip at the left edge
+          {/* FSFTM icon rail (OE-DELIVERY 2026-11-02-fsftm-dock): one vertical strip at the left edge
               for every panel; stays when the panel is closed. */}
           <div
             className="flex w-[52px] shrink-0 flex-col items-center gap-1 rounded-lg border border-border bg-surface-secondary/70 py-1.5"
             role="tablist"
             aria-orientation="vertical"
-            data-testid="revu-rail"
+            data-testid="fsftm-rail"
             style={{ order: 0 }}
           >
             {([
-              // Revu tab order and icons (OE-DELIVERY 2026-11-02-revu-properties-bar).
+              // FSFTM tab order and icons (OE-DELIVERY 2026-11-02-fsftm-properties-bar).
               ['thumbs', 'Thumbnails (Alt+T)', RvThumbsIcon],
               ['index', 'Bookmarks / Page Index (Alt+B)', RvBookmarkIcon],
               ['measure', 'Measurements (Alt+U)', RvMeasureIcon],
@@ -17364,7 +17364,7 @@ export default function TakeoffViewerModule({
                   aria-selected={active}
                   aria-label={label}
                   title={label}
-                  onClick={() => openRevuPanel(key)}
+                  onClick={() => openFSFTMPanel(key)}
                   data-testid={`rail-${key}`}
                   className={clsx(
                     'flex w-11 flex-col items-center justify-center gap-0.5 rounded py-1 transition-colors',
@@ -17387,7 +17387,7 @@ export default function TakeoffViewerModule({
             <div
               className="shrink-0 min-h-0 flex flex-row rounded-lg border border-border bg-surface-primary overflow-hidden"
               style={{ width: leftStripWidth }}
-              data-testid="revu-left-panel"
+              data-testid="fsftm-left-panel"
             >
               <div className="flex min-h-0 min-w-0 flex-1 flex-col">
               {leftTab === 'thumbs' && (
@@ -17420,8 +17420,8 @@ export default function TakeoffViewerModule({
                     </div>
                   )}
                   <span className="flex items-center justify-center gap-1 border-t border-border/60 px-1 py-0.5 text-[11px]">
-                    {/* Revu-style sheet label: the sheet number only; click to
-                        add or fix it (OE-DELIVERY 2026-11-02-revu-left-panel-v2). */}
+                    {/* FSFTM-style sheet label: the sheet number only; click to
+                        add or fix it (OE-DELIVERY 2026-11-02-fsftm-left-panel-v2). */}
                     {editingThumb === n ? (
                       <input
                         autoFocus
@@ -17459,11 +17459,11 @@ export default function TakeoffViewerModule({
               ))}
             </div>
               )}
-              {/* Revu Measurements tab (OE-DELIVERY 2026-11-02-revu-properties-bar): the
-                  measure tools, moved from the top toolbar, with their Revu keys
+              {/* FSFTM Measurements tab (OE-DELIVERY 2026-11-02-fsftm-properties-bar): the
+                  measure tools, moved from the top toolbar, with their FSFTM keys
                   and the totals of this page. */}
               {leftTab === 'measure' && (
-                <div className="min-h-0 flex-1 overflow-y-auto p-2" data-testid="revu-measure-panel" data-guide="takeoff-tools">
+                <div className="min-h-0 flex-1 overflow-y-auto p-2" data-testid="fsftm-measure-panel" data-guide="takeoff-tools">
                   <p className="mb-1 px-1 text-[10px] font-bold uppercase tracking-wider text-content-tertiary">Measurements</p>
                   <div className="flex flex-col gap-0.5" role="group" aria-label={t('takeoff_viewer.measure_tools', { defaultValue: 'Measure tools' })}>
                     {([
@@ -17525,7 +17525,7 @@ export default function TakeoffViewerModule({
                     if (tot.volume) rows.push(['Volume', formatInUnits(tot.volume, 'm³', sc, measurementSystem)]);
                     if (tot.count) rows.push(['Count', String(tot.count)]);
                     return (
-                      <div className="mt-3 border-t border-border pt-2" data-testid="revu-measure-totals">
+                      <div className="mt-3 border-t border-border pt-2" data-testid="fsftm-measure-totals">
                         <p className="mb-1 px-1 text-[10px] font-bold uppercase tracking-wider text-content-tertiary">This page · {onPage.length}</p>
                         {rows.map(([k, v]) => (
                           <div key={k} className="flex justify-between px-1 text-[11px]"><span className="text-content-secondary">{k}</span><span className="font-semibold tabular-nums">{v}</span></div>
@@ -17535,9 +17535,9 @@ export default function TakeoffViewerModule({
                   })()}
                 </div>
               )}
-              {/* Revu Scale tab: scale, calibration and viewports, moved from the top toolbar. */}
+              {/* FSFTM Scale tab: scale, calibration and viewports, moved from the top toolbar. */}
               {leftTab === 'scale' && (
-                <div className="min-h-0 flex-1 overflow-y-auto p-2" data-testid="revu-scale-panel">
+                <div className="min-h-0 flex-1 overflow-y-auto p-2" data-testid="fsftm-scale-panel">
                   <p className="mb-2 px-1 text-[10px] font-bold uppercase tracking-wider text-content-tertiary">Scale &amp; Calibration</p>
                   <div className="flex flex-col items-start gap-2">
               {/* Scale + calibration controls, grouped in one segmented track. */}
@@ -17596,7 +17596,7 @@ export default function TakeoffViewerModule({
                 </button>
               )}
 
-              {/* Viewports (OE-DELIVERY 2026-11-02-revu-viewports-sketch): scaled regions of
+              {/* Viewports (OE-DELIVERY 2026-11-02-fsftm-viewports-sketch): scaled regions of
                   the sheet. Button arms drawing; the chevron panel lists them. */}
               <div className="relative flex w-full flex-wrap items-center gap-0.5">
                 <button
@@ -17672,15 +17672,15 @@ export default function TakeoffViewerModule({
 
                   </div>
                   <p className="mt-3 px-1 text-[11px] leading-snug text-content-tertiary">Pick a preset scale in the status bar, or Calibrate by clicking two points of a known length. Viewports give one region of the sheet its own scale.</p>
-                  {/* Scale presets, moved out of the side panel so Scale and Tool Chest stay separate (OE-DELIVERY 2026-11-02-revu-tool-chest). */}
-                  <div className="mt-3" data-testid="revu-scale-presets">
+                  {/* Scale presets, moved out of the side panel so Scale and Tool Chest stay separate (OE-DELIVERY 2026-11-02-fsftm-tool-chest). */}
+                  <div className="mt-3" data-testid="fsftm-scale-presets">
             {/* Scale info */}
             <div className="rounded-md border border-border/80 bg-surface-primary/80 backdrop-blur-sm p-3 shadow-sm">
               <p className="text-[10px] font-bold uppercase tracking-widest text-content-tertiary mb-1">
                 {t('takeoff_viewer.scale', { defaultValue: 'Scale' })}
               </p>
               <p className="text-sm font-semibold text-content-primary tabular-nums">
-                {/* Drawing scale as on the sheet, with its ratio (OE-DELIVERY 2026-11-03-revu-wrapup). */}
+                {/* Drawing scale as on the sheet, with its ratio (OE-DELIVERY 2026-11-03-fsftm-wrapup). */}
                 <span data-testid="scale-current">{badgeMainLabel}</span>
                 {badgeMainLabel !== formatScaleRatio(scale) && (
                   <span className="ml-2 text-xs font-normal text-content-tertiary">({formatScaleRatio(scale)})</span>
@@ -17914,9 +17914,9 @@ export default function TakeoffViewerModule({
             )
           )}
           {/* Left: PDF + Toolbar */}
-          {/* Revu vertical tool strip (OE-DELIVERY 2026-11-02-revu-tool-strip). */}
+          {/* FSFTM vertical tool strip (OE-DELIVERY 2026-11-02-fsftm-tool-strip). */}
           <div className="flex shrink-0 min-h-0" style={{ order: 4 }}>
-            <RevuToolStrip
+            <FSFTMToolStrip
               tools={stripTools}
               active={activeTool}
               areaRef={areaToolBtnRef}
@@ -18135,7 +18135,7 @@ export default function TakeoffViewerModule({
                         aria-hidden="true"
                       />
                       <div className="absolute left-1/2 top-full z-50 mt-2 w-60 -translate-x-1/2 rounded-lg border border-border bg-surface-elevated p-3 shadow-xl">
-                        {/* Revu-style range (OE-DELIVERY 2026-11-02-revu-zoom): a
+                        {/* FSFTM-style range (OE-DELIVERY 2026-11-02-fsftm-zoom): a
                             logarithmic slider so 10%-6400% is usable, plus a typed
                             exact percentage. Continuous mode stops at 400%. */}
                         {(() => {
@@ -18249,7 +18249,7 @@ export default function TakeoffViewerModule({
                 <button
                   onClick={() => { setLineWeightsOff((v) => { const next = !v; try { localStorage.setItem('oe-line-weights', next ? '1' : '0'); } catch { /* ignore */ } return next; }); }}
                   className={tbBtn(lineWeightsOff, 'blue')}
-                  title={t('takeoff_viewer.line_weights_hint', { defaultValue: 'Line weights off: draw the sheet with thin hairline strokes so lines stay easy to pick, like Bluebeam' })}
+                  title={t('takeoff_viewer.line_weights_hint', { defaultValue: 'Line weights off: draw the sheet with thin hairline strokes so lines stay easy to pick, like FSFTM' })}
                   aria-label={t('takeoff_viewer.line_weights', { defaultValue: 'Line weights' })}
                   aria-pressed={lineWeightsOff}
                   data-testid="line-weights-toggle"
@@ -18368,8 +18368,8 @@ export default function TakeoffViewerModule({
                     <List size={15} />
                     <span className="takeoff-toolbar-label">{t('takeoff_viewer.legend', { defaultValue: 'Legend' })}</span>
                   </button>
-                  {/* Show / hide by markup type, Revu markup-list filter
-                      (OE-DELIVERY 2026-11-02-revu-properties). "Only" solos one type. */}
+                  {/* Show / hide by markup type, FSFTM markup-list filter
+                      (OE-DELIVERY 2026-11-02-fsftm-properties). "Only" solos one type. */}
                   <div className="relative">
                     <button
                       onClick={() => setShowTypeFilter((v) => !v)}
@@ -18567,12 +18567,12 @@ export default function TakeoffViewerModule({
                   <input type="file" accept="application/pdf" onChange={handleFileUpload} className="hidden" />
                 </label>
               </div>
-              {/* Row 2 merged into one wrapping row (OE-DELIVERY 2026-11-03-revu-wrapup). */}
+              {/* Row 2 merged into one wrapping row (OE-DELIVERY 2026-11-03-fsftm-wrapup). */}
               {/* Row 2: scale and the drawing tools. Scale controls lead, then
                   the measure tools, then the markup tools; the AI-assist
                   actions (Recognize / Read-with-AI) sit at the right. */}
-              {/* Stamp preset (OE-DELIVERY 2026-10-30-revu-markup-tools):
-                  which Revu review stamp the next click drops. */}
+              {/* Stamp preset (OE-DELIVERY 2026-10-30-fsftm-markup-tools):
+                  which FSFTM review stamp the next click drops. */}
               {activeTool === 'stamp' && (
                 <select
                   value={stampPresetId}
@@ -18627,7 +18627,7 @@ export default function TakeoffViewerModule({
               </button>
 
               {/* Count-similar scope (Step 5): this page only, or the
-                  whole document (Revu VisualSearch scope). */}
+                  whole document (FSFTM VisualSearch scope). */}
               <button
                 onClick={() => setCountSimilarAllPages((v) => !v)}
                 aria-pressed={countSimilarAllPages}
@@ -18669,11 +18669,11 @@ export default function TakeoffViewerModule({
               </div>
             </div>
 
-            {/* Revu Properties toolbar (OE-DELIVERY 2026-11-02-revu-properties-bar):
+            {/* FSFTM Properties toolbar (OE-DELIVERY 2026-11-02-fsftm-properties-bar):
                 only while markups are selected. */}
             {propsBar.mode === 'selection' && (
             <div className="mb-1.5">
-              <RevuPropertiesBar
+              <FSFTMPropertiesBar
                 mode={propsBar.mode}
                 type={propsBar.type}
                 title={propsBar.title}
@@ -18880,14 +18880,14 @@ export default function TakeoffViewerModule({
                     }}
                     className="block"
                   />
-                  {/* Deep-zoom sharp tile of the visible region (OE-DELIVERY 2026-11-02-revu-zoom). */}
+                  {/* Deep-zoom sharp tile of the visible region (OE-DELIVERY 2026-11-02-fsftm-zoom). */}
                   <canvas
                     ref={detailCanvasRef}
                     className="pointer-events-none absolute"
                     style={{ display: 'none' }}
                     aria-hidden="true"
                   />
-                  {/* Overlay Pages (OE-DELIVERY 2026-11-02-revu-left-panel): the compared page in colour. */}
+                  {/* Overlay Pages (OE-DELIVERY 2026-11-02-fsftm-left-panel): the compared page in colour. */}
                   {overlayCfg && overlayImg && pageSizePdfRef.current && (
                     <img
                       src={overlayImg.url}
@@ -18946,7 +18946,7 @@ export default function TakeoffViewerModule({
                 />
                 {/* Deep-zoom markup layer: draws the visible region only;
                     pointer events fall through to the overlay above
-                    (OE-DELIVERY 2026-11-02-revu-zoom). */}
+                    (OE-DELIVERY 2026-11-02-fsftm-zoom). */}
                 <canvas
                   ref={deepCanvasRef}
                   className="pointer-events-none absolute"
@@ -19822,7 +19822,7 @@ export default function TakeoffViewerModule({
                   <span>{t('takeoff_viewer.view_split_horizontal', { defaultValue: 'Split H' })}</span>
                 </button>
               </div>
-              <div className="flex min-w-0 flex-wrap items-center gap-1" data-revu-pager="1">
+              <div className="flex min-w-0 flex-wrap items-center gap-1" data-fsftm-pager="1">
                 <button
                   type="button"
                   onClick={() => goToPage(1)}
@@ -19896,9 +19896,9 @@ export default function TakeoffViewerModule({
                   <ZoomIn size={16} />
                 </button>
               </div>
-              {/* Revu-style status bar (OE-DELIVERY 2026-11-02-revu-statusbar): snap, zoom, page size,
+              {/* FSFTM-style status bar (OE-DELIVERY 2026-11-02-fsftm-statusbar): snap, zoom, page size,
                   live cursor position in drawing units. */}
-              <div className="ml-auto flex flex-wrap items-center gap-2 text-[11px] text-content-secondary" data-testid="revu-status">
+              <div className="ml-auto flex flex-wrap items-center gap-2 text-[11px] text-content-secondary" data-testid="fsftm-status">
                 {pageMode === 'continuous' && totalPages > 1 ? (
                   <span className="text-content-tertiary">{t('takeoff_viewer.scroll_hint', { defaultValue: 'Scroll to move between pages' })}</span>
                 ) : null}
@@ -19911,11 +19911,11 @@ export default function TakeoffViewerModule({
                     'rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wide border',
                     contentSnap ? 'border-oe-blue bg-oe-blue/10 text-oe-blue' : 'border-border text-content-tertiary',
                   )}
-                  data-testid="revu-status-snap"
+                  data-testid="fsftm-status-snap"
                 >
                   SNAP
                 </button>
-                {/* Scale picker in the status bar (OE-DELIVERY 2026-11-02-revu-left-panel), like Revu. */}
+                {/* Scale picker in the status bar (OE-DELIVERY 2026-11-02-fsftm-left-panel), like FSFTM. */}
                 <select
                   value={(() => {
                     const p = DRAWING_SCALE_PRESETS.find((sp) => !scale.invalid && sameScale(scale, sp.scale));
@@ -19947,7 +19947,7 @@ export default function TakeoffViewerModule({
                   </optgroup>
                   <option value="__calibrate">Calibrate (two clicks)…</option>
                 </select>
-                {/* Dimension units for every label (OE-DELIVERY 2026-11-02-revu-left-panel). */}
+                {/* Dimension units for every label (OE-DELIVERY 2026-11-02-fsftm-left-panel). */}
                 <select
                   value={displayUnitPref}
                   onChange={(e) => setDisplayUnitPref(e.target.value as DisplayUnitPref)}
@@ -19963,12 +19963,12 @@ export default function TakeoffViewerModule({
                   <option value="cm">centimetres</option>
                   <option value="m">metres</option>
                 </select>
-                {/* Sync & compare (OE-DELIVERY 2026-11-02-revu-left-panel-v2): one click opens the
+                {/* Sync & compare (OE-DELIVERY 2026-11-02-fsftm-left-panel-v2): one click opens the
                     next sheet beside this one and keeps both in step. */}
                 <button
                   type="button"
                   onClick={() => {
-                    // Revu Sync (OE-DELIVERY 2026-11-02-revu-dock): both panes on the same
+                    // FSFTM Sync (OE-DELIVERY 2026-11-02-fsftm-dock): both panes on the same
                     // page number, zoom and position, driven from either one.
                     if (splitMode === 'off') toggleSplit('vertical');
                     setSyncViews((x) => {
@@ -20007,7 +20007,7 @@ export default function TakeoffViewerModule({
                     {(pageSizePdfRef.current.w / 72).toFixed(1)} × {(pageSizePdfRef.current.h / 72).toFixed(1)} in
                   </span>
                 )}
-                <span ref={statusCursorRef} className="min-w-[170px] font-mono tabular-nums text-content-primary" data-testid="revu-status-cursor">
+                <span ref={statusCursorRef} className="min-w-[170px] font-mono tabular-nums text-content-primary" data-testid="fsftm-status-cursor">
                   X —   Y —
                 </span>
               </div>
@@ -20146,7 +20146,7 @@ export default function TakeoffViewerModule({
               style={{ width: rightPanelWidth, order: panelSide === 'left' ? 1 : 6 }}
               data-testid="measurements-panel"
             >
-            {/* Active Group selector removed (OE-DELIVERY 2026-11-03-revu-wrapup): markups take their group from the tool. */}
+            {/* Active Group selector removed (OE-DELIVERY 2026-11-03-fsftm-wrapup): markups take their group from the tool. */}
 
             {/* Count label (when count tool active) */}
             {activeTool === 'count' && (
@@ -20320,9 +20320,9 @@ export default function TakeoffViewerModule({
               />
             )}
 
-{/* Tool Chest — Bluebeam-style saved custom tools. */}
+{/* Tool Chest — FSFTM-style saved custom tools. */}
             {sidebarTab === 'tools' && (
-              <RevuToolChest
+              <FSFTMToolChest
                 sets={chestSets}
                 onChange={setChestSets}
                 onUse={drawWithChestItem}
@@ -20335,7 +20335,7 @@ export default function TakeoffViewerModule({
                 toolTypes={stripTools.filter((x) => x.tool !== 'select').map((x) => ({ tool: x.tool, label: x.label }))}
                 onAddStructural={() => setChestSets((prev) => withStructuralSets(prev, STRUCTURAL_TOOLSETS, true))}
               >
-              </RevuToolChest>
+              </FSFTMToolChest>
             )}
 
             {/* Colours panel — markup + label appearance. */}
@@ -20418,13 +20418,13 @@ export default function TakeoffViewerModule({
                     - 1 markup selected → sliders edit THAT markup only.
                     - Multiple selected → sliders edit ALL selected markups.
                     - None selected → sliders are disabled (no changes). */}
-                {/* Label style (OE-DELIVERY 2026-11-02-revu-labels) */}
+                {/* Label style (OE-DELIVERY 2026-11-02-fsftm-labels) */}
                 <div className="space-y-1">
                   <p className="text-[11px] font-semibold text-content-secondary">
                     {t('takeoff_viewer.label_style', { defaultValue: 'Label style' })}
                   </p>
                   <div className="grid grid-cols-2 gap-1">
-                    {(['revu', 'badge'] as const).map((ls) => (
+                    {(['fsftm', 'badge'] as const).map((ls) => (
                       <button
                         key={ls}
                         type="button"
@@ -20432,14 +20432,14 @@ export default function TakeoffViewerModule({
                         className={`rounded border px-2 py-1 text-[11px] ${labelStyle === ls ? 'border-oe-blue bg-oe-blue/10 text-oe-blue' : 'border-border text-content-secondary hover:bg-surface-secondary'}`}
                         data-testid={`label-style-${ls}`}
                       >
-                        {ls === 'revu'
-                          ? t('takeoff_viewer.label_style_revu', { defaultValue: 'Revu (plain text)' })
+                        {ls === 'fsftm'
+                          ? t('takeoff_viewer.label_style_fsftm', { defaultValue: 'FSFTM (plain text)' })
                           : t('takeoff_viewer.label_style_badge', { defaultValue: 'Badge' })}
                       </button>
                     ))}
                   </div>
                 </div>
-                {/* Label text format + units (OE-DELIVERY 2026-11-02-revu-left-panel) */}
+                {/* Label text format + units (OE-DELIVERY 2026-11-02-fsftm-left-panel) */}
                 <div className="space-y-1">
                   <p className="text-[11px] font-semibold text-content-secondary">Label text</p>
                   <div className="flex items-center gap-1">
@@ -20655,7 +20655,7 @@ export default function TakeoffViewerModule({
               </div>
             )}
 
-            {/* Bluebeam-style Legend — first in Properties tab. */}
+            {/* FSFTM-style Legend — first in Properties tab. */}
             {sidebarTab === 'properties' && legendDashboardVisible && (
                 <div className="rounded-md border border-border/80 bg-surface-primary shadow-sm">
                   <div className="flex items-center gap-1.5 px-3 py-2">
@@ -20918,7 +20918,7 @@ export default function TakeoffViewerModule({
             )}
 
             {/* Properties panel — shown when a measurement is selected in the list */}
-            {/* Revu Tool Properties (OE-DELIVERY 2026-11-02-revu-properties): the
+            {/* FSFTM Tool Properties (OE-DELIVERY 2026-11-02-fsftm-properties): the
                 style the NEXT markup of the armed tool is drawn with. */}
             {sidebarTab === 'properties' && !selectedMeasurement && activeTool !== 'select' && (
               <div className="space-y-2.5 rounded-md border border-border bg-surface-primary p-3 shadow-sm" data-testid="tool-properties">
@@ -20946,7 +20946,7 @@ export default function TakeoffViewerModule({
                 <p className="text-[11px] text-content-tertiary">
                   {t('takeoff_viewer.tool_properties_hint', { defaultValue: 'Applies to the next markups you draw with this tool. Select a markup to change it instead.' })}
                 </p>
-                <RevuStyleFields
+                <FSFTMStyleFields
                   testIdPrefix="tool-style"
                   value={toolStyles[activeTool] ?? {}}
                   fields={[
@@ -21413,16 +21413,16 @@ export default function TakeoffViewerModule({
                   </div>
                 )}
 
-                {/* Revu-style properties (OE-DELIVERY 2026-11-02-revu-properties): line
+                {/* FSFTM-style properties (OE-DELIVERY 2026-11-02-fsftm-properties): line
                     style, fill colour and label mode; bulk-apply to the
                     whole selection like every other row here. */}
-                <div className="space-y-2 border-t border-border-light pt-2" data-testid="prop-revu-style">
+                <div className="space-y-2 border-t border-border-light pt-2" data-testid="prop-fsftm-style">
                   {selectedLedgerIds.size > 1 && (
                     <p className="text-[10px] text-content-tertiary">
                       {t('takeoff_viewer.prop_applies_to', { defaultValue: 'Applies to {{n}} selected markups', n: selectedLedgerIds.size })}
                     </p>
                   )}
-                  <RevuStyleFields
+                  <FSFTMStyleFields
                     testIdPrefix="prop-style"
                     value={{
                       lineStyle: selectedMeasurement.lineStyle,
@@ -22519,7 +22519,7 @@ export default function TakeoffViewerModule({
           </div>
         </div>
       )}
-      {/* Multiply dialog: Bluebeam-style linear copies. */}
+      {/* Multiply dialog: FSFTM-style linear copies. */}
       {multiplyDialog && (
         <div
           className="fixed z-[70] left-1/2 top-20 -translate-x-1/2 w-full max-w-xs rounded-xl border border-border bg-surface-primary p-5 shadow-2xl"
@@ -23021,7 +23021,7 @@ export default function TakeoffViewerModule({
           onCreated={() => setRfiMeasurement(null)}
         />
       )}
-      {/* Viewport scale dialog (OE-DELIVERY 2026-11-02-revu-viewports-sketch) */}
+      {/* Viewport scale dialog (OE-DELIVERY 2026-11-02-fsftm-viewports-sketch) */}
       {viewportDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="w-80 rounded-xl border border-border bg-surface-elevated p-5 shadow-lg" data-testid="viewport-dialog">
@@ -23109,7 +23109,7 @@ export default function TakeoffViewerModule({
           </div>
         </div>
       )}
-      {/* Sketch to Scale entry (OE-DELIVERY 2026-11-02-revu-viewports-sketch) */}
+      {/* Sketch to Scale entry (OE-DELIVERY 2026-11-02-fsftm-viewports-sketch) */}
       {sketchInput !== null && (
         <div className="fixed bottom-6 left-1/2 z-50 w-[22rem] max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-xl border border-border bg-surface-elevated p-3 shadow-lg" data-testid="sketch-to-scale">
           <div className="mb-1 text-xs font-semibold text-content-primary">
@@ -23144,7 +23144,7 @@ export default function TakeoffViewerModule({
           </div>
         </div>
       )}
-      {/* Callout / custom stamp text (OE-DELIVERY 2026-10-30-revu-markup-tools) */}
+      {/* Callout / custom stamp text (OE-DELIVERY 2026-10-30-fsftm-markup-tools) */}
       {markupTextPrompt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="w-80 rounded-xl border border-border bg-surface-elevated p-5 shadow-lg">
@@ -23309,7 +23309,7 @@ export default function TakeoffViewerModule({
           </div>
         </div>
       )}
-      {/* Area tool settings popup (Bluebeam-style): shown under the Area
+      {/* Area tool settings popup (FSFTM-style): shown under the Area
           tool button when the Area tool is active, or when an area/volume
           markup is selected. */}
       {showAreaPopup && areaPopupPos && (

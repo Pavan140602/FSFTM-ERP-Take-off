@@ -2,11 +2,11 @@
 
 Also available in [Deutsch](WINDOWS_BLOCKED.de.md) and [Русский](WINDOWS_BLOCKED.ru.md).
 
-This page is for you if Windows refuses to start OpenConstructionERP, calls it an app from an unknown or unverified publisher, or let it run once and blocks it on every start since.
+This page is for you if Windows refuses to start Florida Steel Frame & Truss Manufacturing LLC, calls it an app from an unknown or unverified publisher, or let it run once and blocks it on every start since.
 
 ## Why this happens
 
-The Windows builds of OpenConstructionERP are not code signed yet. A signature is how Windows learns who published a program, and without one Windows treats the app as coming from an unknown publisher. Two separate Windows features react to that, and they need different handling:
+The Windows builds of Florida Steel Frame & Truss Manufacturing LLC are not code signed yet. A signature is how Windows learns who published a program, and without one Windows treats the app as coming from an unknown publisher. Two separate Windows features react to that, and they need different handling:
 
 - **Microsoft Defender SmartScreen** shows a blue "Windows protected your PC" window when you start a program downloaded from the internet that Windows does not recognise yet. It warns, and it lets you continue.
 - **Smart App Control** is a stricter feature of Windows 11. When it is on, it blocks every program file that Microsoft's cloud service cannot vouch for and that carries no trusted signature, and it offers no button to continue and no per-app exception. Its message names Smart App Control and usually says that the app, or part of it, has been blocked.
@@ -38,13 +38,13 @@ SmartScreen only asks for files downloaded from the internet. If it keeps asking
 
 There is no way to allow a single app while Smart App Control stays on. Microsoft's own advice is to turn it off or to ask the publisher to sign the app, and our Windows builds are not signed today. That leaves two honest choices.
 
-**Option 1: keep Smart App Control on and run the app another way.** This is what we recommend if you want to keep the protection. Docker and WSL both run OpenConstructionERP inside a small Linux environment, and Smart App Control does not check Linux programs. Both are described below.
+**Option 1: keep Smart App Control on and run the app another way.** This is what we recommend if you want to keep the protection. Docker and WSL both run Florida Steel Frame & Truss Manufacturing LLC inside a small Linux environment, and Smart App Control does not check Linux programs. Both are described below.
 
 **Option 2: turn Smart App Control off.** This lowers the protection of your whole PC, not only for our app, so do it only if you are comfortable with that. On current Windows 11 builds you can switch it back on later from the same page, but on older builds turning it off is permanent until you reset or reinstall Windows. If the page offers no way back on after you turn it off, you are on such a build.
 
 1. Open **Windows Security**, go to **App & browser control**, then **Smart App Control settings**.
 2. Select **Off** and confirm.
-3. Start OpenConstructionERP again.
+3. Start Florida Steel Frame & Truss Manufacturing LLC again.
 
 Microsoft Defender Antivirus and SmartScreen stay on either way.
 

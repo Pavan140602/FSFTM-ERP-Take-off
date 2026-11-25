@@ -41,7 +41,7 @@ function manifestJson(): Record<string, unknown> {
 describe('PWA manifest', () => {
   it('has the required identity fields', () => {
     const manifest = manifestJson();
-    expect(manifest.name).toBe('OpenConstructionERP');
+    expect(manifest.name).toBe('Florida Steel Frame & Truss Manufacturing LLC');
     expect(manifest.short_name).toBe('OCERP');
     expect(typeof manifest.description).toBe('string');
   });
@@ -87,7 +87,7 @@ describe('PWA plugin configuration', () => {
   it('vite.config.ts still wires VitePWA with the OCERP manifest', () => {
     const config = readFileSync(resolve(__dirname, '..', '..', 'vite.config.ts'), 'utf-8');
     expect(config).toContain('VitePWA');
-    expect(config).toContain("'OpenConstructionERP'");
+    expect(config).toContain("'Florida Steel Frame & Truss Manufacturing LLC'");
     expect(config).toContain("'OCERP'");
     expect(config).toContain("'#0284c7'");
   });

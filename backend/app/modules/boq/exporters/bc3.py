@@ -52,7 +52,7 @@ from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-_PROGRAM = "OpenConstructionERP"
+_PROGRAM = "Florida Steel Frame & Truss Manufacturing LLC"
 
 # FIEBDC-3 concept type codes.
 _TYPE_OBRA = "3"  # aggregator / budget root

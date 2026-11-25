@@ -1,4 +1,4 @@
-"""Cross-module integration tests for OpenConstructionERP.
+"""Cross-module integration tests for Florida Steel Frame & Truss Manufacturing LLC.
 
 Tests the CONNECTIONS between modules -- not individual module CRUD,
 but the workflows where one module's action triggers side-effects

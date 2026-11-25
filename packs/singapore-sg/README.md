@@ -1,6 +1,6 @@
 # Singapore Construction Pack
 
-Configures OpenConstructionERP for the Singapore construction market. Measurement
+Configures Florida Steel Frame & Truss Manufacturing LLC for the Singapore construction market. Measurement
 follows SMM7, the standard method that Singapore QS practice is built on. Currency
 is SGD with 9% GST on construction services. The BCA regulatory framework, CONQUAS
 quality benchmarks and SIA/PSSCOC contract forms are referenced for compliance
@@ -44,7 +44,7 @@ pack is legal, tax or regulatory advice.
 
 ## Install
 
-This pack ships inside OpenConstructionERP. Activate it from Modules then Partner
+This pack ships inside Florida Steel Frame & Truss Manufacturing LLC. Activate it from Modules then Partner
 Packs: click Rescan, find "Singapore Construction Pack", then Activate pack.
 
 To run a workspace that boots straight into it:

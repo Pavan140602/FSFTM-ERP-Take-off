@@ -1,6 +1,6 @@
 # Portugal Construction Pack
 
-Configures OpenConstructionERP for the Portuguese construction market. Estimating
+Configures Florida Steel Frame & Truss Manufacturing LLC for the Portuguese construction market. Estimating
 practice in Portugal is structured around the orcamento (budget), with ProNIC
 providing the national classification and specification framework for public
 works. Currency is EUR with 23% IVA on construction services.
@@ -49,7 +49,7 @@ pack is legal, tax or regulatory advice.
 
 ## Install
 
-This pack ships inside OpenConstructionERP. Activate it from Modules then Partner
+This pack ships inside Florida Steel Frame & Truss Manufacturing LLC. Activate it from Modules then Partner
 Packs: click Rescan, find "Portugal Construction Pack", then Activate pack.
 
 To run a workspace that boots straight into it:

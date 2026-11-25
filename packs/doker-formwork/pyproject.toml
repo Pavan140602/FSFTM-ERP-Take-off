@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "openconstructionerp-doker-formwork"
 version = "0.2.0"
-description = "Doka formwork partner pack for OpenConstructionERP - DIN 18218, EN 12812, EN 13670, EN 206, VOB/C 18331, DGUV 101-008 + Doka systems catalogue."
+description = "Doka formwork partner pack for Florida Steel Frame & Truss Manufacturing LLC - DIN 18218, EN 12812, EN 13670, EN 206, VOB/C 18331, DGUV 101-008 + Doka systems catalogue."
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "AGPL-3.0-or-later" }

@@ -1,6 +1,6 @@
 # Email and SMTP setup
 
-OpenConstructionERP sends mail for password resets, tender invitations, document
+Florida Steel Frame & Truss Manufacturing LLC sends mail for password resets, tender invitations, document
 delivery and notifications. This page is the whole of the setup: what to set, how to
 pick the port, and how to tell whether it is working.
 
@@ -103,7 +103,7 @@ SMTP_PORT=587
 SMTP_TLS=true
 SMTP_USER=noreply@yourcompany.example
 SMTP_PASSWORD=the-password-for-that-mailbox
-SMTP_FROM=OpenConstructionERP <noreply@yourcompany.example>
+SMTP_FROM=Florida Steel Frame & Truss Manufacturing LLC <noreply@yourcompany.example>
 ```
 
 Restart the backend after changing these. The settings are read once at startup.

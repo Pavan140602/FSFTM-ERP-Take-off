@@ -376,7 +376,7 @@ def test_every_string_draws_in_one_face(locale: str) -> None:
     strings += [intl.localize_discipline(d, locale) for d in intl.RFI_DISCIPLINES]
     strings += [days_text(n, locale) for n in (1, 3, 5, 21)]
     strings += [
-        f"OpenConstructionERP  |  {tr(locale, 'footer_generated', timestamp='2026-09-10 08:15 UTC')}",
+        f"Florida Steel Frame & Truss Manufacturing LLC  |  {tr(locale, 'footer_generated', timestamp='2026-09-10 08:15 UTC')}",
         f"{tr(locale, 'attachments')}: 2",
         f"{tr(locale, 'variation')}: CO-003",
         tr(locale, "yes_with", detail=days_text(3, locale)),

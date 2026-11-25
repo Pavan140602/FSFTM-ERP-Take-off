@@ -1,4 +1,4 @@
-# RFCs — Architecture decision records for OpenConstructionERP v1.9+
+# RFCs — Architecture decision records for Florida Steel Frame & Truss Manufacturing LLC v1.9+
 
 Each RFC captures the **rationale** behind a non-trivial design decision. Format:
 

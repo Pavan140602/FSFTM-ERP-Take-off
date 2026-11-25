@@ -1,4 +1,4 @@
-// OpenConstructionERP Desktop, Tauri v2 application.
+// Florida Steel Frame & Truss Manufacturing LLC Desktop, Tauri v2 application.
 //
 // Manages the FastAPI backend as a sidecar process.
 // The React frontend loads in a native webview window.
@@ -924,7 +924,7 @@ fn set_backend_silent_notice(handle: &tauri::AppHandle, shown: bool) {
         let text = js_escape(
             "The application backend has not answered for about two minutes. It may be working \
 through a long operation, such as a large import, and this notice will disappear as soon as it \
-responds. If the window stays unusable, close it and start OpenConstructionERP again.",
+responds. If the window stays unusable, close it and start Florida Steel Frame & Truss Manufacturing LLC again.",
         );
         format!(
             "(function(){{\
@@ -974,7 +974,7 @@ const LIVENESS_SILENT_STRIKES: u32 = 12;
 /// What to say when a server this machine was running has gone.
 const LOCAL_BACKEND_LOST_DETAIL: &str =
     "Nothing is listening on the local address any more, so this window can no longer load or \
-save anything. Please close it and start OpenConstructionERP again. If this keeps happening, \
+save anything. Please close it and start Florida Steel Frame & Truss Manufacturing LLC again. If this keeps happening, \
 send the log file to info@datadrivenconstruction.io.";
 
 /// What to say when a server somewhere else has gone.
@@ -987,7 +987,7 @@ fn remote_backend_lost_detail(url: &str) -> String {
     format!(
         "The server at {url} is no longer answering, so this window can no longer load or save \
 anything. Check that the server is running and that this computer can still reach it, then \
-start OpenConstructionERP again. You can also switch back to a server on this computer from \
+start Florida Steel Frame & Truss Manufacturing LLC again. You can also switch back to a server on this computer from \
 the tray icon menu."
     )
 }
@@ -1234,7 +1234,7 @@ fn show_main_window(handle: &tauri::AppHandle) {
     }
 }
 
-/// Ports an already-running OpenConstructionERP backend is likely to be on.
+/// Ports an already-running Florida Steel Frame & Truss Manufacturing LLC backend is likely to be on.
 ///
 /// Checked in order before we spawn our own sidecar. This is what lets the
 /// desktop app coexist with a developer backend or a CLI ``openconstructionerp
@@ -1735,7 +1735,7 @@ recognised as its own; starting a server instead",
     match attached_port {
         Some(existing) => {
             log_line(&format!(
-                "found an existing OpenConstructionERP backend on port {existing}; attaching instead of starting a second one"
+                "found an existing Florida Steel Frame & Truss Manufacturing LLC backend on port {existing}; attaching instead of starting a second one"
             ));
             BackendSource::AlreadyRunning {
                 base_url: format!("http://127.0.0.1:{existing}/"),
@@ -2247,7 +2247,7 @@ server is running and reachable from here."
         // because the address is almost right and the user is about to stare at
         // it looking for a typo that is not there.
         return Err(
-            "Something answered at that address, but it is not an OpenConstructionERP server. \
+            "Something answered at that address, but it is not an Florida Steel Frame & Truss Manufacturing LLC server. \
 Check that the address is complete, including any folder the server is published under."
                 .to_string(),
         );
@@ -2391,7 +2391,7 @@ fn report_remote_unreachable(
     reason: &str,
 ) {
     let message = format!(
-        "Could not reach the OpenConstructionERP server at {base_url}, which is configured in \
+        "Could not reach the Florida Steel Frame & Truss Manufacturing LLC server at {base_url}, which is configured in \
 {}. {reason} Use the button below to run a server on this computer instead.",
         source.describe()
     );
@@ -3379,7 +3379,7 @@ fn legacy_leftovers_sentence(root: &str, found: &LegacyLeftovers) -> String {
         " Earlier versions of this application unpacked themselves into {root} and did not \
 clear up after themselves, leaving {floor}{} folders there that hold {floor}{}. Their names \
 begin with {EXTRACTION_PREFIX}, no program is running out of the ones counted here, and \
-deleting them with OpenConstructionERP closed frees that space. This version unpacks into a \
+deleting them with Florida Steel Frame & Truss Manufacturing LLC closed frees that space. This version unpacks into a \
 folder it clears up on its own, so they will not come back.",
         found.directories,
         human_bytes(found.bytes)
@@ -3465,7 +3465,7 @@ fn cause_is_a_full_disk(cause: &str) -> bool {
 fn full_disk_message(notes: &str) -> String {
     format!(
         "The drive ran out of space while the application was starting, so its backend could \
-not finish. Free some space and start OpenConstructionERP again.{notes}"
+not finish. Free some space and start Florida Steel Frame & Truss Manufacturing LLC again.{notes}"
     )
 }
 
@@ -3500,7 +3500,7 @@ fn out_of_space_message(dir: &str, free: u64) -> String {
     format!(
         "There is not enough free space to start the application. It unpacks itself into \
 {dir} every time it starts, which needs about {}, and the drive holding that folder has \
-{} free. Free some space on that drive and start OpenConstructionERP again.",
+{} free. Free some space on that drive and start Florida Steel Frame & Truss Manufacturing LLC again.",
         human_bytes(EXTRACTION_ESTIMATED_BYTES),
         human_bytes(free)
     )
@@ -3730,7 +3730,7 @@ the application."
                     "sidecar",
                     &format!(
                         "The backend component could not be started ({e}). Some antivirus \
-tools block newly installed programs; allow OpenConstructionERP and try again."
+tools block newly installed programs; allow Florida Steel Frame & Truss Manufacturing LLC and try again."
                     ),
                 );
                 return;
@@ -4006,7 +4006,7 @@ this keeps happening send it to info@datadrivenconstruction.io."
                                 &format!(
                                     "The backend exited unexpectedly (exit code {:?}), so \
 this window can no longer load or save anything. Please close it and start \
-OpenConstructionERP again. If this keeps happening, send the log file to \
+Florida Steel Frame & Truss Manufacturing LLC again. If this keeps happening, send the log file to \
 info@datadrivenconstruction.io.",
                                     payload.code
                                 ),
@@ -4033,7 +4033,7 @@ info@datadrivenconstruction.io.",
                     &lost_flag,
                     "The connection to the application backend was lost",
                     "The launcher can no longer see the backend it started, so this \
-window may stop working. Please close it and start OpenConstructionERP again. If this keeps \
+window may stop working. Please close it and start Florida Steel Frame & Truss Manufacturing LLC again. If this keeps \
 happening, send the log file to info@datadrivenconstruction.io.",
                 );
             }
@@ -4193,7 +4193,7 @@ fn main() {
     // even if building the Tauri app itself (WebView2 missing, etc.) blows up
     // before any window appears.
     log_line(&format!(
-        "=== OpenConstructionERP desktop launcher starting (v{}) ===",
+        "=== Florida Steel Frame & Truss Manufacturing LLC desktop launcher starting (v{}) ===",
         env!("CARGO_PKG_VERSION")
     ));
 
@@ -4321,7 +4321,7 @@ fn main() {
                         // panic, keeping the no-panic startup contract.
                         tauri::image::Image::new_owned(vec![0, 0, 0, 0], 1, 1)
                     }))
-                    .tooltip("OpenConstructionERP")
+                    .tooltip("Florida Steel Frame & Truss Manufacturing LLC")
                     .menu(&menu)
                     // Keep the existing left-click-to-show behaviour. The menu
                     // shows on right-click; suppressing menu-on-left-click means
@@ -4357,7 +4357,7 @@ fn main() {
                     log_line(&format!("warning: tray menu build failed (non-fatal): {e}"));
                     // Fall back to the plain icon-only tray (left-click shows).
                     TrayIconBuilder::new()
-                        .tooltip("OpenConstructionERP")
+                        .tooltip("Florida Steel Frame & Truss Manufacturing LLC")
                         .on_tray_icon_event(|tray, event| {
                             if let TrayIconEvent::Click {
                                 button: MouseButton::Left,
@@ -4437,7 +4437,7 @@ fn main() {
                             "sidecar",
                             &format!(
                                 "The backend could not be started ({e}). Close anything else \
-that is running and start OpenConstructionERP again."
+that is running and start Florida Steel Frame & Truss Manufacturing LLC again."
                             ),
                         );
                     }
@@ -4784,7 +4784,7 @@ fn show_startup_failure_dialog(message: &str) {
         .map(|p| format!("\n\nA full diagnostic log was written to:\n{}", p.display()))
         .unwrap_or_default();
     let body = format!(
-        "OpenConstructionERP could not start.\n\n{message}{log_hint}\n\n\
+        "Florida Steel Frame & Truss Manufacturing LLC could not start.\n\n{message}{log_hint}\n\n\
 If this keeps happening, please send the log file to info@datadrivenconstruction.io."
     );
 
@@ -4792,7 +4792,7 @@ If this keeps happening, please send the log file to info@datadrivenconstruction
         s.encode_utf16().chain(std::iter::once(0)).collect::<Vec<u16>>()
     };
     let body_w = to_wide(&body);
-    let title_w = to_wide("OpenConstructionERP failed to start");
+    let title_w = to_wide("Florida Steel Frame & Truss Manufacturing LLC failed to start");
 
     // SAFETY: both buffers are valid, NUL-terminated UTF-16; a null HWND is the
     // documented way to show an owner-less message box.
@@ -5142,7 +5142,7 @@ RuntimeError: locale catalogue missing",
             server_config::ChoiceSource::AdminFile,
         ] {
             let message = format!(
-                "Could not reach the OpenConstructionERP server at {}, which is configured in \
+                "Could not reach the Florida Steel Frame & Truss Manufacturing LLC server at {}, which is configured in \
 {}. {} Use the button below to run a server on this computer instead.",
                 "https://erp.example.com/",
                 source.describe(),

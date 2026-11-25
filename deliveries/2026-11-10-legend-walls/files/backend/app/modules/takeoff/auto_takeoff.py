@@ -2729,7 +2729,7 @@ def name_columns_across_sheets(results: list[dict[str, Any]], sources: list[Page
 def label_quad(lab: "Label") -> list[list[float]]:
     """The text band of a label as 4 corners, following its reading
     direction, so the sheet highlight hugs rotated / diagonal text the way a
-    Revu highlighter does (OE-DELIVERY 2026-11-02-revu-workspace)."""
+    FSFTM highlighter does (OE-DELIVERY 2026-11-02-fsftm-workspace)."""
     ux, uy = lab.ux, lab.uy
     norm = math.hypot(ux, uy) or 1.0
     ux, uy = ux / norm, uy / norm

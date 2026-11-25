@@ -12,7 +12,7 @@
  *       inline error; 200 → redirect to ``download_url``.
  *    4. If no password is required → auto-call access and redirect.
  *
- * Brand-aware: shows the OpenConstructionERP logo + project tagline
+ * Brand-aware: shows the Florida Steel Frame & Truss Manufacturing LLC logo + project tagline
  * without the authenticated app shell (no sidebar). The page handles
  * its own loading / error states.
  */
@@ -132,7 +132,7 @@ export function SharePage() {
             <p className="mt-1 text-xs text-content-tertiary">
               {t('share.page.subtitle', {
                 defaultValue:
-                  'Someone shared a file with you via OpenConstructionERP.',
+                  'Someone shared a file with you via Florida Steel Frame & Truss Manufacturing LLC.',
               })}
             </p>
           </div>

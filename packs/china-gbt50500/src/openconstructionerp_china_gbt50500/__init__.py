@@ -1,4 +1,4 @@
-"""OpenConstructionERP - China Construction partner pack (GB/T 50500 + GB-codes + VAT).
+"""Florida Steel Frame & Truss Manufacturing LLC - China Construction partner pack (GB/T 50500 + GB-codes + VAT).
 
 This package exports a module-level ``MANIFEST`` instance of
 :class:`PartnerPackManifest` referenced from ``pyproject.toml``::

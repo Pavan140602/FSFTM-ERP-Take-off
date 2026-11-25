@@ -22,7 +22,7 @@ rep("import { columnShape, columnProfileOf, isColumnMarkup, isManualColumn, prof
 # ── Measurement field ──────────────────────────────────────────────────
 rep("""  text?: string; // Text content for text annotations
 """, """  text?: string; // Text content for text annotations
-  /** Revu-style text box style: font, size, B/I/U/S, alignment, colours,
+  /** FSFTM-style text box style: font, size, B/I/U/S, alignment, colours,
    *  border, opacity (OE-DELIVERY 2026-11-07-text-box). Undefined = the
    *  older bold-14 look. */
   textStyle?: Partial<TextStyle>;
@@ -79,7 +79,7 @@ rep("""    if (target) {
       setTextInputMinH(target.height && target.height > 0 ? target.height : 0);
     } else {
       // A box dragged out with the Text Box tool keeps its drawn size
-      // (Revu); a plain click opens a box of the default width.
+      // (FSFTM); a plain click opens a box of the default width.
       const drawn = pendingTextBoxRef.current;
       pendingTextBoxRef.current = null;
       setEditingTextId(null);
@@ -135,7 +135,7 @@ rep("""          const textContent = m.text || m.annotation;
           ctx.font = `bold ${TEXT_FONT_PX * dpr * zoom}px sans-serif`;""", """          const textContent = m.text || m.annotation;
           const boxW = m.width && m.width > 0 ? m.width : 0;
           if (boxW > 0 && m.textStyle) {
-            // Revu Text Box (OE-DELIVERY 2026-11-07-text-box): fill, border,
+            // FSFTM Text Box (OE-DELIVERY 2026-11-07-text-box): fill, border,
             // font and alignment of its own.
             const st = resolveTextStyle(m.textStyle);
             const lay = layoutTextBox(textContent, boxW, st);
@@ -194,7 +194,7 @@ rep("""      const nw = Math.max(TEXT_BOX_MIN_W, rs.origW + (cur.x - rs.startPt.
         prev.map((m) => {
           if (m.id !== rs.measurementId) return m;
           if (!m.textStyle) return { ...m, width: nw, height: textBoxHeight(m.text || '', nw) };
-          // Revu text box: the corner sets width and height; the height never
+          // FSFTM text box: the corner sets width and height; the height never
           // goes below what the text needs at that width.
           const need = layoutTextBox(m.text || '', nw, resolveTextStyle(m.textStyle)).contentHeight;
           const nh = Math.max(need, (rs.origH ?? need) + (cur.y - rs.startPt.y));
@@ -211,7 +211,7 @@ rep("""      if (activeTool !== 'select' || e.button !== 0) return;
       const pt = pointerToPdf(e);
       if (!pt) return;
       const z = zoomRef.current || 1;
-      const onPage = editableOnPage();""", """      // Text Box tool: a press-and-drag draws the box (Revu); a plain click
+      const onPage = editableOnPage();""", """      // Text Box tool: a press-and-drag draws the box (FSFTM); a plain click
       // still opens a default-width box (OE-DELIVERY 2026-11-07-text-box).
       if (activeTool === 'text' && e.button === 0 && !showTextInputRef.current) {
         const tp = pointerToPdf(e);
@@ -323,7 +323,7 @@ rep("""                {showTextInput && (
                               return next;
                             }),
                           );
-                          // The look you set becomes the Text Box tool's default too (Revu).
+                          // The look you set becomes the Text Box tool's default too (FSFTM).
                           setToolTextStyle((s) => ({ ...s, ...patch }));
                         }}
                       />
@@ -366,7 +366,7 @@ rep("""                      onKeyDown={(e) => {
                       }}
                       onBlur={() => {
                         if (textInputCancellingRef.current) {""", """                      onKeyDown={(e) => {
-                        // Revu: Enter is a new line; Ctrl+Enter or Esc finishes
+                        // FSFTM: Enter is a new line; Ctrl+Enter or Esc finishes
                         // the box; Ctrl+B / I / U style it (OE-DELIVERY 2026-11-07-text-box).
                         if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
                           e.preventDefault();
@@ -440,7 +440,7 @@ rep("""    metadata: {
       text: m.text,
       width: m.width,
       height: m.height,
-      // Revu-style text box look (OE-DELIVERY 2026-11-07-text-box).
+      // FSFTM-style text box look (OE-DELIVERY 2026-11-07-text-box).
       text_style: m.textStyle,""")
 rep("""  const metadata: Record<string, unknown> = {
     text: m.text,

@@ -1,4 +1,4 @@
-// Revu-style Text Box in the real viewer (OE-DELIVERY 2026-11-07-text-box).
+// FSFTM-style Text Box in the real viewer (OE-DELIVERY 2026-11-07-text-box).
 const path = require('path');
 const fs = require('fs');
 const [frontendDir, outDir, qaFile] = process.argv.slice(2);

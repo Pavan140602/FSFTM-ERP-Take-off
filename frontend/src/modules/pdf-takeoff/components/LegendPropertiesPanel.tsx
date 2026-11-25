@@ -1,6 +1,6 @@
-// OE-DELIVERY: 2026-11-12-revu-ui (legend properties)
+// OE-DELIVERY: 2026-11-12-fsftm-ui (legend properties)
 /**
- * Legend Properties, like Revu's properties for a selected legend. Items
+ * Legend Properties, like FSFTM's properties for a selected legend. Items
  * with ▸ open a child pop-up beside the panel:
  *   Font · Colour · Title ▸ (text, show, size, B/I/U, colour) ·
  *   Columns ▸ (the legend's columns, beside them the Markup list columns
@@ -29,7 +29,7 @@ interface Props {
   columnDefs: { key: string; label: string }[];
   onChange: (patch: Partial<LegendSetup>) => void;
   onClose: () => void;
-  /** 'bar' = one horizontal row in the top Properties bar (Revu); child
+  /** 'bar' = one horizontal row in the top Properties bar (FSFTM); child
    *  pop-ups drop down under their item. */
   layout?: 'panel' | 'bar';
 }

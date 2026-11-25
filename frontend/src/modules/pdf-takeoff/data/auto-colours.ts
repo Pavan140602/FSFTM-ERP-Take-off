@@ -1,8 +1,8 @@
 /**
- * Auto Takeoff colours from the Revu picklist, one per set of parameters
+ * Auto Takeoff colours from the FSFTM picklist, one per set of parameters
  * (OE-DELIVERY 2026-11-09-colours-keys).
  *
- * Every auto markup gets its colour from the Revu-style picklist palette:
+ * Every auto markup gets its colour from the FSFTM-style picklist palette:
  *   - header areas and header tags: a warm family (oranges, reds, browns);
  *   - walls: a cool family (blues, greens, purples ...);
  *   - every other member: the remaining picklist colours.

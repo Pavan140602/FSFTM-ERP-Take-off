@@ -41,7 +41,7 @@ def test_other_values_leave_it_on(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
 def test_the_launcher_opt_out_file_turns_it_off(tmp_path: Path) -> None:
     target = policy.opt_out_path(tmp_path)
     target.parent.mkdir(parents=True)
-    target.write_text("OpenConstructionERP does not check for a newer version while this file exists.\n")
+    target.write_text("Florida Steel Frame & Truss Manufacturing LLC does not check for a newer version while this file exists.\n")
     assert policy.update_check_disabled(home=tmp_path) is True
 
 

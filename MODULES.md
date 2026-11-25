@@ -1,9 +1,9 @@
 # Modules - Guide and Catalog
 
-How to build, install, and publish modules for OpenConstructionERP, plus a
+How to build, install, and publish modules for Florida Steel Frame & Truss Manufacturing LLC, plus a
 map of every module that ships in the box.
 
-OpenConstructionERP is modular by design: every business feature (BOQ, BIM,
+Florida Steel Frame & Truss Manufacturing LLC is modular by design: every business feature (BOQ, BIM,
 takeoff, schedule, CDE, regional BOQ packs and more) is a self-contained
 module that can be enabled, disabled, installed, or replaced without touching
 the core. The current build loads 193 modules. You enable only the parts you

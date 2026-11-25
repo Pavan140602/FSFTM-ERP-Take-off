@@ -1,5 +1,5 @@
 [Unit]
-Description=OpenConstructionERP - open-source construction cost estimation
+Description=Florida Steel Frame & Truss Manufacturing LLC - open-source construction cost estimation
 After=network.target
 
 [Service]

@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "OpenConstructionERP",
+    "name": "Florida Steel Frame & Truss Manufacturing LLC",
     "tagline": "Остойностяване на строителството с отворен код"
   },
   "nav": {
@@ -164,7 +164,7 @@
     "update": "Обновяване"
   },
   "dashboard": {
-    "welcome": "Добре дошли в OpenConstructionERP",
+    "welcome": "Добре дошли в Florida Steel Frame & Truss Manufacturing LLC",
     "subtitle": "Вашето работно място за остойностяване",
     "recent_projects": "Последни проекти",
     "system_status": "Състояние на системата",

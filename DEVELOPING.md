@@ -1,4 +1,4 @@
-# Developing on OpenConstructionERP, with or without an AI assistant
+# Developing on Florida Steel Frame & Truss Manufacturing LLC, with or without an AI assistant
 
 This file exists because the platform is large and its shape is not obvious from the outside.
 There are 193 backend modules and around 180 frontend feature directories, and a newcomer who starts

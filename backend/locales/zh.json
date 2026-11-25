@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "OpenConstructionERP",
+    "name": "Florida Steel Frame & Truss Manufacturing LLC",
     "tagline": "开源建筑工程造价"
   },
   "nav": {
@@ -164,7 +164,7 @@
     "update": "更新"
   },
   "dashboard": {
-    "welcome": "欢迎使用 OpenConstructionERP",
+    "welcome": "欢迎使用 Florida Steel Frame & Truss Manufacturing LLC",
     "subtitle": "开源建筑工程造价平台",
     "recent_projects": "最近项目",
     "system_status": "系统状态",

@@ -1,4 +1,4 @@
-// OpenConstructionERP Desktop, launcher-side update check.
+// Florida Steel Frame & Truss Manufacturing LLC Desktop, launcher-side update check.
 //
 // Why this exists, and why it lives in the launcher rather than in the app.
 //
@@ -271,7 +271,7 @@ pub fn set_enabled(enabled: bool) -> Result<(), String> {
         }
         std::fs::write(
             &path,
-            b"OpenConstructionERP does not check for a newer version while this file exists.\n",
+            b"Florida Steel Frame & Truss Manufacturing LLC does not check for a newer version while this file exists.\n",
         )
         .map_err(|e| e.to_string())
     }
@@ -389,7 +389,7 @@ fn notice_script(update: &AvailableUpdate, current: &str, after_failure: bool) -
     let get_label = js_escape(&format!("Get version {}", update.version));
     let later_label = js_escape("Not now");
     let privacy_js = js_escape(
-        "To find this, OpenConstructionERP asked github.com which version is the latest. \
+        "To find this, Florida Steel Frame & Truss Manufacturing LLC asked github.com which version is the latest. \
 Nothing about you or this computer was sent.",
     );
     let off_label = js_escape("Turn off update checks");

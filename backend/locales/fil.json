@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "OpenConstructionERP",
+    "name": "Florida Steel Frame & Truss Manufacturing LLC",
     "tagline": "Open-source na pagtantya ng gastos sa konstruksyon"
   },
   "nav": {
@@ -164,7 +164,7 @@
     "update": "I-update"
   },
   "dashboard": {
-    "welcome": "Maligayang pagdating sa OpenConstructionERP",
+    "welcome": "Maligayang pagdating sa Florida Steel Frame & Truss Manufacturing LLC",
     "subtitle": "Ang iyong workspace para sa pagtantya ng konstruksyon",
     "recent_projects": "Kamakailang Proyekto",
     "system_status": "Status ng Sistema",

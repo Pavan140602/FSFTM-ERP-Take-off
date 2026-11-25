@@ -1,4 +1,4 @@
-# Autostart OpenConstructionERP on system boot
+# Autostart Florida Steel Frame & Truss Manufacturing LLC on system boot
 
 Three ready-to-use templates for the three major OSes. Pick yours.
 
@@ -98,7 +98,7 @@ schtasks /Delete /TN OpenConstructionERP /F
 
 For LAN access on Windows, also open the firewall:
 ```powershell
-New-NetFirewallRule -DisplayName "OpenConstructionERP 8000" -Direction Inbound -Protocol TCP -LocalPort 8000 -Action Allow
+New-NetFirewallRule -DisplayName "Florida Steel Frame & Truss Manufacturing LLC 8000" -Direction Inbound -Protocol TCP -LocalPort 8000 -Action Allow
 ```
 
 ---

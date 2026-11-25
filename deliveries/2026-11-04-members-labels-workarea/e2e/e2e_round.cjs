@@ -25,10 +25,10 @@ const shot = (page, n) => page.screenshot({ path: path.join(outDir, n) });
     await page.goto(`${BASE}/takeoff?tab=measurements&doc=${DOC}&name=x.pdf`);
     await page.waitForFunction(() => document.querySelector('canvas.block')?.width > 400, null, { timeout: 120000 });
     await page.waitForTimeout(1500);
-    const ws = page.locator('[data-testid="revu-workspace-toggle"]');
+    const ws = page.locator('[data-testid="fsftm-workspace-toggle"]');
     if ((await ws.innerText()).includes('Exit')) await ws.click();
     await page.waitForTimeout(1000);
-    r.normal = { viewerCanvasArea: await box('[data-testid="revu-tool-strip"]'), filmstripCurrent: await page.locator('[data-testid="filmstrip-current"]').count() };
+    r.normal = { viewerCanvasArea: await box('[data-testid="fsftm-tool-strip"]'), filmstripCurrent: await page.locator('[data-testid="filmstrip-current"]').count() };
     await shot(page, 'n1-normal.png');
     // Auto Takeoff panel member types
     await page.locator('[data-testid="rail-auto"]').click();

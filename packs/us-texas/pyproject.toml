@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "openconstructionerp-us-texas"
 version = "0.1.0"
-description = "Texas state pack for OpenConstructionERP: lump sum versus separated sales tax on construction, locally determined prevailing wage, public works retainage caps, and the statutory payment and lien clocks."
+description = "Texas state pack for Florida Steel Frame & Truss Manufacturing LLC: lump sum versus separated sales tax on construction, locally determined prevailing wage, public works retainage caps, and the statutory payment and lien clocks."
 readme = "README.md"
 license = { text = "AGPL-3.0-or-later" }
 requires-python = ">=3.11"

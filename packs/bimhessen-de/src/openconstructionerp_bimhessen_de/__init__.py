@@ -1,4 +1,4 @@
-"""BIM-Cluster Hessen partner pack for OpenConstructionERP.
+"""BIM-Cluster Hessen partner pack for Florida Steel Frame & Truss Manufacturing LLC.
 
 Pre-configures the platform for German BIM consultancies and
 engineering offices: DIN 276, GAEB X83/X84/X86, VOB/A+B+C 2019,

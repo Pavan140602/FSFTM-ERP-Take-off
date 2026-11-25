@@ -1,4 +1,4 @@
-# OpenConstructionERP v6.4.2
+# Florida Steel Frame & Truss Manufacturing LLC v6.4.2
 
 This is a maintenance release on top of v6.4.1. It fixes two geometry bugs that placed BIM and 3D models far from the ground, makes Partner Packs much easier to create and install without a source checkout, and tidies up the continuous integration run. Nothing here changes day-to-day workflows, and upgrading is safe.
 

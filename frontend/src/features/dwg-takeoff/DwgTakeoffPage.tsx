@@ -536,7 +536,7 @@ function OfflineReadyBadge({
   const converterMissing = readiness && !readiness.converter_available;
   // Only claim "runs on your machine" when the server is genuinely a
   // same-machine, non-hosted deployment. On the hosted demo we tell the
-  // honest truth: processing happens on the user's OpenConstructionERP
+  // honest truth: processing happens on the user's Florida Steel Frame & Truss Manufacturing LLC
   // server and is never forwarded to a third party.
   const localOnly = readiness?.local_only ?? false;
   const readyTooltip = localOnly
@@ -546,7 +546,7 @@ function OfflineReadyBadge({
       })
     : t('dwg_takeoff.offline_ready_tooltip_server', {
         defaultValue:
-          'Conversions run on your OpenConstructionERP server and are never sent to third parties.',
+          'Conversions run on your Florida Steel Frame & Truss Manufacturing LLC server and are never sent to third parties.',
       });
 
   return (
@@ -3389,7 +3389,7 @@ export function DwgTakeoffPage() {
                         <span className="text-xs text-emerald-300/90 font-medium">
                           {offlineReadiness?.local_only
                             ? t('common.local_processing', { defaultValue: '100% Local Processing · Your files never leave your computer' })
-                            : t('dwg_takeoff.processed_on_your_server', { defaultValue: 'Processed on your OpenConstructionERP server · never sent to third parties' })}
+                            : t('dwg_takeoff.processed_on_your_server', { defaultValue: 'Processed on your Florida Steel Frame & Truss Manufacturing LLC server · never sent to third parties' })}
                         </span>
                         <span className="text-[10px] text-emerald-500/30">|</span>
                         <a
@@ -6861,7 +6861,7 @@ function ConversionErrorCard({
               {isMissingConverter
                 ? t('dwg_takeoff.conv_missing_message', {
                     defaultValue:
-                      'OpenConstructionERP needs the DDC DwgExporter to read DWG files. Install it once - works for every DWG you upload after.',
+                      'Florida Steel Frame & Truss Manufacturing LLC needs the DDC DwgExporter to read DWG files. Install it once - works for every DWG you upload after.',
                   })
                 : message ||
                   t('dwg_takeoff.conv_error_default', {

@@ -1,4 +1,4 @@
-// OE-DELIVERY: 2026-11-02-revu-left-panel
+// OE-DELIVERY: 2026-11-02-fsftm-left-panel
 import { describe, expect, it } from 'vitest';
 import { detectSheet, sheetCaption, type TextItemLite } from './sheet-index';
 

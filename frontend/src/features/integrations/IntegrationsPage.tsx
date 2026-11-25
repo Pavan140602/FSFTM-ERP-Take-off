@@ -255,7 +255,7 @@ const CONNECTORS: ConnectorDef[] = [
     setupSteps: [
       { text: 'Open your Teams channel' },
       { text: 'Click "..." → "Connectors" → "Incoming Webhook"' },
-      { text: 'Name it "OpenConstructionERP" and click "Create"' },
+      { text: 'Name it "Florida Steel Frame & Truss Manufacturing LLC" and click "Create"' },
       { text: 'Copy the webhook URL' },
       { text: 'Paste it below' },
     ],

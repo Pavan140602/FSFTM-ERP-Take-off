@@ -1,4 +1,4 @@
-// Headless multi-page smoke probe for OpenConstructionERP dev frontend.
+// Headless multi-page smoke probe for Florida Steel Frame & Truss Manufacturing LLC dev frontend.
 // Logs in once as demo, injects token + skip-tour flags, then walks every
 // route, captures status/console/page errors and a few content heuristics,
 // and prints a summary table.

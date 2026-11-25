@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "OpenConstructionERP",
+    "name": "Florida Steel Frame & Truss Manufacturing LLC",
     "tagline": "Estimare de costuri în construcții open-source"
   },
   "nav": {
@@ -164,7 +164,7 @@
     "update": "Actualizați"
   },
   "dashboard": {
-    "welcome": "Bine ați venit la OpenConstructionERP",
+    "welcome": "Bine ați venit la Florida Steel Frame & Truss Manufacturing LLC",
     "subtitle": "Spațiul dvs. de lucru pentru estimarea în construcții",
     "recent_projects": "Proiecte recente",
     "system_status": "Stare sistem",

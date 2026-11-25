@@ -1781,7 +1781,7 @@ export function TakeoffPage() {
       // Clear any previous upload error toast so stale errors don't linger on retry
       setUploadErrorToast(null);
       // The first upload of this batch to finish opens in PDF Measurements
-      // (OE-DELIVERY 2026-11-12-revu-ui); the others just join the list.
+      // (OE-DELIVERY 2026-11-12-fsftm-ui); the others just join the list.
       let openedOne = false;
       for (const file of files) {
         // Create an optimistic local entry immediately

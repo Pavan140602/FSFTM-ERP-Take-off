@@ -1,4 +1,4 @@
-"""OpenConstructionERP - Portugal country pack (ProNIC, EUR)."""
+"""Florida Steel Frame & Truss Manufacturing LLC - Portugal country pack (ProNIC, EUR)."""
 
 from __future__ import annotations
 

@@ -8,7 +8,7 @@ DOCKER_COMPOSE = docker compose
 # ─── Help ───────────────────────────────────────────────────────────────────
 help: ## Show this help
 	@echo ""
-	@echo "  OpenConstructionERP — Construction Cost Estimation Platform"
+	@echo "  Florida Steel Frame & Truss Manufacturing LLC — Construction Cost Estimation Platform"
 	@echo "  ─────────────────────────────────────────────────────────────"
 	@echo ""
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -35,7 +35,7 @@ dev-frontend: ## Start frontend dev server
 	cd $(FRONTEND_DIR) && npm run dev
 
 dev: ## Show how to start dev (cross-platform: two terminals)
-	@echo "OpenConstructionERP local dev needs two terminals (cross-platform safe):"
+	@echo "Florida Steel Frame & Truss Manufacturing LLC local dev needs two terminals (cross-platform safe):"
 	@echo "  Terminal 1:  make dev-backend   (http://localhost:8000)"
 	@echo "  Terminal 2:  make dev-frontend  (http://localhost:5173)"
 	@echo ""
@@ -45,7 +45,7 @@ dev: ## Show how to start dev (cross-platform: two terminals)
 # Does NOT work in Windows cmd.exe or MSYS2 make — use `make dev-backend`
 # and `make dev-frontend` in two terminals instead.
 dev-unix: infra ## Start backend (background) + frontend — POSIX shells only
-	@echo "Starting OpenConstructionERP (POSIX dev)..."
+	@echo "Starting Florida Steel Frame & Truss Manufacturing LLC (POSIX dev)..."
 	@echo "  Backend:  http://localhost:8000"
 	@echo "  Frontend: http://localhost:5173"
 	@echo ""
@@ -186,7 +186,7 @@ quickstart-secrets:
 # Building is optional. A failed build used to end at a raw compose error,
 # which left people stuck on a step they never had to run, so the failure
 # path now names the published image instead.
-quickstart: quickstart-secrets ## Start OpenConstructionERP (PostgreSQL + App) — needs a .env with two secrets
+quickstart: quickstart-secrets ## Start Florida Steel Frame & Truss Manufacturing LLC (PostgreSQL + App) — needs a .env with two secrets
 	@$(DOCKER_COMPOSE) -f docker-compose.quickstart.yml up --build || $(MAKE) --no-print-directory quickstart-build-failed
 
 quickstart-build-failed:
@@ -208,7 +208,7 @@ QUICKSTART_IMAGE_FILES = -f docker-compose.quickstart.yml -f docker-compose.quic
 quickstart-image: quickstart-secrets ## Start quickstart from the published image (no local build)
 	$(DOCKER_COMPOSE) $(QUICKSTART_IMAGE_FILES) pull app
 	$(DOCKER_COMPOSE) $(QUICKSTART_IMAGE_FILES) up -d
-	@echo "  OpenConstructionERP: http://localhost:8080"
+	@echo "  Florida Steel Frame & Truss Manufacturing LLC: http://localhost:8080"
 
 quickstart-image-down: ## Stop the published-image quickstart
 	$(DOCKER_COMPOSE) $(QUICKSTART_IMAGE_FILES) down

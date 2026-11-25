@@ -1,4 +1,4 @@
-# OpenConstructionERP Desktop, build and release.
+# Florida Steel Frame & Truss Manufacturing LLC Desktop, build and release.
 #
 # Triggered on version tag push (e.g., v6.7.0).
 # Builds desktop installers for Windows, macOS, and Linux.
@@ -356,7 +356,7 @@ jobs:
             exit 1
           fi
           case "$out" in
-            *"OpenConstructionERP v"*)
+            *"Florida Steel Frame & Truss Manufacturing LLC v"*)
               echo "OK: the sidecar starts and reports its version." ;;
             *)
               echo "::error title=The desktop sidecar started but said nothing recognisable::Exit was 0 but the output does not carry a version line, so the interpreter may have started without the app package."
@@ -372,7 +372,7 @@ jobs:
           # sidecar would be green everywhere.
           #
           # Safe to gate on, measured rather than assumed: the frozen sidecar
-          # printed "OpenConstructionERP v15.0.0" on all three platforms in the
+          # printed "Florida Steel Frame & Truss Manufacturing LLC v15.0.0" on all three platforms in the
           # v15.0.0 run (32222276138), so the version resolves inside a bundle
           # where importlib.metadata does not answer.
           #
@@ -381,7 +381,7 @@ jobs:
           ref="${RELEASE_REF:-}"
           case "$ref" in
             v[0-9]*)
-              want="OpenConstructionERP v${ref#v}"
+              want="Florida Steel Frame & Truss Manufacturing LLC v${ref#v}"
               case "$out" in
                 *"$want"*)
                   echo "OK: the sidecar reports ${ref#v}, which is the version being released." ;;

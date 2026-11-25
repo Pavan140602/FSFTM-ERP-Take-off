@@ -83,11 +83,11 @@
     "common.required": "Obrigatório",
     "common.optional": "Opcional",
 
-    "branding.powered_by": "Desenvolvido com OpenConstructionERP",
+    "branding.powered_by": "Desenvolvido com Florida Steel Frame & Truss Manufacturing LLC",
     "branding.in_partnership": "Em parceria com {partner}",
-    "branding.co_brand_line": "Desenvolvido com OpenConstructionERP - Em parceria com {partner}",
+    "branding.co_brand_line": "Desenvolvido com Florida Steel Frame & Truss Manufacturing LLC - Em parceria com {partner}",
 
-    "onboarding.welcome_title": "Bem-vindo ao OpenConstructionERP - Edição Brasil",
+    "onboarding.welcome_title": "Bem-vindo ao Florida Steel Frame & Truss Manufacturing LLC - Edição Brasil",
     "onboarding.welcome_subtitle": "Cinco passos rápidos para alinhar seu espaço de trabalho à prática brasileira (SINAPI, NBR, RPS).",
     "onboarding.step_company": "Perfil da empresa",
     "onboarding.step_cost_db": "Base de custos (SINAPI)",

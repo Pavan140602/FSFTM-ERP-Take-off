@@ -1,6 +1,6 @@
 # BIM-Cluster Hessen Pack (Germany)
 
-Partner pack pre-configuring OpenConstructionERP for German BIM consultancies
+Partner pack pre-configuring Florida Steel Frame & Truss Manufacturing LLC for German BIM consultancies
 and engineering offices, with a regional focus on Hessen. Loads the German
 standards stack: DIN 276 cost groups, GAEB exchange, VOB contract conditions,
 ISO 19650 information management and the HOAI fee phases.
@@ -55,7 +55,7 @@ publishers' own text and tables are not reproduced here.
 
 ## Install
 
-This pack ships inside OpenConstructionERP. Activate it from Modules then
+This pack ships inside Florida Steel Frame & Truss Manufacturing LLC. Activate it from Modules then
 Partner Packs: click Rescan, find "BIM-Cluster Hessen", then Activate pack.
 
 To run a workspace that boots straight into it:

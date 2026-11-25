@@ -1,7 +1,7 @@
 // DDC-CWICR-OE: DataDrivenConstruction · OpenConstructionERP
 // Copyright (c) 2026 Artem Boiko / DataDrivenConstruction
 /**
- * Anonymized error logging system for OpenConstructionERP.
+ * Anonymized error logging system for Florida Steel Frame & Truss Manufacturing LLC.
  *
  * Captures JS errors, unhandled promise rejections, React Error Boundary errors,
  * and API errors. All data is anonymized before storage. Errors are kept in a

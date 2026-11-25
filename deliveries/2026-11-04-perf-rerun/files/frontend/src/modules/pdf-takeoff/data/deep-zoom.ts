@@ -1,9 +1,9 @@
-// OE-DELIVERY: 2026-11-02-revu-zoom
+// OE-DELIVERY: 2026-11-02-fsftm-zoom
 /**
- * Revu-style deep zoom for the PDF takeoff viewer.
+ * FSFTM-style deep zoom for the PDF takeoff viewer.
  *
  * A browser canvas cannot hold a whole E-size sheet at 1000%+ (side and
- * pixel-count limits, and seconds per pdf.js render). Revu renders only what
+ * pixel-count limits, and seconds per pdf.js render). FSFTM renders only what
  * is on screen; we do the same:
  *
  *  - the page bitmap is rendered at most at {@link bitmapZoomCap} and CSS
@@ -22,7 +22,7 @@
 export const MAX_BITMAP_SIDE = 6144;
 export const MAX_BITMAP_PIXELS = 10_000_000;
 
-/** Revu-like zoom range: 10% - 6400%. */
+/** FSFTM-like zoom range: 10% - 6400%. */
 export const DEEP_ZOOM_MIN = 0.1;
 export const DEEP_ZOOM_MAX = 64;
 
@@ -86,7 +86,7 @@ export function sameRegion(a: Region | null, b: Region | null): boolean {
 
 /**
  * Zoom-to-box: the zoom that fits the PDF-unit rectangle ``r`` into a
- * ``viewW x viewH`` viewport (with a small margin, like Revu), and the PDF
+ * ``viewW x viewH`` viewport (with a small margin, like FSFTM), and the PDF
  * point that must land at the viewport centre.
  */
 export function zoomToBox(
@@ -128,5 +128,5 @@ export function centreScroll(
   };
 }
 
-/** One Revu Zoom-tool click step. */
+/** One FSFTM Zoom-tool click step. */
 export const ZOOM_TOOL_STEP = 2;

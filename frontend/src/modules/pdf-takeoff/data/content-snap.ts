@@ -1,7 +1,7 @@
 // DDC-CWICR-OE: DataDrivenConstruction · OpenConstructionERP
 /**
  * Snap-to-PDF-content: extract vector geometry from a PDF page so measurement
- * tools can snap to the drawing's own lines (endpoints, midpoints), Bluebeam-style.
+ * tools can snap to the drawing's own lines (endpoints, midpoints), FSFTM-style.
  *
  * Approach: `page.getOperatorList()` yields the raw PDF drawing operators.
  * We walk them tracking the CTM (current transform matrix) through save/restore,
@@ -198,7 +198,7 @@ export async function extractPageSegments(page: PDFPageProxy): Promise<Segment[]
       case OPS.constructPath: {
         // pdf.js 4+ packs each path into one constructPath op instead of
         // separate moveTo / lineTo ops, so without this nothing was read and
-        // content snap never had any lines (OE-DELIVERY 2026-11-12-revu-ui u12).
+        // content snap never had any lines (OE-DELIVERY 2026-11-12-fsftm-ui u12).
         const raw = argsArray[i] as unknown as unknown[];
         // New form: [drawOp, [Float32Array of DrawOPS-coded data], minMax].
         const packed = Array.isArray(raw?.[1]) ? (raw[1] as unknown[])[0] : null;
@@ -374,7 +374,7 @@ export function snapToContent(
   zoom: number,
   tolerancePx: number,
 ): ContentSnap | null {
-  // Magnet reach (Revu-like): a little wider than the markup-vertex snap.
+  // Magnet reach (FSFTM-like): a little wider than the markup-vertex snap.
   const tol = (tolerancePx * 1.6) / Math.max(zoom, 0.01);
   const tol2 = tol * tol;
   const { segments, cell, grid, minX, minY } = index;

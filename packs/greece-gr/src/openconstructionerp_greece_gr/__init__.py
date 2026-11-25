@@ -1,4 +1,4 @@
-"""OpenConstructionERP - Greece country pack (ΝΕΤ articles, EUR, ΦΠΑ).
+"""Florida Steel Frame & Truss Manufacturing LLC - Greece country pack (ΝΕΤ articles, EUR, ΦΠΑ).
 
 This package exports a module-level ``MANIFEST`` instance of
 :class:`PartnerPackManifest` referenced from ``pyproject.toml``::

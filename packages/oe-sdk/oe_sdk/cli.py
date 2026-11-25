@@ -1,4 +1,4 @@
-"""Command-line entry for the OpenConstructionERP module SDK.
+"""Command-line entry for the Florida Steel Frame & Truss Manufacturing LLC module SDK.
 
 ``oe-sdk`` wraps the platform's own server-side scaffolder
 (``app.scripts.scaffold_module``). It does not generate code itself and it runs
@@ -28,7 +28,7 @@ from oe_sdk import __version__
 _CORE_MISSING_HINT = (
     "oe-sdk: the platform core (app.scripts.scaffold_module) is not importable "
     "in this environment.\n"
-    "The scaffolder ships with the OpenConstructionERP backend and copies the "
+    "The scaffolder ships with the Florida Steel Frame & Truss Manufacturing LLC backend and copies the "
     "template from the repository checkout.\n"
     "Install the backend into this environment and run oe-sdk from the "
     "repository, for local work:\n"
@@ -71,7 +71,7 @@ def build_parser() -> argparse.ArgumentParser:
     """Build the argument parser for the ``oe-sdk`` command."""
     parser = argparse.ArgumentParser(
         prog="oe-sdk",
-        description="Build modules for OpenConstructionERP.",
+        description="Build modules for Florida Steel Frame & Truss Manufacturing LLC.",
     )
     parser.add_argument("--version", action="version", version=f"oe-sdk {__version__}")
     sub = parser.add_subparsers(dest="command")

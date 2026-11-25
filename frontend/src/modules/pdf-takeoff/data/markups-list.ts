@@ -1,6 +1,6 @@
 // DDC-CWICR-OE: DataDrivenConstruction · OpenConstructionERP
 /**
- * Markups List power features (Bluebeam-style):
+ * Markups List power features (FSFTM-style):
  *  - Formula columns: `=Value*2`, `=Area+Perimeter`, etc.
  *  - Filtering: by type, group, page, text.
  *  - Totals: sum values grouped by type.

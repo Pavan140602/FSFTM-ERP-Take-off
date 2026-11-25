@@ -31,7 +31,7 @@ rep("""  const ledgerDocKey = documentId || fileName || 'local';""", """  const 
   const autoColourKeyRef = useRef('');
   autoColourKeyRef.current = `takeoff.autoColours.v1.${ledgerDocKey}`;""")
 rep("""      const colourFor = (item: AutoItem, fallback: string): string =>
-        chestByLabel.get(norm(item.profile ?? item.designation)) ?? (item.role ? ROLE_COLORS[item.role] : undefined) ?? fallback;""", """      // Colours from the Revu picklist, a different one for every set of
+        chestByLabel.get(norm(item.profile ?? item.designation)) ?? (item.role ? ROLE_COLORS[item.role] : undefined) ?? fallback;""", """      // Colours from the FSFTM picklist, a different one for every set of
       // parameters (header / wall / material / spacing / width / height),
       // kept per drawing (OE-DELIVERY 2026-11-09-colours-keys). The Tool
       // Chest / role colours stay as the fallback when no item is given.

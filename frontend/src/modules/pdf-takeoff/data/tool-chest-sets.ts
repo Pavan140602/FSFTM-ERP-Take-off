@@ -1,14 +1,14 @@
-// OE-DELIVERY: 2026-11-02-revu-tool-chest
+// OE-DELIVERY: 2026-11-02-fsftm-tool-chest
 /**
- * Bluebeam Revu-style Tool Chest: named tool sets (Recent Tools, My Tools and
+ * FSFTM-style Tool Chest: named tool sets (Recent Tools, My Tools and
  * any the user adds), each holding tools that remember their markup type,
  * Subject, Label, group and every property (colour, line, width, fill,
  * opacity, units, caption, text style). A set is in Drawing mode (click =
  * draw with that tool) or Properties mode (click = apply the tool's
  * properties to the selected markups). Pure helpers, stored in localStorage.
  */
-import { cleanLabelStyle } from '../../../features/takeoff/lib/takeoff-revu-props';
-import { parseToolStyles, type ToolStyle } from './revu-style';
+import { cleanLabelStyle } from '../../../features/takeoff/lib/takeoff-fsftm-props';
+import { parseToolStyles, type ToolStyle } from './fsftm-style';
 
 export interface ChestItem {
   id: string;
@@ -202,7 +202,7 @@ interface MarkupLike {
 }
 const STYLE_KEYS = ['color', 'fillColor', 'strokeWidth', 'lineStyle', 'fillAlpha', 'strokeAlpha', 'labelMode'] as const;
 
-/** A tool built from an existing markup (Revu "Add to Tool Chest"). */
+/** A tool built from an existing markup (FSFTM "Add to Tool Chest"). */
 export function itemFromMarkup(m: MarkupLike, name?: string): ChestItem {
   const style: Record<string, unknown> = {};
   for (const k of STYLE_KEYS) if (m[k] !== undefined) style[k] = m[k];
@@ -220,11 +220,11 @@ export function itemFromMarkup(m: MarkupLike, name?: string): ChestItem {
   };
 }
 
-/* ── Structural shapes (OE-DELIVERY 2026-11-03-revu-tool-chest-structural) ──
+/* ── Structural shapes (OE-DELIVERY 2026-11-03-fsftm-tool-chest-structural) ──
  * Tools show the member family they draw (W beam, WT, HSS, angle, channel,
  * CFS stud / track, deck, joist), read from the designation. The structural
  * tool sets are built from the SSMA / AISC / Vulcraft tables in
- * tool-chest-library.ts, one set per family, like a structural Revu chest. */
+ * tool-chest-library.ts, one set per family, like a structural FSFTM chest. */
 export type ShapeFamily = 'W' | 'WT' | 'HSS' | 'HSSR' | 'L' | 'C' | 'CFS-S' | 'CFS-T' | 'DECK' | 'JOIST' | 'HDR' | 'JAMB' | 'HAT';
 
 export const FAMILY_NAMES: Record<ShapeFamily, string> = {

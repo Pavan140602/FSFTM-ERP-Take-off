@@ -1,4 +1,4 @@
-# OpenConstructionERP — PyPI publish
+# Florida Steel Frame & Truss Manufacturing LLC — PyPI publish
 #
 # Triggered on version tag push (e.g., v5.0.0). Builds the frontend
 # bundle, vendors it into the wheel layout, builds the wheel, and
@@ -10,7 +10,7 @@
 #   2. "Add a new pending publisher" with:
 #        PyPI Project Name: openconstructionerp
 #        Owner: DataDrivenConstruction
-#        Repository name: OpenConstructionERP
+#        Repository name: Florida Steel Frame & Truss Manufacturing LLC
 #        Workflow name: pypi-publish.yml
 #        Environment name: pypi
 #   3. Save. Next tag push to this repo publishes automatically.

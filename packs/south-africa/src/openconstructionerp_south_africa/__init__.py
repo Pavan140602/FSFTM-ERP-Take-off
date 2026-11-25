@@ -1,4 +1,4 @@
-"""OpenConstructionERP - South Africa partner pack.
+"""Florida Steel Frame & Truss Manufacturing LLC - South Africa partner pack.
 
 Pre-configures OCERP for South African construction against SANS 1200 civil
 works and the ASAQS Standard System of Measuring Building Work, CIDB

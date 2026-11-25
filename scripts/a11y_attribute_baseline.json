@@ -2,7 +2,7 @@
  "_comment": "This baseline records accessibility debt that already existed. It MAY ONLY SHRINK. Adding an entry to make this gate pass is not an accepted fix - it converts a defect a reader would hit into a line nobody reads. Fix the site, or, if the string is untranslatable on purpose (a product name, a sample value, a regex), move it to the allowlist with a reason instead.",
  "allowlist": {
   "untranslated_attributes": {
-   "app/layout/CustomBranding.tsx::title::OpenConstructionERP": "product name - identical in every language; a translator meeting it cold would render it",
+   "app/layout/CustomBranding.tsx::title::Florida Steel Frame & Truss Manufacturing LLC": "product name - identical in every language; a translator meeting it cold would render it",
    "features/dashboard/DashboardPage.tsx::alt::DataDrivenConstruction": "company name - identical in every language",
    "features/modules/RequestCustomModuleDialog.tsx::alt::DataDrivenConstruction": "company name - identical in every language"
   }

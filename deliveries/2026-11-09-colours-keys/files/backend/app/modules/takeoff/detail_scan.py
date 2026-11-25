@@ -491,7 +491,7 @@ def plan_area(model) -> tuple[float, float, float, float]:
 
 def plan_parts(model, parts: int = 0) -> list[dict[str, Any]]:
     """Split the drawing area into parts to zoom into one by one (like an
-    estimator zooming in Revu): 4, 6, 9, 12 or 16 parts, more for a crowded
+    estimator zooming in FSFTM): 4, 6, 9, 12 or 16 parts, more for a crowded
     sheet. Each part has its ``core`` (what it owns, so nothing is counted
     twice) and its ``zoom`` area (core plus an overlap of about 2 ft, so a
     member crossing the line between two parts is still seen whole)."""

@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "OpenConstructionERP",
+    "name": "Florida Steel Frame & Truss Manufacturing LLC",
     "tagline": "Кошторисна справа з відкритим кодом"
   },
   "nav": {
@@ -164,7 +164,7 @@
     "update": "Оновити"
   },
   "dashboard": {
-    "welcome": "Ласкаво просимо до OpenConstructionERP",
+    "welcome": "Ласкаво просимо до Florida Steel Frame & Truss Manufacturing LLC",
     "subtitle": "Ваш робочий простір кошторисної справи",
     "recent_projects": "Останні проєкти",
     "system_status": "Стан системи",

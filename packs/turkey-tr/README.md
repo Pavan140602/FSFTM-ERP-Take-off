@@ -64,7 +64,7 @@ birim fiyat item references and pozlar numbering.
 
 ## Install
 
-This pack ships inside OpenConstructionERP. Activate it from Modules then
+This pack ships inside Florida Steel Frame & Truss Manufacturing LLC. Activate it from Modules then
 Partner Packs: click Rescan, find "Turkey Construction Pack", then Activate
 pack.
 

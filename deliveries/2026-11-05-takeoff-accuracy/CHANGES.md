@@ -2,7 +2,7 @@
 
 Apply after `2026-11-05-upload-progress`. Restore with `python deliveries/2026-11-05-takeoff-accuracy/restore.py` (try `--dry-run` first), then **restart the backend**. The backend in use when this was written started at 19:33, before these changes, so it runs the older code until restarted.
 
-## Shear wall plans: measured like an estimator in Revu
+## Shear wall plans: measured like an estimator in FSFTM
 
 - **Wall types W1–W4:** each wall runs from the centre of the intersecting wall on one side to the one on the other. Examples: a bay's exterior wall between two party walls (13'-0"), or a party wall from the exterior wall to the corridor wall.
   - Window and door gaps are bridged; a corridor is never crossed.

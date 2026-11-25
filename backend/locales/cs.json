@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "OpenConstructionERP",
+    "name": "Florida Steel Frame & Truss Manufacturing LLC",
     "tagline": "Open-source rozpočtování staveb"
   },
   "nav": {
@@ -164,7 +164,7 @@
     "update": "Aktualizovat"
   },
   "dashboard": {
-    "welcome": "Vítejte v OpenConstructionERP",
+    "welcome": "Vítejte v Florida Steel Frame & Truss Manufacturing LLC",
     "subtitle": "Open-source platforma pro rozpočtování staveb",
     "recent_projects": "Nedávné projekty",
     "system_status": "Stav systému",

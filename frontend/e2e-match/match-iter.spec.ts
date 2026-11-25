@@ -132,7 +132,7 @@ test.describe('match-elements iterative probe', () => {
       // Red-flag heuristics — tuned for the universality concerns:
       // 1. Wrong currency surfaced (EUR shown on a non-EUR project,
       //    or USD when the project says BRL). Match WHOLE-WORD token
-      //    only — "EUR" inside "OpenConstructionERP" is a false hit.
+      //    only — "EUR" inside "Florida Steel Frame & Truss Manufacturing LLC" is a false hit.
       const expectedCcy = (p.currency ?? '').toUpperCase();
       const ccyTokens = ['EUR', 'USD', 'GBP', 'BRL', 'RUB', 'CNY', 'JPY', 'INR'];
       for (const tk of ccyTokens) {

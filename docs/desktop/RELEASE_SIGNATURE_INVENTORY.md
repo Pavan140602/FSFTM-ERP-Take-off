@@ -1,6 +1,6 @@
 # Which releases are signed, and what "signed" means
 
-This page states plainly what cryptographic guarantees an OpenConstructionERP
+This page states plainly what cryptographic guarantees an Florida Steel Frame & Truss Manufacturing LLC
 download does and does not carry. It exists because "is it signed?" has four
 different answers here and they do not agree with each other, so a single yes or
 no would be misleading whichever way it went.

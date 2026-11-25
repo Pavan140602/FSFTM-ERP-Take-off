@@ -1,6 +1,6 @@
 # Greece Construction Pack
 
-Configures OpenConstructionERP for the Greek construction market. A Greek budget
+Configures Florida Steel Frame & Truss Manufacturing LLC for the Greek construction market. A Greek budget
 (προϋπολογισμός) prices every line from an article of the national unified price
 lists, the Νέα Ενιαία Τιμολόγια (ΝΕΤ), and then adds the public works cascade:
 general expenses and contractor profit, contingency and ΦΠΑ. The pack keeps the
@@ -127,7 +127,7 @@ are relied on for a tender.
 
 ## Install
 
-This pack ships inside OpenConstructionERP. Activate it from Modules then Partner
+This pack ships inside Florida Steel Frame & Truss Manufacturing LLC. Activate it from Modules then Partner
 Packs: click Rescan, find "Greece Construction Pack", then Activate pack.
 
 To run a workspace that boots straight into it:

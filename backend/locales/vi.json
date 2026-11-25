@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "OpenConstructionERP",
+    "name": "Florida Steel Frame & Truss Manufacturing LLC",
     "tagline": "Dự toán chi phí xây dựng mã nguồn mở"
   },
   "nav": {
@@ -164,7 +164,7 @@
     "update": "Cập nhật"
   },
   "dashboard": {
-    "welcome": "Chào mừng đến với OpenConstructionERP",
+    "welcome": "Chào mừng đến với Florida Steel Frame & Truss Manufacturing LLC",
     "subtitle": "Không gian làm việc dự toán xây dựng của bạn",
     "recent_projects": "Dự án gần đây",
     "system_status": "Trạng thái hệ thống",

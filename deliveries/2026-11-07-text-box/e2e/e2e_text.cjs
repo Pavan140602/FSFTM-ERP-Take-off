@@ -1,4 +1,4 @@
-// Revu-style Text Box in the real viewer (OE-DELIVERY 2026-11-07-text-box).
+// FSFTM-style Text Box in the real viewer (OE-DELIVERY 2026-11-07-text-box).
 const path = require('path');
 const fs = require('fs');
 const [frontendDir, outDir, qaFile] = process.argv.slice(2);
@@ -46,7 +46,7 @@ const shot = (page, n) => page.screenshot({ path: path.join(outDir, n) });
     const ed = page.locator('[data-testid="text-box-editor"]');
     r.editorOpen = await ed.count();
     r.editorWidth = await ed.evaluate((el) => el.getBoundingClientRect().width).catch(() => null);
-    await ed.type('Revu text box test');
+    await ed.type('FSFTM text box test');
     await page.keyboard.press('Enter');
     await ed.type('Second line, centred and bold');
     // Style from the bar while typing.
@@ -78,7 +78,7 @@ const shot = (page, n) => page.screenshot({ path: path.join(outDir, n) });
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
         const v = localStorage.getItem(k) || '';
-        if (v.includes('Revu text box test')) out.push(k + ' ' + (v.includes('"textStyle"') ? 'has textStyle' : 'NO textStyle'));
+        if (v.includes('FSFTM text box test')) out.push(k + ' ' + (v.includes('"textStyle"') ? 'has textStyle' : 'NO textStyle'));
       }
       return out;
     });

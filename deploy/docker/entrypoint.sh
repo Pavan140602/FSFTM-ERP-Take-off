@@ -1,5 +1,5 @@
 #!/bin/sh
-# Entrypoint for the unified OpenConstructionERP image.
+# Entrypoint for the unified Florida Steel Frame & Truss Manufacturing LLC image.
 #
 # The backend is PostgreSQL-only (SQLite support was removed in v6.6.0)
 # and this image does not bundle a database server, so DATABASE_URL is
@@ -93,7 +93,7 @@ if [ "$db_from_parts" = 0 ]; then
     "")
       echo "ERROR: DATABASE_URL is not set." >&2
       echo "" >&2
-      echo "OpenConstructionERP needs a PostgreSQL server. Either:" >&2
+      echo "Florida Steel Frame & Truss Manufacturing LLC needs a PostgreSQL server. Either:" >&2
       echo "  - run the full stack from the repo root:" >&2
       echo "      docker compose -f docker-compose.quickstart.yml up" >&2
       echo "  - or point this container at your own PostgreSQL:" >&2

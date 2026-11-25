@@ -133,7 +133,7 @@ export interface AutoTakeoffListProps {
   onSetProfile: (ids: string[], profile: string) => void;
   /** Profiles to suggest while typing (the ones on this drawing). */
   profileOptions: string[];
-  /** Recolour markups from the Revu colour picklist (OE-DELIVERY 2026-11-08-stud-walls). */
+  /** Recolour markups from the FSFTM colour picklist (OE-DELIVERY 2026-11-08-stud-walls). */
   onRecolor?: (ids: string[], colour: string) => void;
   /** Walls shown: one role only (Shear Wall ...) or all (null). The sheet
    *  shows the same walls as the list. */

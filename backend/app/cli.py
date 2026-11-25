@@ -1,6 +1,6 @@
 # DDC-CWICR-OE: DataDrivenConstruction · OpenConstructionERP
 # Copyright (c) 2026 Artem Boiko / DataDrivenConstruction
-"""OpenConstructionERP CLI - run the platform from the command line.
+"""Florida Steel Frame & Truss Manufacturing LLC CLI - run the platform from the command line.
 
 The happy path for a new user is two commands:
 
@@ -305,7 +305,7 @@ def _bar() -> str:
 
 
 # ── Banner ────────────────────────────────────────────────────────────────
-# "OpenConstructionERP" rendered in the figlet "small" font (82 cols × 5
+# "Florida Steel Frame & Truss Manufacturing LLC" rendered in the figlet "small" font (82 cols × 5
 # rows). The previous "Standard" font wrapped the 19-character name onto
 # multiple visual rows on a typical 80-col terminal, which looked crooked;
 # the "small" font fits the full name on one row with the trailing "ERP"
@@ -344,7 +344,7 @@ def print_startup_banner(
     print()
     print(_amber(_BANNER_ART))
     print()
-    print(f"  {bar}  {_bold('OpenConstructionERP is starting')}  {_dim('v' + version)}")
+    print(f"  {bar}  {_bold('Florida Steel Frame & Truss Manufacturing LLC is starting')}  {_dim('v' + version)}")
     print(f"  {bar}")
     print(f"  {bar}  {_bold('Open in your browser')}")
     print(f"  {bar}     {_amber(url)}")
@@ -789,7 +789,7 @@ def check_env_overrides() -> Check:
             "DATABASE_URL",
             "warn",
             f"unsupported scheme: {db.split(':', 1)[0]}",
-            "OpenConstructionERP runs only on PostgreSQL. Use postgresql+asyncpg://... "
+            "Florida Steel Frame & Truss Manufacturing LLC runs only on PostgreSQL. Use postgresql+asyncpg://... "
             "or leave DATABASE_URL unset to use the embedded PostgreSQL.",
         )
     if db.startswith("postgresql"):
@@ -1277,8 +1277,8 @@ def _run_fatal_preflight(data_dir: Path, host: str, port: int) -> None:
         _red(
             _bold(
                 _u(
-                    "Cannot start OpenConstructionERP — pre-flight checks failed:",
-                    "Cannot start OpenConstructionERP - pre-flight checks failed:",
+                    "Cannot start Florida Steel Frame & Truss Manufacturing LLC — pre-flight checks failed:",
+                    "Cannot start Florida Steel Frame & Truss Manufacturing LLC - pre-flight checks failed:",
                 )
             )
         )
@@ -1293,7 +1293,7 @@ def _run_fatal_preflight(data_dir: Path, host: str, port: int) -> None:
 
 
 def cmd_serve(args: argparse.Namespace) -> None:
-    """Start the OpenConstructionERP server."""
+    """Start the Florida Steel Frame & Truss Manufacturing LLC server."""
     data_dir = _data_dir_from_args(args)
 
     # ``serve --no-demo``: skip demo accounts / showcase projects for this
@@ -1689,7 +1689,7 @@ def cmd_doctor(args: argparse.Namespace) -> None:
     data_dir = _data_dir_from_args(args)
 
     print()
-    print(_bold(_u("OpenConstructionERP \u2014 doctor", "OpenConstructionERP - doctor")))
+    print(_bold(_u("Florida Steel Frame & Truss Manufacturing LLC \u2014 doctor", "Florida Steel Frame & Truss Manufacturing LLC - doctor")))
     print(_dim(f"Checking install at {data_dir}"))
     print()
 
@@ -1724,7 +1724,7 @@ def cmd_version(_args: argparse.Namespace) -> None:
     """Print version information."""
     version = _resolve_version()
 
-    print(f"OpenConstructionERP v{version}")
+    print(f"Florida Steel Frame & Truss Manufacturing LLC v{version}")
     print(f"Python {sys.version.split()[0]} ({sys.platform})")
     # This is the line people paste when something is wrong with an install, so
     # each label has to name what it actually shows. "Site-packages" used to be
@@ -1758,7 +1758,7 @@ def cmd_upgrade(args: argparse.Namespace) -> None:
     from app.core.self_upgrade import RELEASES_URL, is_frozen_build
 
     print()
-    print(_bold(_u("OpenConstructionERP \u2014 upgrade", "OpenConstructionERP - upgrade")))
+    print(_bold(_u("Florida Steel Frame & Truss Manufacturing LLC \u2014 upgrade", "Florida Steel Frame & Truss Manufacturing LLC - upgrade")))
 
     # In the PyInstaller desktop build ``sys.executable`` is the frozen binary,
     # not an interpreter, so the tokens below would come straight back into this
@@ -1852,7 +1852,7 @@ def _resolve_version() -> str:
     that way has no ``default``: pydantic stores the ``PydanticUndefined``
     sentinel there. That sentinel has a ``__str__``, so the old code did not
     raise and did not fall through to "unknown" either. It printed
-    ``OpenConstructionERP vPydanticUndefined`` at the one moment that path
+    ``Florida Steel Frame & Truss Manufacturing LLC vPydanticUndefined`` at the one moment that path
     exists for. Both branches are kept because either declaration is
     legitimate and this function must not break the next time somebody changes
     which one is used.
@@ -1892,7 +1892,7 @@ def print_welcome(*, next_command_hint: bool = True) -> None:
     print()
     print(_amber(_BANNER_ART))
     print()
-    print(f"  {_bold('OpenConstructionERP')} {_dim('v' + version)}")
+    print(f"  {_bold('Florida Steel Frame & Truss Manufacturing LLC')} {_dim('v' + version)}")
     print(f"  {_dim('Open-source construction cost estimation platform')}")
     print()
     if next_command_hint:
@@ -2459,7 +2459,7 @@ steps:
     title_i18n:
       en: "Welcome"
     body_i18n:
-      en: "This OpenConstructionERP install is pre-configured by {partner}. Replace these placeholder steps with your own onboarding flow."
+      en: "This Florida Steel Frame & Truss Manufacturing LLC install is pre-configured by {partner}. Replace these placeholder steps with your own onboarding flow."
 
   - id: done
     kind: summary
@@ -2471,7 +2471,7 @@ steps:
 """
 
 _PACK_README = """\
-# {slug} - OpenConstructionERP partner pack
+# {slug} - Florida Steel Frame & Truss Manufacturing LLC partner pack
 
 This is a declarative partner pack (Shape A). It carries only presets:
 branding, default locale, currency/tax defaults, module visibility and an
@@ -2636,7 +2636,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="openconstructionerp",
         description=(
-            "OpenConstructionERP, open-source construction cost estimation platform.\n\n"
+            "Florida Steel Frame & Truss Manufacturing LLC, open-source construction cost estimation platform.\n\n"
             "Quick start, one command does everything:\n"
             "    openconstructionerp\n\n"
             "It creates the local database, loads the demo data, starts the server\n"
@@ -2667,7 +2667,7 @@ def _build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command")
 
     # serve
-    serve_p = subparsers.add_parser("serve", help="Start the OpenConstructionERP server")
+    serve_p = subparsers.add_parser("serve", help="Start the Florida Steel Frame & Truss Manufacturing LLC server")
     _add_common_server_args(serve_p)
     serve_p.add_argument("--open", action="store_true", help="Open browser after startup")
     serve_p.add_argument("--quiet", action="store_true", help="Suppress banner and info logs")
@@ -2777,7 +2777,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "module",
         help="Install, list, or uninstall modules",
         description=(
-            "Manage OpenConstructionERP modules.\n\n"
+            "Manage Florida Steel Frame & Truss Manufacturing LLC modules.\n\n"
             "    openconstructionerp module install <archive.zip> [--force]\n"
             "    openconstructionerp module list\n"
             "    openconstructionerp module uninstall <name> [--force]\n\n"
@@ -2811,7 +2811,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "pack",
         help="Scaffold and manage partner packs",
         description=(
-            "Manage OpenConstructionERP partner packs (declarative preset bundles).\n\n"
+            "Manage Florida Steel Frame & Truss Manufacturing LLC partner packs (declarative preset bundles).\n\n"
             "    openconstructionerp pack new <slug> [--out DIR] [--force]\n\n"
             "Emits a minimal, valid pack folder (manifest.json + logo + onboarding\n"
             "+ README). Drop the folder (or a .zip of it) into <data-dir>/packs/ and\n"

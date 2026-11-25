@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "OpenConstructionERP",
+    "name": "Florida Steel Frame & Truss Manufacturing LLC",
     "tagline": "Presupuesto de construcción de código abierto"
   },
   "nav": {
@@ -164,7 +164,7 @@
     "update": "Actualizar"
   },
   "dashboard": {
-    "welcome": "Bienvenido a OpenConstructionERP",
+    "welcome": "Bienvenido a Florida Steel Frame & Truss Manufacturing LLC",
     "subtitle": "Plataforma de presupuestos de construcción de código abierto",
     "recent_projects": "Proyectos recientes",
     "system_status": "Estado del sistema",

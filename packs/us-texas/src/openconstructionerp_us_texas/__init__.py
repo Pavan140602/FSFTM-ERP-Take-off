@@ -1,4 +1,4 @@
-"""OpenConstructionERP - Texas construction pack.
+"""Florida Steel Frame & Truss Manufacturing LLC - Texas construction pack.
 
 State depth for Texas, layered on the national US pack rather than repeating
 it. What this pack adds:

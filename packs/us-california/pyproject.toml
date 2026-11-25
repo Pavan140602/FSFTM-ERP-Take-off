@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "openconstructionerp-us-california"
 version = "0.1.0"
-description = "California state pack for OpenConstructionERP: district sales tax and the materials versus fixtures split, the state prevailing wage regime, the public and private retention caps, and the statutory payment and mechanics lien clocks."
+description = "California state pack for Florida Steel Frame & Truss Manufacturing LLC: district sales tax and the materials versus fixtures split, the state prevailing wage regime, the public and private retention caps, and the statutory payment and mechanics lien clocks."
 readme = "README.md"
 license = { text = "AGPL-3.0-or-later" }
 requires-python = ">=3.11"

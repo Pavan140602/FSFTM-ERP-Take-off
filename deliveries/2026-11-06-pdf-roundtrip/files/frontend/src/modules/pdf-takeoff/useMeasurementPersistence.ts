@@ -1,7 +1,7 @@
 // DDC-CWICR-OE: DataDrivenConstruction · OpenConstructionERP
 // Copyright (c) 2026 Artem Boiko / DataDrivenConstruction
 import { cleanLegendSetup } from './data/legend-setup';
-import { cleanLabelStyle, labelStyleOf } from '../../features/takeoff/lib/takeoff-revu-props';
+import { cleanLabelStyle, labelStyleOf } from '../../features/takeoff/lib/takeoff-fsftm-props';
 import { cleanTextStyle } from './data/text-box';
 import {
   type Dispatch,
@@ -26,7 +26,7 @@ import {
   inferredCalibrationPages,
 } from '@/features/takeoff/lib/scaleSource';
 import { normalizeOpening } from '@/features/takeoff/lib/takeoff-quantity';
-import { isLabelMode, isLineStyle } from './data/revu-style';
+import { isLabelMode, isLineStyle } from './data/fsftm-style';
 import { type AutoTag, isAutoTag } from './data/auto-takeoff';
 import type { WallOpening } from '@/features/takeoff/lib/takeoff-types';
 import {
@@ -36,7 +36,7 @@ import {
   pageIsCalibrated,
   pageScalesHaveCalibration,
   reconcilePageScales,
-  // Viewport-aware scale per measurement (OE-DELIVERY 2026-11-02-revu-viewports-sketch).
+  // Viewport-aware scale per measurement (OE-DELIVERY 2026-11-02-fsftm-viewports-sketch).
   scaleForMeasurement,
 } from './data/page-scales';
 
@@ -52,7 +52,7 @@ interface Measurement {
   type: 'distance' | 'polyline' | 'area' | 'volume' | 'count'
     | 'cloud' | 'arrow' | 'text' | 'rectangle' | 'highlight'
     | 'perimeter' | 'diameter' | 'radiusCenter' | 'radius3Point' | 'angle'
-    // Revu markup + arc tools (OE-DELIVERY 2026-10-30-revu-markup-tools).
+    // FSFTM markup + arc tools (OE-DELIVERY 2026-10-30-fsftm-markup-tools).
     | 'line' | 'polygon' | 'ellipse' | 'pen' | 'callout' | 'stamp' | 'arc'
     | 'polygonCutout' | 'ellipseCutout' | 'dynamicFill';
   points: Point[];
@@ -68,7 +68,7 @@ interface Measurement {
   area?: number;
   text?: string;
   textStyle?: Partial<import("./data/text-box").TextStyle>;
-  /** Revu legend setup (OE-DELIVERY 2026-11-12-revu-ui). */
+  /** FSFTM legend setup (OE-DELIVERY 2026-11-12-fsftm-ui). */
   legendSetup?: import("./data/legend-setup").LegendSetup;
   color?: string;
   width?: number;
@@ -88,13 +88,13 @@ interface Measurement {
   /** Per-measurement STROKE (line) opacity for linear types (issue #332).
    *  Round-trips via metadata; falls back to fully opaque when unset. */
   strokeAlpha?: number;
-  /** Revu-style per-markup properties (OE-DELIVERY 2026-11-02-revu-properties):
+  /** FSFTM-style per-markup properties (OE-DELIVERY 2026-11-02-fsftm-properties):
    *  line pattern, a fill colour independent of the line colour, and which
    *  label parts show on the drawing. Undefined = previous behaviour. */
   lineStyle?: 'solid' | 'dashed' | 'dotted' | 'dashdot';
   fillColor?: string;
   labelMode?: 'all' | 'value' | 'name' | 'none';
-  /** Revu Properties toolbar (OE-DELIVERY 2026-11-02-revu-properties-bar):
+  /** FSFTM Properties toolbar (OE-DELIVERY 2026-11-02-fsftm-properties-bar):
    *  caption units, caption pick list and caption text style per markup. */
   dispUnit?: 'in' | 'ft' | 'ftin' | 'mm' | 'cm' | 'm' | 'km';
   dispAreaUnit?: 'sq in' | 'sq ft' | 'sq cm' | 'sq m' | 'sq mm';
@@ -387,7 +387,7 @@ function toApiFormat(
   // document-wide ratio, so a sheet at 1:500 and a sheet at 1:50 each get
   // their own px-per-unit for the server-side B8 recompute.
   // A measurement inside a viewport sends that viewport's ratio instead
-  // (OE-DELIVERY 2026-11-02-revu-viewports-sketch).
+  // (OE-DELIVERY 2026-11-02-fsftm-viewports-sketch).
   const scale = pageScales ? scaleForMeasurement(pageScales, m.page, m.points) : undefined;
   const ppu =
     scale && scale.pixelsPerUnit > 0 ? scale.pixelsPerUnit : null;
@@ -440,7 +440,7 @@ function toApiFormat(
       text: m.text,
       width: m.width,
       height: m.height,
-      // Revu-style text box look (OE-DELIVERY 2026-11-07-text-box).
+      // FSFTM-style text box look (OE-DELIVERY 2026-11-07-text-box).
       text_style: m.textStyle,
       legend_setup: m.legendSetup,
       // Per-measurement appearance overrides (issues #311/#312/#332); round-trip
@@ -451,7 +451,7 @@ function toApiFormat(
       // true-width line survives a server sync and renders per each page's scale.
       stroke_width_real: m.strokeWidthReal,
       stroke_alpha: m.strokeAlpha,
-      // Revu-style properties (OE-DELIVERY 2026-11-02-revu-properties).
+      // FSFTM-style properties (OE-DELIVERY 2026-11-02-fsftm-properties).
       line_style: m.lineStyle,
       fill_color: m.fillColor,
       label_mode: m.labelMode,
@@ -542,7 +542,7 @@ function syncSignature(m: Measurement): string {
     lst: labelStyleOf(m),
     at: m.auto ?? null,
     // Markups-list Label / Material (custom fields) edits must re-sync; they
-    // were only written on create before (OE-DELIVERY 2026-11-02-revu-markups-list).
+    // were only written on create before (OE-DELIVERY 2026-11-02-fsftm-markups-list).
     cf: m.customFields ?? null,
     ch: m.columnHeight ?? null,
     // Reported-quantity adjustments (issue #332 wave): a slope / wastage /
@@ -638,7 +638,7 @@ function toApiUpdate(
     // because the server replaces the metadata blob wholesale.
     stroke_width_real: m.strokeWidthReal,
     stroke_alpha: m.strokeAlpha,
-    // Revu-style properties (OE-DELIVERY 2026-11-02-revu-properties); NULL clears.
+    // FSFTM-style properties (OE-DELIVERY 2026-11-02-fsftm-properties); NULL clears.
     line_style: m.lineStyle ?? null,
     fill_color: m.fillColor ?? null,
     label_mode: m.labelMode ?? null,

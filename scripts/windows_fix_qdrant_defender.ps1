@@ -1,4 +1,4 @@
-# OpenConstructionERP - Windows Defender fix for Qdrant snapshot restore.
+# Florida Steel Frame & Truss Manufacturing LLC - Windows Defender fix for Qdrant snapshot restore.
 #
 # Why this exists:
 # Qdrant 1.18+ writes a WAL clock file (newest_clocks.json) during snapshot
@@ -44,7 +44,7 @@ if (-not (Test-Admin)) {
 $targetPath = Join-Path $env:USERPROFILE ".openestimator"
 
 Write-Host ""
-Write-Host "OpenConstructionERP - Qdrant Defender fix" -ForegroundColor Cyan
+Write-Host "Florida Steel Frame & Truss Manufacturing LLC - Qdrant Defender fix" -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Adding Defender exclusion for:" -ForegroundColor White

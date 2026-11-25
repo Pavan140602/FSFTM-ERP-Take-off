@@ -1,4 +1,4 @@
-"""OpenConstructionERP - Canada Construction pack (MasterFormat + CCDC + NBC + CSA)."""
+"""Florida Steel Frame & Truss Manufacturing LLC - Canada Construction pack (MasterFormat + CCDC + NBC + CSA)."""
 
 from __future__ import annotations
 

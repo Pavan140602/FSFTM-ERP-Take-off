@@ -1,6 +1,6 @@
 // DDC-CWICR-OE: DataDrivenConstruction · OpenConstructionERP
 // Copyright (c) 2026 Artem Boiko / DataDrivenConstruction
-// OpenConstructionERP — chat XSS regression suite.
+// Florida Steel Frame & Truss Manufacturing LLC — chat XSS regression suite.
 //
 // Security audit 2026-05-24 finding #1: the chat surfaces
 // (FloatingChatPanel + full-page MessageBubble) render assistant

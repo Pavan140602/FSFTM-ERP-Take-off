@@ -1,6 +1,6 @@
-# Contributing to OpenConstructionERP
+# Contributing to Florida Steel Frame & Truss Manufacturing LLC
 
-Thank you for your interest. OpenConstructionERP is an open-source platform for
+Thank you for your interest. Florida Steel Frame & Truss Manufacturing LLC is an open-source platform for
 construction cost estimation, and the work that comes in from outside genuinely shapes
 what gets built. Read the next section before you write any code, because the route in
 is not the one most projects use.
@@ -37,7 +37,7 @@ how to brief an AI coding assistant on it.
 ```bash
 # 1. Clone
 git clone https://github.com/datadrivenconstruction/OpenConstructionERP.git
-cd OpenConstructionERP
+cd Florida Steel Frame & Truss Manufacturing LLC
 
 # 2. Start dev environment
 docker compose up -d   # PostgreSQL + Redis

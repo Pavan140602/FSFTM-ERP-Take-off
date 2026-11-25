@@ -64,7 +64,7 @@ patch('data/tool-chest-sets.ts', [
   return [...kept, ...structuralSets(library).filter((s) => !have.has(s.id))];"""),
 ])
 
-patch('components/RevuToolChest.tsx', [
+patch('components/FSFTMToolChest.tsx', [
     ("""    case 'JOIST':""", """    case 'HDR':
       return (<g {...sw} strokeWidth={2.2}><path d="M6 7 H24 V23 H6 Z" /><path d="M15 7 V23" /></g>);
     case 'JAMB':

@@ -198,7 +198,7 @@ export function buildReviewMinutesHtml(params: ReviewMinutesParams): string {
   ${metaTable(params, l)}
   ${decisionsTable(params, l)}
   ${agendaTable(params, l)}
-  <p class="brand">OpenConstructionERP</p>
+  <p class="brand">Florida Steel Frame & Truss Manufacturing LLC</p>
 </body>
 </html>`;
 }

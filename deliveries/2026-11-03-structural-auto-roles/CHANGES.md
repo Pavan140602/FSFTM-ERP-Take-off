@@ -1,10 +1,10 @@
 # 2026-11-03 (part 2): Structural Tool Chest + Auto Takeoff roles + column marks
 
-Apply after `2026-11-02-revu-pdf-takeoff` and `2026-11-03-revu-wrapup`. The code changes are marked `OE-DELIVERY 2026-11-03-structural-tool-chest` and `2026-11-03-auto-takeoff-roles`.
+Apply after `2026-11-02-fsftm-pdf-takeoff` and `2026-11-03-fsftm-wrapup`. The code changes are marked `OE-DELIVERY 2026-11-03-structural-tool-chest` and `2026-11-03-auto-takeoff-roles`.
 
 ## Tool Chest: profile by profile, by use
 
-The sets follow the idea of ZenTek's structural Revu tool sets. Nothing was copied from ZenTek, whose chests are a paid product. The data is in `frontend/src/modules/pdf-takeoff/data/structural-tools.ts`.
+The sets follow the idea of ZenTek's structural FSFTM tool sets. Nothing was copied from ZenTek, whose chests are a paid product. The data is in `frontend/src/modules/pdf-takeoff/data/structural-tools.ts`.
 
 **AISC, most commonly used shapes**
 - W Beams (46)

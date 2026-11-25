@@ -1,16 +1,16 @@
 <div align="center">
 
-# OpenConstructionERP
+# Florida Steel Frame & Truss Manufacturing LLC
 
 ### A leading open-source workspace for construction project management
 
-<img src="docs/screenshots/hero-overview.png" alt="OpenConstructionERP - open-source construction ERP for BOQ, BIM takeoff, DWG/PDF quantification and 5D cost modeling" width="900" />
+<img src="docs/screenshots/hero-overview.png" alt="Florida Steel Frame & Truss Manufacturing LLC - open-source construction ERP for BOQ, BIM takeoff, DWG/PDF quantification and 5D cost modeling" width="900" />
 
 Professional BOQ, CAD and BIM takeoff, 4D scheduling, 5D cost model, and tendering - all in one self-hosted platform.
 
 **Like WordPress for construction companies** - pick modules from the marketplace, drop in your own, or replace ours with custom-built ones. Same plug-and-play model, but for BOQ, scheduling, cost control, BIM, and tendering.
 
-**A platform companies build any construction app on.** Use OpenConstructionERP as the base to assemble the exact software a project needs and to build your own modules on top, from estimating and BIM to scheduling and site delivery. One open, powerful foundation for anything you run in construction.
+**A platform companies build any construction app on.** Use Florida Steel Frame & Truss Manufacturing LLC as the base to assemble the exact software a project needs and to build your own modules on top, from estimating and BIM to scheduling and site delivery. One open, powerful foundation for anything you run in construction.
 
 [▶ Watch the 12-min walkthrough](https://www.youtube.com/watch?v=X06cIaroAeI) · [Demo](https://openconstructionerp.com) · [Documentation](https://openconstructionerp.com/docs) · [Build on it](DEVELOPING.md) · [Discussions](https://t.me/datadrivenconstruction) · [Report Bug](https://github.com/datadrivenconstruction/OpenConstructionERP/issues)
 
@@ -25,7 +25,7 @@ Professional BOQ, CAD and BIM takeoff, 4D scheduling, 5D cost model, and tenderi
 
 <sub><picture><source media="(prefers-color-scheme: dark)" srcset="docs/readme-icons/device-camera-video-dark.svg"><img src="docs/readme-icons/device-camera-video-light.svg" width="14" align="center" alt=""></picture> <b>1-minute teaser above</b> · for the full 12-minute walkthrough → <a href="https://www.youtube.com/watch?v=X06cIaroAeI"><b>watch on YouTube</b></a> · onboarding → BoQ → BIM → DWG → PDF → AI → dashboard</sub>
 
-<img src="docs/screenshots/banner.png" alt="OpenConstructionERP: a honeycomb of the eight company types and fifteen professional roles the platform is built around, over a second honeycomb of its 193 backend modules and the two shared libraries drawn beside them, each cell coloured by the category its own manifest declares and shaded by how many of the others it is wired to" width="800" />
+<img src="docs/screenshots/banner.png" alt="Florida Steel Frame & Truss Manufacturing LLC: a honeycomb of the eight company types and fifteen professional roles the platform is built around, over a second honeycomb of its 193 backend modules and the two shared libraries drawn beside them, each cell coloured by the category its own manifest declares and shaded by how many of the others it is wired to" width="800" />
 
 <br/><br/>
 
@@ -68,7 +68,7 @@ Professional BOQ, CAD and BIM takeoff, 4D scheduling, 5D cost model, and tenderi
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="docs/readme-icons/rocket-dark.svg"><img src="docs/readme-icons/rocket-light.svg" width="14" align="center" alt=""></picture> **Get Started**
 - [Video guides](#video-guides)
-- [Why OpenConstructionERP?](#why-openconstructionerp)
+- [Why Florida Steel Frame & Truss Manufacturing LLC?](#why-openconstructionerp)
 - [A Look Inside](#a-look-inside)
 - [Quick Start](#quick-start)
 - [Demo Accounts](#demo-accounts)
@@ -184,7 +184,7 @@ Short, practical videos, most of them from the [OpenConstruction Academy](https:
 **More series on the channel**
 
 - German, the Landshut learning project from start to finish: [Projekt und Verantwortung klären](https://www.youtube.com/watch?v=IM9hK6kCZCs) (7:18) · [Dokumente und Entscheidungen sichern](https://www.youtube.com/watch?v=LP-CZOhu6OA) (6:00), plus the German videos above.
-- French, Québec: [Démarrer avec OpenConstructionERP en français](https://www.youtube.com/watch?v=CMuMMej0zwM) (3:46) · [Estimer un projet de construction](https://www.youtube.com/watch?v=7eT4lg1ggQY) (4:18) · [Soumissions et BSDQ](https://www.youtube.com/watch?v=gmg2h1JcuGI) (4:31) · [Facturation, retenue et hypothèque légale](https://www.youtube.com/watch?v=4LTXS0QEkzY) (4:37) · [Réception des travaux et déficiences](https://www.youtube.com/watch?v=IWjtAujWPAA) (3:44)
+- French, Québec: [Démarrer avec Florida Steel Frame & Truss Manufacturing LLC en français](https://www.youtube.com/watch?v=CMuMMej0zwM) (3:46) · [Estimer un projet de construction](https://www.youtube.com/watch?v=7eT4lg1ggQY) (4:18) · [Soumissions et BSDQ](https://www.youtube.com/watch?v=gmg2h1JcuGI) (4:31) · [Facturation, retenue et hypothèque légale](https://www.youtube.com/watch?v=4LTXS0QEkzY) (4:37) · [Réception des travaux et déficiences](https://www.youtube.com/watch?v=IWjtAujWPAA) (3:44)
 - French, site management: [Budget de chantier : justifier chaque coût](https://www.youtube.com/watch?v=L1DUikMF04Y) (5:06) · [Achats et stock : suivre les quantités](https://www.youtube.com/watch?v=ZXbWsG_Syuo) (4:37) · [Chantier : suivre les heures et le matériel](https://www.youtube.com/watch?v=5utorRM1fhY) (5:23) · [Facture et paiement : comprendre le solde](https://www.youtube.com/watch?v=ViuB-ONl5Lk) (5:39)
 - Talk: [The uberization of construction (ETH Zürich)](https://www.youtube.com/watch?v=R_PQQHXY-rQ) (14:22)
 
@@ -193,9 +193,9 @@ Short, practical videos, most of them from the [OpenConstruction Academy](https:
 
 ---
 
-## Why OpenConstructionERP?
+## Why Florida Steel Frame & Truss Manufacturing LLC?
 
-Construction cost estimation software is expensive, closed-source, and locked to specific regions. OpenConstructionERP changes that.
+Construction cost estimation software is expensive, closed-source, and locked to specific regions. Florida Steel Frame & Truss Manufacturing LLC changes that.
 
 | What you get | How it works |
 |-------------|-------------|
@@ -228,7 +228,7 @@ The entire UI ships in **44 languages**, including full right-to-left support fo
 <thead>
 <tr>
 <th align="left">Capability</th>
-<th align="center">OpenConstructionERP</th>
+<th align="center">Florida Steel Frame & Truss Manufacturing LLC</th>
 <th align="center">Enterprise<br/>BIM</th>
 <th align="center">CAD<br/>Takeoff</th>
 <th align="center">Legacy<br/>Estimating</th>
@@ -257,7 +257,7 @@ The entire UI ships in **44 languages**, including full right-to-left support fo
 </tbody>
 </table>
 
-<sub>Comparison reflects typical category capabilities based on publicly available information as of Q3 2026. Pricing is approximate (per-seat, list price) and varies by vendor and region. OpenConstructionERP is an independent open-source project and is not affiliated with any commercial vendor in the categories above.</sub>
+<sub>Comparison reflects typical category capabilities based on publicly available information as of Q3 2026. Pricing is approximate (per-seat, list price) and varies by vendor and region. Florida Steel Frame & Truss Manufacturing LLC is an independent open-source project and is not affiliated with any commercial vendor in the categories above.</sub>
 
 ---
 
@@ -405,7 +405,7 @@ Get productive in under 10 minutes:
 
 ### Easiest: download the desktop app (no Python, no setup)
 
-Download the installer for your operating system, run it, and OpenConstructionERP opens as a native desktop app. No Python, no pip, no Docker, and no database to set up. Everything runs locally on your machine.
+Download the installer for your operating system, run it, and Florida Steel Frame & Truss Manufacturing LLC opens as a native desktop app. No Python, no pip, no Docker, and no database to set up. Everything runs locally on your machine.
 
 - **[Download for your platform](https://openconstructionerp.com/download)** picks the right file for your OS automatically.
 - Or grab one straight from the **[latest release](https://github.com/datadrivenconstruction/OpenConstructionERP/releases/latest)**: Windows `.exe` installer, macOS `.dmg` (Apple Silicon), or Linux `.deb` / `.AppImage`.
@@ -455,7 +455,7 @@ curl -fsSL https://raw.githubusercontent.com/datadrivenconstruction/OpenConstruc
 irm https://raw.githubusercontent.com/datadrivenconstruction/OpenConstructionERP/main/scripts/install.ps1 | iex
 ```
 
-If you would rather not think about PATH at all, use this. It picks Docker if installed, otherwise uv, otherwise a dedicated Python virtual environment, installs OpenConstructionERP there, puts the `openconstructionerp` command on your PATH automatically, and finishes with a short panel showing the URL, the demo login and how to start. It also offers to launch right away. Open a new terminal afterwards and `openconstructionerp` just works. Runs at **http://localhost:8080**.
+If you would rather not think about PATH at all, use this. It picks Docker if installed, otherwise uv, otherwise a dedicated Python virtual environment, installs Florida Steel Frame & Truss Manufacturing LLC there, puts the `openconstructionerp` command on your PATH automatically, and finishes with a short panel showing the URL, the demo login and how to start. It also offers to launch right away. Open a new terminal afterwards and `openconstructionerp` just works. Runs at **http://localhost:8080**.
 
 ### Alternative 2: Docker
 
@@ -473,7 +473,7 @@ Or build from source (also the better choice on Apple Silicon):
 
 ```bash
 git clone https://github.com/datadrivenconstruction/OpenConstructionERP.git
-cd OpenConstructionERP
+cd Florida Steel Frame & Truss Manufacturing LLC
 echo "POSTGRES_PASSWORD=$(openssl rand -base64 24)" >  .env
 echo "JWT_SECRET=$(openssl rand -hex 32)"           >> .env
 make quickstart
@@ -485,7 +485,7 @@ Open **http://localhost:8080**. See [docs/getting-started.md](docs/getting-start
 
 ```bash
 git clone https://github.com/datadrivenconstruction/OpenConstructionERP.git
-cd OpenConstructionERP
+cd Florida Steel Frame & Truss Manufacturing LLC
 
 # Install dependencies
 pip install -e ./backend[server]
@@ -557,9 +557,9 @@ or CI), set the env vars **before the first boot**:
 
 ### How the platform turns raw CAD/BIM into structured ERP data
 
-<img src="docs/screenshots/architecture-pipeline.jpg" alt="OpenConstructionERP - Digitalization of Processes: Pipelines for Automatic Data Creation" width="100%" />
+<img src="docs/screenshots/architecture-pipeline.jpg" alt="Florida Steel Frame & Truss Manufacturing LLC - Digitalization of Processes: Pipelines for Automatic Data Creation" width="100%" />
 
-OpenConstructionERP is built around **seven cooperating pipelines** that turn closed CAD/BIM files (RVT, IFC, DWG, DGN) into structured, queryable ERP data - without locking you into a proprietary stack. Every module in the platform plugs into one or more of these stages:
+Florida Steel Frame & Truss Manufacturing LLC is built around **seven cooperating pipelines** that turn closed CAD/BIM files (RVT, IFC, DWG, DGN) into structured, queryable ERP data - without locking you into a proprietary stack. Every module in the platform plugs into one or more of these stages:
 
 1. **Mining** - collect existing project data (CAD/BIM models, CDE drops, COBie deliverables) into a semi-structured pool. Handled by `cad`, `documents`, `bim_hub`, `file_search` modules + the **DDC cad2data** converters (RVT/IFC/DWG/DGN → canonical JSON).
 2. **QTO Check & Quantity Take-off rules** - apply rule sets per discipline / family / type to extract quantities deterministically. Handled by `takeoff`, `requirements`, `validation`, and the rule editor in `match-elements`.
@@ -571,7 +571,7 @@ OpenConstructionERP is built around **seven cooperating pipelines** that turn cl
 
 The right-hand side of the diagram is the **automatic data retrieval** layer that every UI surface (Dashboard, BOQ editor, /clash, /match-elements, /files, /scheduling) consumes: dashboards, calculations, reports, tables, charts, geometries, and ERP-ready exports - all driven from the same canonical store. The Machine-Learning column on the far right is where the platform progressively automates classification, parameterisation, recognition and marking, replacing manual steps (<picture><source media="(prefers-color-scheme: dark)" srcset="docs/readme-icons/tools-dark.svg"><img src="docs/readme-icons/tools-light.svg" width="14" align="center" alt=""></picture>) with automatic steps (<picture><source media="(prefers-color-scheme: dark)" srcset="docs/readme-icons/zap-dark.svg"><img src="docs/readme-icons/zap-light.svg" width="14" align="center" alt=""></picture>) over time.
 
-This pipeline is the reason OpenConstructionERP can replace several commercial point-solutions with a single self-hosted stack - every module reads from and writes to the same canonical data layer.
+This pipeline is the reason Florida Steel Frame & Truss Manufacturing LLC can replace several commercial point-solutions with a single self-hosted stack - every module reads from and writes to the same canonical data layer.
 
 ### Technical stack
 
@@ -636,7 +636,7 @@ This pipeline is the reason OpenConstructionERP can replace several commercial p
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/readme-charts/download-history-dark.svg">
     <source media="(prefers-color-scheme: light)" srcset="docs/readme-charts/download-history-light.svg">
-    <img alt="OpenConstructionERP release downloads: 11,544 GitHub release asset downloads as of 30 September 2026, accumulated by release date" src="docs/readme-charts/download-history-light.svg" width="720">
+    <img alt="Florida Steel Frame & Truss Manufacturing LLC release downloads: 11,544 GitHub release asset downloads as of 30 September 2026, accumulated by release date" src="docs/readme-charts/download-history-light.svg" width="720">
   </picture>
 </a>
 
@@ -648,7 +648,7 @@ This pipeline is the reason OpenConstructionERP can replace several commercial p
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/readme-charts/star-history-dark.svg">
     <source media="(prefers-color-scheme: light)" srcset="docs/readme-charts/star-history-light.svg">
-    <img alt="OpenConstructionERP star history: 878 stars as of 30 September 2026, from 2 April 2026" src="docs/readme-charts/star-history-light.svg" width="720">
+    <img alt="Florida Steel Frame & Truss Manufacturing LLC star history: 878 stars as of 30 September 2026, from 2 April 2026" src="docs/readme-charts/star-history-light.svg" width="720">
   </picture>
 </a>
 
@@ -665,7 +665,7 @@ OpenConstructionERP is built by [DataDrivenConstruction](https://datadrivenconst
 
 ## Contributors
 
-OpenConstructionERP is shaped by the people who report bugs, request features, and ask the sharp questions that push the platform forward. We credit every one of them. For supply-chain security, we do not merge external pull requests - see **[CONTRIBUTING.md](CONTRIBUTING.md)** for how contributions work here.
+Florida Steel Frame & Truss Manufacturing LLC is shaped by the people who report bugs, request features, and ask the sharp questions that push the platform forward. We credit every one of them. For supply-chain security, we do not merge external pull requests - see **[CONTRIBUTING.md](CONTRIBUTING.md)** for how contributions work here.
 
 See **[CONTRIBUTORS.md](CONTRIBUTORS.md)** for the full list. Want to join it? [Open an issue](https://github.com/datadrivenconstruction/OpenConstructionERP/issues) or say hello in the [community chat](https://t.me/datadrivenconstruction).
 
@@ -685,13 +685,13 @@ tender-submission use. See [NOTICE](NOTICE) and [TERMS.md](docs/legal/TERMS.md) 
 All product names, logos, and trademarks referenced in this repository
 are property of their respective owners. Any comparative references to
 commercial categories or products are made for fair comparative purposes
-based on publicly available information. OpenConstructionERP is an
+based on publicly available information. Florida Steel Frame & Truss Manufacturing LLC is an
 independent project and is not affiliated with, endorsed by, or sponsored
 by any third-party trademark owners. Full attributions in [NOTICE](NOTICE).
 
 ## Development and Contribution Model
 
-OpenConstructionERP has been under continuous development for more than six years and has benefited from contributions, feedback, testing, and domain expertise from many different people.
+Florida Steel Frame & Truss Manufacturing LLC has been under continuous development for more than six years and has benefited from contributions, feedback, testing, and domain expertise from many different people.
 
 To maintain a consistent architecture and reduce security, dependency, and integration risks, the project follows a centralized integration model.
 
@@ -713,7 +713,7 @@ and deploy it as a service, AGPL §13 requires you to make the
 corresponding source code available under the same licence.
 
 For **commercial licensing**, which lifts the AGPL obligations on
-OpenConstructionERP itself so you can deploy it closed-source, see
+Florida Steel Frame & Truss Manufacturing LLC itself so you can deploy it closed-source, see
 [COMMERCIAL-LICENSE.md](docs/legal/COMMERCIAL-LICENSE.md) or contact
 [info@datadrivenconstruction.io](mailto:info@datadrivenconstruction.io).
 

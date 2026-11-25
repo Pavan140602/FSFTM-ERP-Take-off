@@ -60,7 +60,7 @@ class PartnerBranding(BaseModel):
         default=None,
         description=(
             "Co-branding line shown next to the partner logo. "
-            "Defaults to 'Powered by OpenConstructionERP · In partnership with {partner_name}'."
+            "Defaults to 'Powered by Florida Steel Frame & Truss Manufacturing LLC · In partnership with {partner_name}'."
         ),
     )
 
@@ -367,7 +367,7 @@ class PartnerPackManifest(BaseModel):
         """Co-branding string. Default preserves AGPL attribution."""
         if self.branding.powered_by_text:
             return self.branding.powered_by_text
-        return f"Powered by OpenConstructionERP · In partnership with {self.partner_name}"
+        return f"Powered by Florida Steel Frame & Truss Manufacturing LLC · In partnership with {self.partner_name}"
 
     def _carries(self, relpath: str | None) -> bool:
         """Whether the pack actually ships the file it names at ``relpath``.

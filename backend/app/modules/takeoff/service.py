@@ -489,7 +489,7 @@ def recompute_measurement_value(
     # carry a numeric tag for downstream reporting).
     if mtype in {
         "cloud", "arrow", "text", "rectangle", "highlight", "legend",
-        # OE-DELIVERY: 2026-10-30-revu-markup-tools
+        # OE-DELIVERY: 2026-10-30-fsftm-markup-tools
         "line", "polygon", "ellipse", "pen", "callout", "stamp",
     }:
         return client_value
@@ -754,7 +754,7 @@ _MEASUREMENT_TYPE_DIMENSION: dict[str, str] = {
     "area": "area",
     "volume": "volume",
     "count": "count",
-    # OE-DELIVERY: 2026-10-30-revu-markup-tools
+    # OE-DELIVERY: 2026-10-30-fsftm-markup-tools
     "perimeter": "length",
     "diameter": "length",
     "radiuscenter": "length",

@@ -66,10 +66,10 @@ Extracted from the CWICR Construction Cost Database (55,719 work items, 900K+ re
 | Testing Equipment | 27 |
 | Compressors | 23 |
 
-## Import into OpenConstructionERP
+## Import into Florida Steel Frame & Truss Manufacturing LLC
 
 ```bash
-# From the OpenConstructionERP backend directory:
+# From the Florida Steel Frame & Truss Manufacturing LLC backend directory:
 python -m app.scripts.seed_catalog
 ```
 

@@ -248,7 +248,7 @@ def chapters_from_description(description: str) -> list[dict]:
 # The channel titles carry a prefix for the YouTube shelf: a flag, the
 # language, the place and the episode ("🇨🇦 EN • TORONTO • 01/06 | Price a
 # Construction Job"), or an episode and a channel suffix ("01/04 · Budget de
-# chantier | OpenConstructionERP"). The page shows language, market and order
+# chantier | Florida Steel Frame & Truss Manufacturing LLC"). The page shows language, market and order
 # as badges of its own, so only the topic is kept.
 CHANNEL_PREFIX = re.compile(r"^(?:[^|]*•[^|]*\|\s*|\d{2}/\d{2}\s*·\s*)")
 CHANNEL_SUFFIX = re.compile(r"\s*\|\s*OpenConstructionERP\s*$")

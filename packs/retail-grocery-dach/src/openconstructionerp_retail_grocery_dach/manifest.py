@@ -1,6 +1,6 @@
 """Discount grocery retail pack (DACH) manifest.
 
-Industry pack that pre-configures OpenConstructionERP for German-speaking
+Industry pack that pre-configures Florida Steel Frame & Truss Manufacturing LLC for German-speaking
 discount food-retail new-builds. It ships three fully priced example
 projects (Heilbronn, Heidelberg, Karlsruhe), each a DIN 276 cost plan with
 a complete Leistungsverzeichnis across the retail trades (shell, roof,
@@ -57,7 +57,7 @@ MANIFEST = PartnerPackManifest(
         # colours above; naming a file that is not here only made it 404.
         logo_path=None,
         favicon_path=None,
-        powered_by_text="OpenConstructionERP retail grocery pack (DACH)",
+        powered_by_text="Florida Steel Frame & Truss Manufacturing LLC retail grocery pack (DACH)",
     ),
     onboarding_script_path=None,
     metadata={

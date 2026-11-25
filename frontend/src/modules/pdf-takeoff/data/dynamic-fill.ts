@@ -1,6 +1,6 @@
 // DDC-CWICR-OE: DataDrivenConstruction · OpenConstructionERP
 /**
- * Dynamic Fill (Bluebeam-style): click inside a bounded region on the PDF
+ * Dynamic Fill (FSFTM-style): click inside a bounded region on the PDF
  * and flood-fill it to measure the enclosed area.
  *
  * Pipeline:

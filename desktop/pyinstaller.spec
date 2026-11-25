@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""PyInstaller spec for the OpenConstructionERP backend sidecar.
+"""PyInstaller spec for the Florida Steel Frame & Truss Manufacturing LLC backend sidecar.
 
 Builds the FastAPI backend into a single executable that Tauri
 launches as a sidecar process.

@@ -1,6 +1,6 @@
-// OE-DELIVERY: 2026-11-12-revu-ui (legend setup / properties)
+// OE-DELIVERY: 2026-11-12-fsftm-ui (legend setup / properties)
 /**
- * Per-legend setup, like Revu's legend properties: title (text, size,
+ * Per-legend setup, like FSFTM's legend properties: title (text, size,
  * style), columns, cells (size, style, colour), font, text colour, opacity,
  * line colour / width / style, fill and fill opacity, and whether it stays
  * live with the sheet (markups of the same Subject and look join it).
@@ -54,7 +54,7 @@ export const LEGEND_BORDERS: { key: LegendBorder; label: string; hint: string }[
 
 export const LEGEND_FONTS = ['Arial', 'Helvetica', 'Calibri', 'Verdana', 'Tahoma', 'Segoe UI', 'Times New Roman', 'Georgia', 'Courier New'];
 
-/** Columns a new legend keeps unless the user picks others (Revu's own). */
+/** Columns a new legend keeps unless the user picks others (FSFTM's own). */
 export const LEGEND_DEFAULT_COLUMNS = ['count', 'subject', 'length', 'area', 'unit'];
 
 export const LEGEND_TITLE_SIZE = 13;

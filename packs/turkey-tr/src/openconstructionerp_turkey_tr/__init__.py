@@ -1,4 +1,4 @@
-"""OpenConstructionERP - Turkey Construction partner pack (Birim Fiyat + TBDY + KDV).
+"""Florida Steel Frame & Truss Manufacturing LLC - Turkey Construction partner pack (Birim Fiyat + TBDY + KDV).
 
 This package exports a module-level ``MANIFEST`` instance of
 :class:`PartnerPackManifest` referenced from ``pyproject.toml``::

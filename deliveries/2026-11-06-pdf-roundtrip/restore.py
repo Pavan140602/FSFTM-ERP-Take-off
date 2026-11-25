@@ -1,9 +1,9 @@
-"""Restore the 2026-11-12 revu-ui delivery into the project.
+"""Restore the 2026-11-12 fsftm-ui delivery into the project.
 
 Copies every file under ./files back to its place in the project root. Any file
 it would overwrite is first copied to <file>.pre-restore-<timestamp>.
 
-Usage (from anywhere):  python deliveries/2026-11-12-revu-ui/restore.py [--dry-run]
+Usage (from anywhere):  python deliveries/2026-11-12-fsftm-ui/restore.py [--dry-run]
 """
 import shutil
 import sys

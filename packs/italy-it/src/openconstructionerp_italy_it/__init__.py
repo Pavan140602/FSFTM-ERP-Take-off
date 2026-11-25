@@ -1,4 +1,4 @@
-"""OpenConstructionERP - Italy Construction partner pack (Prezzari DEI + NTC 2018 + IVA).
+"""Florida Steel Frame & Truss Manufacturing LLC - Italy Construction partner pack (Prezzari DEI + NTC 2018 + IVA).
 
 This package exports a module-level ``MANIFEST`` instance of
 :class:`PartnerPackManifest` referenced from ``pyproject.toml``::

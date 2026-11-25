@@ -1,4 +1,4 @@
-"""OpenConstructionERP — Australia partner pack.
+"""Florida Steel Frame & Truss Manufacturing LLC — Australia partner pack.
 
 Pre-configures OCERP for Australian general contractors against the
 National Construction Code (NCC) 2022, AS 1684 timber-framing series

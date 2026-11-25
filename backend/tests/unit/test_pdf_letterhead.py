@@ -351,8 +351,8 @@ def _shared_header_footer_pdf() -> bytes:
 def test_the_legal_name_brands_a_workspace_whose_app_has_no_name(data_dir: Path) -> None:
     """A formal document must not be credited to the platform once the firm is known."""
     before = _rfi_pdf()
-    assert "OpenConstructionERP" in _text(before)
-    assert _metadata(before).author == "OpenConstructionERP"
+    assert "Florida Steel Frame & Truss Manufacturing LLC" in _text(before)
+    assert _metadata(before).author == "Florida Steel Frame & Truss Manufacturing LLC"
 
     _profile(data_dir)
     # With the letterhead off, the legal name can only have come from the
@@ -360,14 +360,14 @@ def test_the_legal_name_brands_a_workspace_whose_app_has_no_name(data_dir: Path)
     pdf_appearance.write_appearance({"show_letterhead": False}, data_dir)
     pdf = _rfi_pdf()
     assert LEGAL_NAME in _text(pdf)
-    assert "OpenConstructionERP" not in _text(pdf)
+    assert "Florida Steel Frame & Truss Manufacturing LLC" not in _text(pdf)
     assert _metadata(pdf).author == LEGAL_NAME
-    assert "OpenConstructionERP" not in (_metadata(pdf).producer or "")
+    assert "Florida Steel Frame & Truss Manufacturing LLC" not in (_metadata(pdf).producer or "")
 
     # The shared header band and footer every other generator draws follow too.
     shared = _shared_header_footer_pdf()
     assert LEGAL_NAME in _text(shared)
-    assert "OpenConstructionERP" not in _text(shared)
+    assert "Florida Steel Frame & Truss Manufacturing LLC" not in _text(shared)
     assert _metadata(shared).author == LEGAL_NAME
 
 

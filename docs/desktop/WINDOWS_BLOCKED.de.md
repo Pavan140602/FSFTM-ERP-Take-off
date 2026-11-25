@@ -2,13 +2,13 @@
 
 Auch auf [English](WINDOWS_BLOCKED.md) und [Русский](WINDOWS_BLOCKED.ru.md).
 
-Diese Seite ist für Sie, wenn Windows OpenConstructionERP nicht starten lässt, die App als Programm eines unbekannten oder nicht verifizierten Herausgebers bezeichnet, oder sie einmal laufen ließ und seitdem bei jedem Start blockiert.
+Diese Seite ist für Sie, wenn Windows Florida Steel Frame & Truss Manufacturing LLC nicht starten lässt, die App als Programm eines unbekannten oder nicht verifizierten Herausgebers bezeichnet, oder sie einmal laufen ließ und seitdem bei jedem Start blockiert.
 
 Die Bezeichnungen der Windows-Oberfläche stehen hier so, wie ein deutsches Windows 11 sie zeigt, mit dem englischen Namen in Klammern. Je nach Windows-Version kann der deutsche Wortlaut leicht abweichen.
 
 ## Warum das passiert
 
-Die Windows-Builds von OpenConstructionERP sind noch nicht code-signiert. Über die Signatur erfährt Windows, wer ein Programm veröffentlicht hat. Ohne sie gilt die App als Programm eines unbekannten Herausgebers. Darauf reagieren zwei getrennte Windows-Funktionen, und sie brauchen unterschiedliche Schritte:
+Die Windows-Builds von Florida Steel Frame & Truss Manufacturing LLC sind noch nicht code-signiert. Über die Signatur erfährt Windows, wer ein Programm veröffentlicht hat. Ohne sie gilt die App als Programm eines unbekannten Herausgebers. Darauf reagieren zwei getrennte Windows-Funktionen, und sie brauchen unterschiedliche Schritte:
 
 - **Microsoft Defender SmartScreen** zeigt ein blaues Fenster "Der Computer wurde durch Windows geschützt" (Windows protected your PC), wenn Sie ein aus dem Internet geladenes Programm starten, das Windows noch nicht kennt. SmartScreen warnt und lässt Sie fortfahren.
 - **Smart App Control** ist eine strengere Funktion von Windows 11. Wenn sie eingeschaltet ist, blockiert sie jede Programmdatei, für die der Cloud-Dienst von Microsoft nicht bürgen kann und die keine vertrauenswürdige Signatur trägt. Sie bietet keine Schaltfläche zum Fortfahren und keine Ausnahme für einzelne Apps. Ihre Meldung nennt Smart App Control und sagt meist, dass die App oder ein Teil davon blockiert wurde.
@@ -40,13 +40,13 @@ SmartScreen fragt nur bei Dateien, die aus dem Internet geladen wurden. Fragt es
 
 Solange Smart App Control eingeschaltet ist, lässt sich keine einzelne App freigeben. Microsoft selbst rät, die Funktion auszuschalten oder den Herausgeber um eine Signatur zu bitten, und unsere Windows-Builds sind derzeit nicht signiert. Damit bleiben zwei ehrliche Möglichkeiten.
 
-**Möglichkeit 1: Smart App Control eingeschaltet lassen und die App anders starten.** Das empfehlen wir, wenn Sie den Schutz behalten möchten. Docker und WSL führen OpenConstructionERP in einer kleinen Linux-Umgebung aus, und Linux-Programme prüft Smart App Control nicht. Beide Wege sind unten beschrieben.
+**Möglichkeit 1: Smart App Control eingeschaltet lassen und die App anders starten.** Das empfehlen wir, wenn Sie den Schutz behalten möchten. Docker und WSL führen Florida Steel Frame & Truss Manufacturing LLC in einer kleinen Linux-Umgebung aus, und Linux-Programme prüft Smart App Control nicht. Beide Wege sind unten beschrieben.
 
 **Möglichkeit 2: Smart App Control ausschalten.** Das senkt den Schutz Ihres ganzen PCs, nicht nur für unsere App. Tun Sie es nur, wenn Sie damit einverstanden sind. Auf aktuellen Builds von Windows 11 können Sie Smart App Control später auf derselben Seite wieder einschalten, auf älteren Builds ist das Ausschalten dagegen endgültig, bis Windows zurückgesetzt oder neu installiert wird. Bietet die Seite nach dem Ausschalten keinen Weg zurück, haben Sie einen solchen Build.
 
 1. Öffnen Sie **Windows-Sicherheit**, dann **App- & Browsersteuerung** und die **Smart App Control-Einstellungen**.
 2. Wählen Sie **Aus** und bestätigen Sie.
-3. Starten Sie OpenConstructionERP erneut.
+3. Starten Sie Florida Steel Frame & Truss Manufacturing LLC erneut.
 
 Microsoft Defender Antivirus und SmartScreen bleiben in jedem Fall aktiv.
 

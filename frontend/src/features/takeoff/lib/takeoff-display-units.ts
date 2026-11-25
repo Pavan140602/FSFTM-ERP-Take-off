@@ -27,7 +27,7 @@
 import type { MeasurementSystem } from '@/stores/usePreferencesStore';
 import { convertUnit, getDisplayUnit } from '@/shared/lib/unitConversion';
 import type { Measurement } from './takeoff-types';
-import { METRES_PER, SQM_PER, type AreaDispUnit, type CaptionKey, type DispUnit } from './takeoff-revu-props';
+import { METRES_PER, SQM_PER, type AreaDispUnit, type CaptionKey, type DispUnit } from './takeoff-fsftm-props';
 import { formatQuantity as formatPlainQuantity } from './measurement-format';
 import { effectiveQuantity, effectiveUnit, isWallMeasurement, quantityFactor, wallGrossArea } from './takeoff-quantity';
 import {
@@ -130,7 +130,7 @@ export function formatQuantity(
  * (previous behaviour).
  */
 /** Dimension display unit chosen by the user for every label, the legend
- *  and the exports (OE-DELIVERY 2026-11-02-revu-units): 'auto' follows each
+ *  and the exports (OE-DELIVERY 2026-11-02-fsftm-units): 'auto' follows each
  *  page's calibration unit (previous behaviour). Set by the viewer. */
 export type DisplayUnitPref = 'auto' | 'ftin' | 'ft' | 'in' | 'mm' | 'cm' | 'm';
 let globalDisplayUnit: DisplayUnitPref = 'auto';
@@ -151,7 +151,7 @@ function formatWithDisplayUnit(
 ): string {
   const isArea = metricUnit.includes('²') || metricUnit === 'm2';
   const isVol = metricUnit.includes('³') || metricUnit === 'm3';
-  // Revu Properties toolbar (OE-DELIVERY 2026-11-02-revu-properties-bar): the
+  // FSFTM Properties toolbar (OE-DELIVERY 2026-11-02-fsftm-properties-bar): the
   // markup's own area / length unit wins over the global choice.
   if (isArea && markupAreaUnit) {
     return `${formatPlainQuantity(metricValue / SQM_PER[markupAreaUnit])} ${markupAreaUnit}`;
@@ -266,7 +266,7 @@ export function measurementLabel(
       const areaStr = areaUnitOverride && !m.dispAreaUnit
         ? formatAreaWithUnit(trueArea, m.unit || 'm²', areaUnitOverride)
         : fmt(trueArea, m.unit || 'm²');
-      // Area only on the sheet (user rule, OE-DELIVERY 2026-11-12-revu-ui u25);
+      // Area only on the sheet (user rule, OE-DELIVERY 2026-11-12-fsftm-ui u25);
       // the perimeter is still there through the Caption option (P).
       return areaStr;
     }
@@ -294,8 +294,8 @@ export function measurementLabel(
 }
 
 /**
- * Caption text built from the markup's caption pick list (Revu Properties
- * toolbar, OE-DELIVERY 2026-11-02-revu-properties-bar). 'label' is the name
+ * Caption text built from the markup's caption pick list (FSFTM Properties
+ * toolbar, OE-DELIVERY 2026-11-02-fsftm-properties-bar). 'label' is the name
  * line and is drawn by the viewer, so it is skipped here; every other pick
  * adds one figure in the markup's own units.
  */
@@ -348,8 +348,8 @@ export function captionValueText(
   return out.join('  ');
 }
 
-/** Format a metric quantity in a markup's own units (Revu Properties
- *  toolbar totals, OE-DELIVERY 2026-11-02-revu-properties-bar). */
+/** Format a metric quantity in a markup's own units (FSFTM Properties
+ *  toolbar totals, OE-DELIVERY 2026-11-02-fsftm-properties-bar). */
 export function formatInUnits(
   value: number,
   metricUnit: string,
@@ -363,7 +363,7 @@ export function formatInUnits(
 
 /** A markup quantity formatted exactly as its sheet caption shows it: the
  *  markup's own units, else the area-popup area unit, else the chosen display
- *  unit, else the page calibration (OE-DELIVERY 2026-11-02-revu-markups-units). */
+ *  unit, else the page calibration (OE-DELIVERY 2026-11-02-fsftm-markups-units). */
 export function formatMarkupQuantity(
   m: Pick<Measurement, 'dispUnit' | 'dispAreaUnit'>,
   metricValue: number,

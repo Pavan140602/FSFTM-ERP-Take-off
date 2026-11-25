@@ -1,8 +1,8 @@
-// OE-DELIVERY: 2026-11-12-revu-ui (update 15 - Revu page tools + vector save)
+// OE-DELIVERY: 2026-11-12-fsftm-ui (update 15 - FSFTM page tools + vector save)
 /**
  * PDF page work on the real (vector) file, with pdf-lib:
- *  - Save PDF the Revu way: every page kept as it is, each markup written as
- *    a real PDF annotation (Revu / Acrobat / browsers show them), and the ERP
+ *  - Save PDF the FSFTM way: every page kept as it is, each markup written as
+ *    a real PDF annotation (FSFTM / Acrobat / browsers show them), and the ERP
  *    snapshot embedded so the ERP reopens them as editable markups.
  *  - Page tools from the thumbnails menu: extract, delete, insert blank,
  *    insert / replace from another PDF, rotate, paste, repair.
@@ -135,7 +135,7 @@ const BOXES = new Set(['rectangle', 'highlight', 'rectarea']);
 /** Name of the PDF layer the ERP's annotations sit on. Other viewers show
  *  it (on by default); the ERP turns just this layer off when it reopens the
  *  file, so its editable markups are not doubled and the drawing's own
- *  annotations (e.g. Revu markups) still show (update 15). */
+ *  annotations (e.g. FSFTM markups) still show (update 15). */
 export const OE_LAYER = 'OE Markups';
 
 /** The "OE Markups" optional-content group (made once, reused on re-save). */
@@ -176,7 +176,7 @@ const n2 = (v: number) => (Math.round(v * 100) / 100).toString();
 
 /** A drawn appearance (/AP /N) in page coordinates: BBox = Rect, so the
  *  stream draws exactly where the annotation sits. Every viewer (Chrome,
- *  Edge, Acrobat, Revu, Bluebeam, pdf.js) then shows it the same. */
+ *  Edge, Acrobat, FSFTM, FSFTM, pdf.js) then shows it the same. */
 function apRef(doc: PDFDocument, rect: number[], ops: string, opts: { CA?: number; ca?: number; fonts?: Fonts }): PDFRef {
   const resources: Record<string, unknown> = {
     ExtGState: { GS1: { Type: 'ExtGState', CA: opts.CA ?? 1, ca: opts.ca ?? opts.CA ?? 1 } },
@@ -342,7 +342,7 @@ function addAnnots(doc: PDFDocument, pageIndex: number, items: AnnotInput[], fon
       NM: PDFString.of(`oe-${m.id}`),
       Contents: PDFHexString.fromText([text, dim].filter(Boolean).join(' - ')),
       Subj: PDFHexString.fromText(String(m.customFields?.Subject || m.type)),
-      T: PDFHexString.fromText(String(m.author || 'OpenConstructionERP')),
+      T: PDFHexString.fromText(String(m.author || 'Florida Steel Frame & Truss Manufacturing LLC')),
       OC: layer,
     };
     /** A plain dimension label, upright, centred on `at` (PDF space). */
@@ -518,7 +518,7 @@ function dropOwnAnnots(doc: PDFDocument): void {
 }
 
 /**
- * Revu-style Save PDF: the original file, every page, markups as PDF
+ * FSFTM-style Save PDF: the original file, every page, markups as PDF
  * annotations, plus the ERP snapshot (markups + page scales) so the ERP
  * reopens them editable.
  */

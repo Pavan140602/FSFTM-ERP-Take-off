@@ -163,7 +163,7 @@ const CSV_FIXTURE =
  * point: it is a native container, not a delimited sheet.
  */
 const BC3_FIXTURE =
-  '~V|sample.bc3|FIEBDC-3/2020|OpenConstructionERP|26052026|Sample|ISO-8859-1|2||EUR|\r\n' +
+  '~V|sample.bc3|FIEBDC-3/2020|Florida Steel Frame & Truss Manufacturing LLC|26052026|Sample|ISO-8859-1|2||EUR|\r\n' +
   '~C|01#||01 Movimiento de tierras|0|||1|\r\n' +
   '~C|01.01|m3|Excavacion en zanja|18.50|||0|\r\n' +
   '~D|01#|01.01\\1\\120|\r\n' +

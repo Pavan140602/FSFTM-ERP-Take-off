@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "OpenConstructionERP",
+    "name": "Florida Steel Frame & Truss Manufacturing LLC",
     "tagline": "Open-source сметное дело"
   },
   "nav": {
@@ -164,7 +164,7 @@
     "update": "Обновить"
   },
   "dashboard": {
-    "welcome": "Добро пожаловать в OpenConstructionERP",
+    "welcome": "Добро пожаловать в Florida Steel Frame & Truss Manufacturing LLC",
     "subtitle": "Ваше рабочее пространство сметного дела",
     "recent_projects": "Последние проекты",
     "system_status": "Состояние системы",

@@ -1,4 +1,4 @@
-"""Doka formwork partner pack for OpenConstructionERP.
+"""Doka formwork partner pack for Florida Steel Frame & Truss Manufacturing LLC.
 
 Exposes ``MANIFEST`` for the ``openconstructionerp.partner_packs`` entry-point.
 """

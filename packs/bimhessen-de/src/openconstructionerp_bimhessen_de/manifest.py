@@ -1,6 +1,6 @@
 """BIM-Cluster Hessen partner pack manifest.
 
-Pre-configures OpenConstructionERP for German BIM consultancies and
+Pre-configures Florida Steel Frame & Truss Manufacturing LLC for German BIM consultancies and
 engineering offices, especially those active in Hessen (Frankfurt /
 Wiesbaden / Kassel / Darmstadt). Loads the German standards stack:
 
@@ -61,7 +61,7 @@ MANIFEST = PartnerPackManifest(
         accent_color="#7A7A7A",  # BIM-Cluster Hessen grey
         logo_path="logo.png",
         favicon_path=None,
-        powered_by_text="Powered by OpenConstructionERP, in partnership with BIM-Cluster Hessen",
+        powered_by_text="Powered by Florida Steel Frame & Truss Manufacturing LLC, in partnership with BIM-Cluster Hessen",
     ),
     onboarding_script_path="onboarding.yaml",
     metadata={

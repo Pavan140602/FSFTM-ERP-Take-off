@@ -145,14 +145,14 @@ export function PortalPaymentsPage() {
           </div>
         </Card>
         {/* Escape hatch — a stranded internal user (no magic link, no app
-            shell) can get back into OpenConstructionERP instead of being
+            shell) can get back into Florida Steel Frame & Truss Manufacturing LLC instead of being
             trapped on the sign-in wall. */}
         <Link
           to={escapeTo}
           className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-oe-blue transition-colors hover:underline"
         >
           <ArrowLeft size={14} />
-          {t('payportal.back_to_app', { defaultValue: 'Back to OpenConstructionERP' })}
+          {t('payportal.back_to_app', { defaultValue: 'Back to Florida Steel Frame & Truss Manufacturing LLC' })}
         </Link>
       </CenteredShell>
     );

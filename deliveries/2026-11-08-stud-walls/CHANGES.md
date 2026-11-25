@@ -1,4 +1,4 @@
-# 2026-11-08: Stud walls (full width, studs, header areas), materials, wall filter, Revu colour picklist
+# 2026-11-08: Stud walls (full width, studs, header areas), materials, wall filter, FSFTM colour picklist
 
 Apply after `2026-11-07-text-box`. Restore with `python deliveries/2026-11-08-stud-walls/restore.py` (add `--dry-run` to preview), then **restart the backend** and reload the browser.
 
@@ -43,9 +43,9 @@ Framing, roof and foundation sheets are unchanged.
 - **Walls filter chips:** "All walls · Load Bearing Wall · Shear Wall · Strap Braced Wall".
   - Picking one shows only those walls, in the list and on the sheet.
   - "Shear Wall" on S205 shows SW-1 ×16 only.
-- **Colour per size group** from the Revu-style colour picklist.
+- **Colour per size group** from the FSFTM-style colour picklist.
 
-## Revu colour picklist
+## FSFTM colour picklist
 - New `ColorPicklist` includes:
   - 48 standard colours (8 hues × 5 tints plus greys);
   - the colours used lately;
@@ -70,7 +70,7 @@ Framing, roof and foundation sheets are unchanged.
   - `AutoTakeoffList.tsx`: material, studs, role chips, colour.
   - `data/auto-takeoff.ts`: wall fields on items and tags; walls of another tag on the same line are not duplicates.
   - `TakeoffViewerModule.tsx`: band and stud drawing, role filter, rows, recolour.
-  - `TextFormatBar.tsx`, `RevuPropertiesBar.tsx`: picklist.
+  - `TextFormatBar.tsx`, `FSFTMPropertiesBar.tsx`: picklist.
 
 ## Checks
 - **Backend:** 41 unit tests pass, including the wall width and opening test and the spacing test.

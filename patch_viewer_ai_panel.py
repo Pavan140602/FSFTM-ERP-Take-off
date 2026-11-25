@@ -82,7 +82,7 @@ NEW_COLOURS_END = """                {t('takeoff_viewer.tab_colours', { defaultV
               </button>
             </div>"""
 
-ANCHOR_TOOL_CHEST = "{/* Tool Chest — Bluebeam-style saved custom tools. */}"
+ANCHOR_TOOL_CHEST = "{/* Tool Chest — FSFTM-style saved custom tools. */}"
 AI_PANEL_BLOCK = """            {/* AI Assistant — document search + Ask AI for the open drawing. */}
             {sidebarTab === 'ai' && (
               <AiAssistantPanel

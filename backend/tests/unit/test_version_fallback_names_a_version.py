@@ -17,7 +17,7 @@ The Settings branch reads ``Settings.model_fields["app_version"]``, and
 survive. Nothing raised, so the ``except`` below it never ran and the value
 never became "unknown". The line printed to the user was
 
-    OpenConstructionERP vPydanticUndefined
+    Florida Steel Frame & Truss Manufacturing LLC vPydanticUndefined
 
 on the one code path that only ever runs when somebody is already trying to
 work out what they have installed.
@@ -162,6 +162,6 @@ def test_the_printed_line_uses_the_resolver(
     cmd_version(argparse.Namespace())
     printed = capsys.readouterr().out
 
-    assert f"OpenConstructionERP v{expected}" in printed
+    assert f"Florida Steel Frame & Truss Manufacturing LLC v{expected}" in printed
     assert NOT_THIS_TREE not in printed
     assert "Undefined" not in printed

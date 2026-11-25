@@ -1,4 +1,4 @@
-; OpenConstructionERP - NSIS installer hooks
+; Florida Steel Frame & Truss Manufacturing LLC - NSIS installer hooks
 ;
 ; Windows keeps an exclusive lock on a running .exe. If the backend sidecar
 ; (openconstructionerp-server.exe) is still running when the installer tries to
@@ -93,7 +93,7 @@
 ; /TIMEOUT, and the uninstaller waits for nsExec, and the installer waits for
 ; the uninstaller. So a PowerShell that never returns - a wedged host, an
 ; antivirus holding the image, a console that never gets a handle - stops the
-; upgrade dead on the line "Closing OpenConstructionERP..." with no way out but
+; upgrade dead on the line "Closing Florida Steel Frame & Truss Manufacturing LLC..." with no way out but
 ; the task manager. That is exactly what a user saw. On expiry nsExec pushes
 ; the string "timeout" rather than an exit code, which the caller below already
 ; reads as "not zero" and answers with the by-name fallback, so a timed-out
@@ -135,7 +135,7 @@
 
 !macro OE_STOP_THIS_INSTALL
   Push $0
-  DetailPrint "Closing OpenConstructionERP..."
+  DetailPrint "Closing Florida Steel Frame & Truss Manufacturing LLC..."
   ; Hand the install directory to the script below without quoting it.
   System::Call 'kernel32::SetEnvironmentVariable(t "OE_STOP_DIR", t "$INSTDIR")'
   ; Close the app window (which stops its backend cleanly), give it a bounded

@@ -1,6 +1,6 @@
 // DDC-CWICR-OE: DataDrivenConstruction · OpenConstructionERP
 // Copyright (c) 2026 Artem Boiko / DataDrivenConstruction
-// OpenConstructionERP — property-dev document-template preview XSS suite.
+// Florida Steel Frame & Truss Manufacturing LLC — property-dev document-template preview XSS suite.
 //
 // Security audit 2026-06-22 finding #2: the custom document-template
 // editor renders the template body into ``dangerouslySetInnerHTML`` in a

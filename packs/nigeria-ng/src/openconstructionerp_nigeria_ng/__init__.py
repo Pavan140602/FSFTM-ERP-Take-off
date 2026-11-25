@@ -1,4 +1,4 @@
-"""OpenConstructionERP - Nigeria country pack (BESMM, NBS, NGN)."""
+"""Florida Steel Frame & Truss Manufacturing LLC - Nigeria country pack (BESMM, NBS, NGN)."""
 
 from __future__ import annotations
 

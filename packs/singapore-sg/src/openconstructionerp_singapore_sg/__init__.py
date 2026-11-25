@@ -1,4 +1,4 @@
-"""OpenConstructionERP - Singapore country pack (SMM7, BCA, CONQUAS)."""
+"""Florida Steel Frame & Truss Manufacturing LLC - Singapore country pack (SMM7, BCA, CONQUAS)."""
 
 from __future__ import annotations
 

@@ -123,7 +123,7 @@ bottom-nav + card-list layout under a new `/field` route.
 `frontend/vite.config.ts` already wires `vite-plugin-pwa` with:
 
 * `registerType: 'autoUpdate'` + `clientsClaim` / `skipWaiting`
-* Manifest: name `OpenConstructionERP`, short_name `OCERP`, theme
+* Manifest: name `Florida Steel Frame & Truss Manufacturing LLC`, short_name `OCERP`, theme
   `#0284c7`, standalone, 5 SVG icons (192/256/384/512/maskable-512) in
   `frontend/public/pwa/`.
 * Workbox runtime caches: `oce-static-assets` (CacheFirst, 30 d),

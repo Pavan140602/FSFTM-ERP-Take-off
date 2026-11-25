@@ -31,7 +31,7 @@ import type { Point } from './takeoff-types';
  * pinch handler and zoom-in/out buttons so every zoom path shares one
  * definition rather than three copies of `0.25` / `4`. */
 
-/** Minimum canvas zoom (10%). Revu-style range (OE-DELIVERY 2026-11-02-revu-zoom). */
+/** Minimum canvas zoom (10%). FSFTM-style range (OE-DELIVERY 2026-11-02-fsftm-zoom). */
 export const ZOOM_MIN = 0.1;
 /** Maximum canvas zoom (6400%). Above the full-page bitmap limit the viewer
  *  renders only the visible region (see modules/pdf-takeoff/data/deep-zoom.ts);

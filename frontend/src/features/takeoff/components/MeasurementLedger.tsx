@@ -60,7 +60,7 @@ export interface MeasurementLedgerProps {
   /** Called when a row is clicked — parent navigates to the measurement. */
   onRowClick?: (measurement: Measurement) => void;
   /** Right-click on a row: the parent opens its markup menu for the
-   *  selection (Revu markups-list menu, OE-DELIVERY 2026-11-12-revu-ui). */
+   *  selection (FSFTM markups-list menu, OE-DELIVERY 2026-11-12-fsftm-ui). */
   onRowContextMenu?: (e: React.MouseEvent, measurement: Measurement) => void;
   /** Extra controls beside the title (e.g. This sheet / All sheets). */
   headerExtra?: React.ReactNode;
@@ -97,7 +97,7 @@ export interface MeasurementLedgerProps {
   onCustomFieldChange?: (id: string, column: string, value: string) => void;
   /** A predefined editable field was edited. */
   onFieldChange?: (id: string, field: 'annotation' | 'group' | 'qty' | 'label' | 'material' | 'subject', value: string) => void;
-  /** Bluebeam-style column visibility. Keys of hidden built-in columns. */
+  /** FSFTM-style column visibility. Keys of hidden built-in columns. */
   hiddenColumns?: ReadonlySet<string>;
   /** PDF page labels (e.g. "T1.0") indexed by 0-based page; null when unknown. */
   pageLabels?: string[] | null;
@@ -107,7 +107,7 @@ export interface MeasurementLedgerProps {
   lengthUnit?: string;
   /** Formats a quantity exactly as the sheet caption does (the markup's own
    *  units, else the chosen display unit, else the page calibration). Returns
-   *  the number and the unit separately. (OE-DELIVERY 2026-11-02-revu-markups-units) */
+   *  the number and the unit separately. (OE-DELIVERY 2026-11-02-fsftm-markups-units) */
   formatQuantityCell?: (m: Measurement, kind: 'length' | 'area' | 'volume', metricValue: number) => { num: string; unit: string };
 }
 
@@ -184,7 +184,7 @@ export const COLUMNS: {
 }[] = [
   { key: 'ordinal', i18nKey: 'takeoff_viewer.col_ordinal', fallback: '#', align: 'right' },
   { key: 'type', i18nKey: 'takeoff_viewer.col_type', fallback: 'Kind', align: 'left' },
-  // Revu Markups list: Subject (category) and Label (text on the sheet).
+  // FSFTM Markups list: Subject (category) and Label (text on the sheet).
   { key: 'subject', i18nKey: 'takeoff_viewer.col_subject', fallback: 'Subject', align: 'left' },
   { key: 'label', i18nKey: 'takeoff_viewer.col_label', fallback: 'Label', align: 'left' },
   { key: 'material', i18nKey: 'takeoff_viewer.col_material', fallback: 'Material/Profile', align: 'left' },
@@ -298,7 +298,7 @@ export function MeasurementLedger({
     if (onToggleSelect && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
       e.preventDefault();
       // The row picked with a plain click stays in the selection when Ctrl
-      // adds more, like Revu / Windows lists (OE-DELIVERY 2026-11-12-revu-ui).
+      // adds more, like FSFTM / Windows lists (OE-DELIVERY 2026-11-12-fsftm-ui).
       if ((!selectedIds || selectedIds.size === 0) && selectedMeasurementId && selectedMeasurementId !== m.id) {
         onToggleSelect(selectedMeasurementId);
       }
@@ -895,7 +895,7 @@ function GroupRows({
     const disp = convertQuantity(signed, effectiveUnit(measurement) || '', measurementSystem);
     const isWall = isWallMeasurement(measurement);
     const openingCount = isWall ? wallOpeningsCount(measurement) : 0;
-    // Same figures and units as the sheet caption (OE-DELIVERY 2026-11-02-revu-markups-units).
+    // Same figures and units as the sheet caption (OE-DELIVERY 2026-11-02-fsftm-markups-units).
     const sheet = (() => {
       if (!formatQuantityCell || measurement.type === 'count' || ANNOTATION_KINDS.has(measurement.type)) return null;
       const sign = signed < 0 ? '-' : '';
@@ -1019,7 +1019,7 @@ function GroupRows({
           className="px-1.5 py-1 text-content-primary truncate max-w-[140px]"
           title={measurement.annotation || ''}
         >
-          {/* Label = the text on the sheet, as in Revu. */}
+          {/* Label = the text on the sheet, as in FSFTM. */}
           {onFieldChange ? (
             <EditableCell
               value={measurement.annotation || ''}
@@ -1119,7 +1119,7 @@ function GroupRows({
         <td className="px-1.5 py-1 text-content-secondary">
           {/* A linear row's Length is shown in the chosen length unit (mm by
               default), so the Unit column must name that unit, not the
-              stored metre (OE-DELIVERY 2026-11-02-revu-markups-list). */}
+              stored metre (OE-DELIVERY 2026-11-02-fsftm-markups-list). */}
           {sheet
             ? sheet.primary.unit
             : localizedUnitCode(

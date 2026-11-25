@@ -1,4 +1,4 @@
-"""OpenConstructionERP — Renewables EPC partner pack (PV + Wind + LCOE + IEC).
+"""Florida Steel Frame & Truss Manufacturing LLC — Renewables EPC partner pack (PV + Wind + LCOE + IEC).
 
 This package exports a module-level ``MANIFEST`` instance of
 :class:`PartnerPackManifest` referenced from ``pyproject.toml``::

@@ -1,7 +1,7 @@
 // DDC-CWICR-OE: DataDrivenConstruction · OpenConstructionERP
 // Copyright (c) 2026 Artem Boiko / DataDrivenConstruction
 /**
- * ProductTour — first-run guided tour of OpenConstructionERP.
+ * ProductTour — first-run guided tour of Florida Steel Frame & Truss Manufacturing LLC.
  *
  * A multi-step spotlight coachmark walkthrough that introduces a new user
  * to the key surfaces of the app: sidebar navigation, project picker,

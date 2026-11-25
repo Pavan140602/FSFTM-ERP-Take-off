@@ -43,7 +43,7 @@ detect_target() {
 }
 
 TARGET="${1:-$(detect_target)}"
-echo "=== Building OpenConstructionERP sidecar for $TARGET ==="
+echo "=== Building Florida Steel Frame & Truss Manufacturing LLC sidecar for $TARGET ==="
 
 # Step 1: Build frontend
 echo "[1/3] Building frontend..."

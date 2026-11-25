@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "OpenConstructionERP",
+    "name": "Florida Steel Frame & Truss Manufacturing LLC",
     "tagline": "Ochiq kodli qurilish smetasi"
   },
   "nav": {
@@ -164,7 +164,7 @@
     "update": "Yangilash"
   },
   "dashboard": {
-    "welcome": "OpenConstructionERP tizimiga xush kelibsiz",
+    "welcome": "Florida Steel Frame & Truss Manufacturing LLC tizimiga xush kelibsiz",
     "subtitle": "Qurilish smetasi boʻyicha ish maydoningiz",
     "recent_projects": "Soʻnggi loyihalar",
     "system_status": "Tizim holati",

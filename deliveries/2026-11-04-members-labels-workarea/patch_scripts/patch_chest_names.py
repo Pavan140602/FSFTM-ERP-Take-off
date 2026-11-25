@@ -48,7 +48,7 @@ export interface ChestSet {"""),
         group: `${subject}: ${mat.designation.toUpperCase()}`,"""),
 ])
 
-patch('components/RevuToolChest.tsx', [
+patch('components/FSFTMToolChest.tsx', [
     ("""  addSet,
   newId,""", """  addSet,
   displayDesignation,

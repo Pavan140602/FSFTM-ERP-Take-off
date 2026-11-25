@@ -227,7 +227,7 @@ thead th {{ font: 600 11px/1.3 var(--mono); text-transform: uppercase; letter-sp
   <header class="intro">
     <p class="eyebrow">Auto Takeoff · zoomed check · engine run on your PDFs</p>
     <h1>Zoomed Takeoff Check</h1>
-    <p>Every sheet is split into parts and each part is checked zoomed in, one by one, the way you would check it in Revu. Below is the final take-off on six sheets from three of your drawing sets, with the parts each sheet was split into and every markup drawn on it.</p>
+    <p>Every sheet is split into parts and each part is checked zoomed in, one by one, the way you would check it in FSFTM. Below is the final take-off on six sheets from three of your drawing sets, with the parts each sheet was split into and every markup drawn on it.</p>
     <div class="steps">
       <div class="step"><b>Split</b><span>The drawing area is cut into 4, 6, 9 or more parts, more for a busy sheet. Parts overlap by about 2 ft.</span></div>
       <div class="step"><b>Zoom in</b><span>Every small shape and every line in the part is read at full detail, curves included.</span></div>

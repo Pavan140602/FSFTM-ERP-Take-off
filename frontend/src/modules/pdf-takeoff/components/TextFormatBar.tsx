@@ -1,6 +1,6 @@
 // OE-DELIVERY: 2026-11-07-text-box
 /**
- * Text Box properties bar, like Revu's text toolbar: font, size, bold /
+ * Text Box properties bar, like FSFTM's text toolbar: font, size, bold /
  * italic / underline / strike-through, alignment, text colour, fill, border
  * and opacity. Floats over the sheet above the text box being edited or
  * selected, and sets the default for new boxes when the Text Box tool is
@@ -43,7 +43,7 @@ function Toggle({ on, title, onClick, children, testId }: { on: boolean; title: 
 }
 
 function Swatch({ value, title, onPick, testId, none }: { value: string | null; title: string; onPick: (v: string | null) => void; testId: string; none?: boolean }) {
-  // Revu-style colour picklist (OE-DELIVERY 2026-11-08-stud-walls).
+  // FSFTM-style colour picklist (OE-DELIVERY 2026-11-08-stud-walls).
   return <ColorPicklist value={value} onChange={onPick} allowNone={none} title={title} testId={testId} />;
 }
 

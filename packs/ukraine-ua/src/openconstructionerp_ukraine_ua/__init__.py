@@ -1,4 +1,4 @@
-"""OpenConstructionERP - Ukraine country pack (кошторис chapters, UAH, ПДВ).
+"""Florida Steel Frame & Truss Manufacturing LLC - Ukraine country pack (кошторис chapters, UAH, ПДВ).
 
 This package exports a module-level ``MANIFEST`` instance of
 :class:`PartnerPackManifest` referenced from ``pyproject.toml``::

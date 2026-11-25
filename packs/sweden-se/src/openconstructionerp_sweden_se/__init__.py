@@ -1,4 +1,4 @@
-"""OpenConstructionERP — Sweden Construction partner pack (AMA + AB 04 + BSAB)."""
+"""Florida Steel Frame & Truss Manufacturing LLC — Sweden Construction partner pack (AMA + AB 04 + BSAB)."""
 
 from __future__ import annotations
 from .manifest import MANIFEST

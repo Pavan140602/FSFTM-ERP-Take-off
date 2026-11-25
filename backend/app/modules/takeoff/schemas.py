@@ -99,7 +99,7 @@ class DocumentPageScalesUpdate(BaseModel):
         by_page = v.get("byPage")
         if isinstance(by_page, dict) and len(by_page) > 5000:
             raise ValueError("too many per-page scales")
-        # Bluebeam-style viewports (OE-DELIVERY 2026-11-02-revu-viewports-sketch):
+        # FSFTM-style viewports (OE-DELIVERY 2026-11-02-fsftm-viewports-sketch):
         # {<page>: [{id, name, rect, scale, scaleLabel}]}, max 50 per page
         # (mirrors MAX_VIEWPORTS_PER_PAGE in the viewer).
         viewports = v.get("viewports")
@@ -358,7 +358,7 @@ class TakeoffMeasurementCreate(BaseModel):
         ...,
         min_length=1,
         max_length=50,
-        # OE-DELIVERY: 2026-10-30-revu-markup-tools - every type the PDF
+        # OE-DELIVERY: 2026-10-30-fsftm-markup-tools - every type the PDF
         # viewer creates. The old pattern stopped at the first ten, so one
         # perimeter / angle / cut-out / legend row 422'd the whole bulk
         # create and nothing new in that batch reached the server.

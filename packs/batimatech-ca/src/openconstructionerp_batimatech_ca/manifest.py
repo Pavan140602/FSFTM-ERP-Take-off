@@ -69,7 +69,7 @@ MANIFEST = PartnerPackManifest(
         accent_color="#1B3A5B",  # batimatech navy
         logo_path="logo.png",
         favicon_path="favicon.ico",
-        powered_by_text="Powered by OpenConstructionERP, in partnership with Batimatech",
+        powered_by_text="Powered by Florida Steel Frame & Truss Manufacturing LLC, in partnership with Batimatech",
     ),
     onboarding_script_path="onboarding.yaml",
     metadata={

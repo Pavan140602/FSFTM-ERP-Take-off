@@ -1,4 +1,4 @@
-"""OpenConstructionERP - Switzerland Construction partner pack (SIA 451 + BKP + SIA 118 + MWST)."""
+"""Florida Steel Frame & Truss Manufacturing LLC - Switzerland Construction partner pack (SIA 451 + BKP + SIA 118 + MWST)."""
 
 from __future__ import annotations
 

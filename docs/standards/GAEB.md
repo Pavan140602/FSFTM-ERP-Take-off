@@ -1,6 +1,6 @@
-# GAEB DA XML in OpenConstructionERP
+# GAEB DA XML in Florida Steel Frame & Truss Manufacturing LLC
 
-OpenConstructionERP reads and writes GAEB DA XML 3.3 natively. This page
+Florida Steel Frame & Truss Manufacturing LLC reads and writes GAEB DA XML 3.3 natively. This page
 records what our implementation is built from, so that anyone who needs to
 know can find out without asking us.
 

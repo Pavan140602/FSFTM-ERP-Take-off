@@ -9,7 +9,7 @@
 
 `OCE_TECH_SPEC_GLOBAL.md` recommends **`ifcopenshell`** as the core IFC parser for Modules 2 (BIM Diff), 3 (Validation EAC), 4 (Classification ML), and 5 (QTO). Every code example in the spec assumes direct IFC parsing.
 
-OpenConstructionERP has explicitly banned IfcOpenShell since project inception (`the architecture guide` puts it plainly: we do not use IfcOpenShell, all BIM and CAD goes through the DDC cad2data pipeline). The reasoning:
+Florida Steel Frame & Truss Manufacturing LLC has explicitly banned IfcOpenShell since project inception (`the architecture guide` puts it plainly: we do not use IfcOpenShell, all BIM and CAD goes through the DDC cad2data pipeline). The reasoning:
 
 - DDC `cad2data` already converts DWG, DGN, RVT, **and IFC** into one canonical format (Parquet + JSON).
 - A single canonical schema means downstream code (diff, validation, QTO) handles all formats identically — DWG-only projects work the same as IFC-only projects.

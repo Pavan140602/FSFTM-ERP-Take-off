@@ -1,4 +1,4 @@
-"""OpenConstructionERP — UAE Construction partner pack (MasterFormat + AED + Estidama).
+"""Florida Steel Frame & Truss Manufacturing LLC — UAE Construction partner pack (MasterFormat + AED + Estidama).
 
 This package exports a module-level ``MANIFEST`` instance of
 :class:`PartnerPackManifest` referenced from ``pyproject.toml``::

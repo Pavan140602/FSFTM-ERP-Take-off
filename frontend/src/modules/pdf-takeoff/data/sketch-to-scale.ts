@@ -1,6 +1,6 @@
-// OE-DELIVERY: 2026-11-02-revu-viewports-sketch
+// OE-DELIVERY: 2026-11-02-fsftm-viewports-sketch
 /**
- * Bluebeam-style "Sketch to Scale" and viewport value reconciliation.
+ * FSFTM-style "Sketch to Scale" and viewport value reconciliation.
  *
  * Sketch to Scale: while a length / area tool has a point down, the estimator
  * types the next segment's true length (optionally with an angle) instead of

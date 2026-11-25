@@ -1,4 +1,4 @@
-// OE-DELIVERY: 2026-11-12-revu-ui (update 21 - text highlight + text select)
+// OE-DELIVERY: 2026-11-12-fsftm-ui (update 21 - text highlight + text select)
 /**
  * Words on a PDF page with their boxes (viewport space at scale 1, y down),
  * so the Highlight tool can snap to the words a drag covers and the Text

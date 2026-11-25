@@ -4,20 +4,20 @@
 //
 // Renders the user's company logo / name when they have customised
 // the platform via the edit modal; otherwise renders the default
-// OpenConstructionERP wordmark. Clicking the brand area (or the
+// Florida Steel Frame & Truss Manufacturing LLC wordmark. Clicking the brand area (or the
 // "Customise" pencil that appears on hover) opens the editor.
 //
 // Layout rules:
-//   * No customisation → full OpenConstructionERP logo+wordmark, as
+//   * No customisation → full Florida Steel Frame & Truss Manufacturing LLC logo+wordmark, as
 //     before (visual parity with v3.0.5).
 //   * Logo set        → user's logo fills the header width;
-//                       "OpenConstructionERP" subtitle is rendered at
+//                       "Florida Steel Frame & Truss Manufacturing LLC" subtitle is rendered at
 //                       roughly 1/3 of the original size beneath it
 //                       as a "powered by" attribution (required by
 //                       the AGPL-3.0 licence).
 //   * Name only       → company name in Plus Jakarta Sans 800, sized
 //                       to match the default wordmark; same small
-//                       OpenConstructionERP subtitle below.
+//                       Florida Steel Frame & Truss Manufacturing LLC subtitle below.
 //
 // The editor is a lightweight inline form (not WideModal) so the
 // sidebar can keep working on narrow viewports. The logo upload
@@ -169,7 +169,7 @@ export function CustomBranding({ iconified }: CustomBrandingProps) {
                   {companyName}
                 </span>
               )}
-              {/* "by OpenConstructionERP" — minimal subordinate attribution
+              {/* "by Florida Steel Frame & Truss Manufacturing LLC" — minimal subordinate attribution
                   under the user's brand. AGPL-3.0 attribution requirement
                   is satisfied while the user's logo stays the dominant
                   visual; font is small + muted on purpose. */}

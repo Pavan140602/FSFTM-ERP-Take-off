@@ -68,7 +68,7 @@ def write_pdf_placeholder(target: Path, title: str, note: str | None = None) -> 
         c.drawString(72, height - 200, "This file is auto-generated for the example project.")
         c.drawString(72, height - 215, "Upload your own document to replace it.")
         c.setFont(BODY_FONT, 9)
-        c.drawString(72, 60, "OpenConstructionERP - open-source construction cost platform")
+        c.drawString(72, 60, "Florida Steel Frame & Truss Manufacturing LLC - open-source construction cost platform")
         c.showPage()
         c.save()
     except Exception:  # pragma: no cover - reportlab missing or font failure
@@ -116,8 +116,8 @@ def write_ifc_placeholder(target: Path, title: str) -> None:
     body = (
         "ISO-10303-21;\n"
         "HEADER;\n"
-        "FILE_DESCRIPTION(('OpenConstructionERP sample model'),'2;1');\n"
-        f"FILE_NAME('{safe_title}','',(''),(''),'OpenConstructionERP','OpenConstructionERP','');\n"
+        "FILE_DESCRIPTION(('Florida Steel Frame & Truss Manufacturing LLC sample model'),'2;1');\n"
+        f"FILE_NAME('{safe_title}','',(''),(''),'Florida Steel Frame & Truss Manufacturing LLC','Florida Steel Frame & Truss Manufacturing LLC','');\n"
         "FILE_SCHEMA(('IFC4'));\n"
         "ENDSEC;\n"
         "DATA;\n"

@@ -124,7 +124,7 @@ patch('data/tool-chest-sets.ts', [
   const kept = sets.filter((s) => !s.id.startsWith('lib-') && (force || !s.id.startsWith('zs-')));"""),
 ])
 
-patch('components/RevuToolChest.tsx', [
+patch('components/FSFTMToolChest.tsx', [
     ("""    case 'JOIST':""", """    case 'HAT':
       return <path d="M3 21 H9 V9 H21 V21 H27" {...sw} strokeWidth={2.2} />;
     case 'JOIST':"""),

@@ -78,7 +78,7 @@ export interface AutoTag {
   /** The user set the profile by hand (OE-DELIVERY 2026-11-02-auto-takeoff-profile-edit):
    *  re-runs keep it, exactly like a moved or reshaped markup. */
   ud?: boolean;
-  /** Text band [[x, y] x4] for the Revu-style highlight (rotated text). */
+  /** Text band [[x, y] x4] for the FSFTM-style highlight (rotated text). */
   lq?: [number, number][];
   /** Member role (OE-DELIVERY 2026-11-03-auto-takeoff-roles). */
   role?: string;
@@ -116,8 +116,8 @@ export function autoCategoryMeta(cat: string) {
   return AUTO_CATEGORIES.find((c) => c.key === cat) ?? AUTO_CATEGORIES[AUTO_CATEGORIES.length - 1]!;
 }
 
-/** Revu "Subject" of an auto markup, shown in the Markups list Label
- *  column (OE-DELIVERY 2026-11-02-revu-markups-list). */
+/** FSFTM "Subject" of an auto markup, shown in the Markups list Label
+ *  column (OE-DELIVERY 2026-11-02-fsftm-markups-list). */
 export function autoSubject(cat: string): string {
   return (
     {
@@ -628,7 +628,7 @@ export function parseFeetInches(text: string): number | null {
   return null;
 }
 
-/** Feet -> 12'-6" or 27'-2 3/4" (nearest 1/4", fractions like Revu). */
+/** Feet -> 12'-6" or 27'-2 3/4" (nearest 1/4", fractions like FSFTM). */
 export function formatFeetInches(ft: number | null | undefined): string {
   if (ft == null || !Number.isFinite(ft) || ft <= 0) return '';
   let whole = Math.floor(ft);

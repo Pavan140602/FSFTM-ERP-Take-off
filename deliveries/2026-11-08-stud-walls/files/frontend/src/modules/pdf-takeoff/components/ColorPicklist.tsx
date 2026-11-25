@@ -1,13 +1,13 @@
 // OE-DELIVERY: 2026-11-08-stud-walls
 /**
- * Colour picklist like Bluebeam Revu's: a palette of standard colours in a
+ * Colour picklist like FSFTM's: a palette of standard colours in a
  * grid, the colours used lately, "No colour" where it applies, and "More
  * colours…" for anything else. Opens from a small swatch button.
  */
 import { useEffect, useRef, useState } from 'react';
 
-/** Revu-style standard palette: 8 hues x 5 tints, then greys. */
-export const REVU_PALETTE: string[] = [
+/** FSFTM-style standard palette: 8 hues x 5 tints, then greys. */
+export const FSFTM_PALETTE: string[] = [
   // full colours
   '#FF0000', '#FF8000', '#FFFF00', '#00FF00', '#00FFFF', '#0000FF', '#8000FF', '#FF00FF',
   // dark
@@ -114,7 +114,7 @@ export default function ColorPicklist({ value, onChange, allowNone, title = 'Col
           data-testid={`${testId}-menu`}
           onMouseDown={(e) => e.stopPropagation()}
         >
-          <div className="grid grid-cols-8 gap-1">{REVU_PALETTE.map((c, i) => cell(c, `p${i}`))}</div>
+          <div className="grid grid-cols-8 gap-1">{FSFTM_PALETTE.map((c, i) => cell(c, `p${i}`))}</div>
           {recent.length > 0 && (
             <>
               <p className="mt-2 text-[10px] text-content-tertiary">Recent</p>

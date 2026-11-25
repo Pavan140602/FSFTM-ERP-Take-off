@@ -1,6 +1,6 @@
-# OpenConstructionERP × Doker — Formwork Partner Pack
+# Florida Steel Frame & Truss Manufacturing LLC × Doker — Formwork Partner Pack
 
-Pre-configures OpenConstructionERP for **formwork (Schalung) and concrete
+Pre-configures Florida Steel Frame & Truss Manufacturing LLC for **formwork (Schalung) and concrete
 contractors** in the DACH region.
 
 ## What it does

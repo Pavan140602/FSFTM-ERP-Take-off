@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "OpenConstructionERP",
+    "name": "Florida Steel Frame & Truss Manufacturing LLC",
     "tagline": "Open-source bouwkostencalculatie"
   },
   "nav": {
@@ -164,7 +164,7 @@
     "update": "Bijwerken"
   },
   "dashboard": {
-    "welcome": "Welkom bij OpenConstructionERP",
+    "welcome": "Welkom bij Florida Steel Frame & Truss Manufacturing LLC",
     "subtitle": "Open-source bouwkostencalculatie-platform",
     "recent_projects": "Recente projecten",
     "system_status": "Systeemstatus",

@@ -452,7 +452,7 @@ EXACT: dict[str, str] = {
     "Send reset link": "Сэргээх холбоос илгээх",
     "Passwords do not match": "Нууц үгүүд таарахгүй байна",
     # --- Dashboard ---
-    "Welcome to OpenConstructionERP": "OpenConstructionERP-д тавтай морил",
+    "Welcome to Florida Steel Frame & Truss Manufacturing LLC": "OpenConstructionERP-д тавтай морил",
     "Recent Projects": "Сүүлийн үеийн төслүүд",
     "Recent Activity": "Сүүлийн үеийн үйл ажиллагаа",
     "Quick Actions": "Хурдан үйлдэл",
