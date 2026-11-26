@@ -10,7 +10,7 @@ import type { ComponentType } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import ColorPicklist from './ColorPicklist';
 import clsx from 'clsx';
-import { Bold, Briefcase, ChevronDown, Italic, Underline } from 'lucide-react';
+import { Bold, Briefcase, ChevronDown, Circle, Italic, Scissors, Underline } from 'lucide-react';
 import {
   AREA_DISP_UNITS,
   CAPTION_LABELS,
@@ -95,6 +95,8 @@ interface Props {
   onAddToChest?: () => void;
   /** Lay out framing across the selected outline (OE-DELIVERY 2026-11-04-framing-layout). */
   onLayoutFraming?: () => void;
+  /** Cut an opening (stairs, shafts ...) out of the selected area (OE-DELIVERY 2026-11-26-fsftm-pdf). */
+  onCutout?: (shape: 'polygon' | 'ellipse') => void;
   /** Selection totals, already formatted. */
   totals?: string;
   /** Fallbacks shown when the markup has no override. */
@@ -235,7 +237,7 @@ function CaptionPicker({
   );
 }
 
-export function FSFTMPropertiesBar({ mode, type, title, value, subject, onSubject, label, onLabel, onWallHeight, onPatch, totals, defaults, onAddToChest, onLayoutFraming, popover }: Props) {
+export function FSFTMPropertiesBar({ mode, type, title, value, subject, onSubject, label, onLabel, onWallHeight, onPatch, totals, defaults, onAddToChest, onLayoutFraming, onCutout, popover }: Props) {
   const [popOpen, setPopOpen] = useState(false);
   const [chestOpen, setChestOpen] = useState(false);
   const off = mode === 'none';
@@ -487,6 +489,29 @@ export function FSFTMPropertiesBar({ mode, type, title, value, subject, onSubjec
             {totals}
           </span>
         </>
+      )}
+      {onCutout && mode === 'selection' && (type === 'area' || type === 'volume') && (
+        <span className="flex shrink-0 items-center gap-1" data-testid="props-cutout">
+          <span className="text-[10px] text-content-tertiary">Cut out:</span>
+          <button
+            type="button"
+            onClick={() => onCutout('polygon')}
+            className="flex h-6 items-center gap-1 rounded border border-border px-2 text-[10px] font-semibold text-content-primary hover:border-oe-blue/60 hover:bg-oe-blue/5"
+            title="Cut a hole out of this area (stairs, shafts ...): click its corners inside the area, double-click to finish"
+            data-testid="props-cutout-polygon"
+          >
+            <Scissors size={11} />Hole
+          </button>
+          <button
+            type="button"
+            onClick={() => onCutout('ellipse')}
+            className="flex h-6 items-center gap-1 rounded border border-border px-2 text-[10px] font-semibold text-content-primary hover:border-oe-blue/60 hover:bg-oe-blue/5"
+            title="Cut a round hole out of this area: click its centre, then its edge"
+            data-testid="props-cutout-ellipse"
+          >
+            <Circle size={11} />Round
+          </button>
+        </span>
       )}
       {onLayoutFraming && mode === 'selection' && (type === 'area' || type === 'polygon') && (
         <button

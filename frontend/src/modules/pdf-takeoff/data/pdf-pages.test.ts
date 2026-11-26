@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PDFArray, PDFDocument, PDFName, degrees } from 'pdf-lib';
-import { editPages, extractPages, makeSnapshot, saveVectorPdf, rotatePoint, type AnnotInput } from './pdf-pages';
+import { editPages, extractPages, planPageMap, makeSnapshot, saveVectorPdf, rotatePoint, type AnnotInput } from './pdf-pages';
 import type { Measurement } from '../../../features/takeoff/lib/takeoff-types';
 
 async function threePages(): Promise<Uint8Array> {
@@ -41,6 +41,28 @@ describe('pdf-pages', () => {
     expect([Math.round(blank.getWidth()), Math.round(blank.getHeight())]).toEqual([600, 400]);
     expect(blank.getRotation().angle).toBe(0);
     expect(r.pageMap).toEqual({ 1: 1, 2: 2, 3: 4 });
+  });
+  it('plans the same page map the byte-level edit produces', async () => {
+    const edits = [
+      { kind: 'reorder', order: [3, 1, 2] },
+      { kind: 'rotate', pages: [2], deg: 90 },
+      { kind: 'delete', pages: [2] },
+      { kind: 'insertBlank', after: 1, count: 2 },
+      { kind: 'insertBlank', after: 0, count: 1 },
+      { kind: 'insertBlank', after: 3, count: 1 },
+    ] as const;
+    for (const edit of edits) {
+      const real = await editPages(await threePages(), edit as never);
+      const plan = planPageMap(edit as never, 3);
+      expect(plan.pageMap).toEqual(real.pageMap);
+      expect(plan.numPages).toBe(real.numPages);
+    }
+  });
+  it('reorders pages and maps where each one went', async () => {
+    const r = await editPages(await threePages(), { kind: 'reorder', order: [3, 1, 2] });
+    expect(await sizes(r.bytes)).toEqual([300, 600, 600]);
+    expect(r.pageMap).toEqual({ 3: 1, 1: 2, 2: 3 });
+    await expect(editPages(await threePages(), { kind: 'reorder', order: [1, 1, 2] })).rejects.toThrow();
   });
   it('inserts and replaces from another PDF', async () => {
     const other = await extractPages(await threePages(), [3]);

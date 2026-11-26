@@ -449,6 +449,27 @@ def _polyline_length(pts: list[tuple[float, float]]) -> float:
     return total
 
 
+def _holes_area_px(holes: Any) -> float:
+    """Total pixel area of an area's cut-out holes (``metadata.holes``).
+
+    A hole is a list of at least three points; anything else is ignored, so
+    a malformed blob can never ADD area (OE-DELIVERY 2026-11-26-fsftm-pdf).
+    """
+    if not isinstance(holes, list):
+        return 0.0
+    total = 0.0
+    for hole in holes[:200]:
+        if not isinstance(hole, list):
+            continue
+        try:
+            xy = _points_to_xy(hole)
+        except Exception:
+            continue
+        if len(xy) >= 3:
+            total += _shoelace_area(xy)
+    return total
+
+
 def recompute_measurement_value(
     *,
     measurement_type: str | None,
@@ -456,6 +477,7 @@ def recompute_measurement_value(
     scale_pixels_per_unit: float | None,
     count_value: int | None,
     client_value: float | None,
+    holes: Any = None,
 ) -> float | None:
     """Recompute ``measurement_value`` server-side from raw geometry.
 
@@ -520,15 +542,15 @@ def recompute_measurement_value(
         return _polyline_length(xy) / scale
 
     if mtype == "area":
-        # 2D polygon area. Scale is pixels per linear unit, so divide
-        # by scale² to convert pixel² to unit².
-        return _shoelace_area(xy) / (scale * scale)
+        # 2D polygon area minus its cut-out holes. Scale is pixels per
+        # linear unit, so divide by scale² to convert pixel² to unit².
+        return max(0.0, _shoelace_area(xy) - _holes_area_px(holes)) / (scale * scale)
 
     if mtype == "volume":
         # Volume on a takeoff page is always area × depth. We
         # recompute the base area here and leave depth multiplication
         # to the caller (it lives in a separate field).
-        return _shoelace_area(xy) / (scale * scale)
+        return max(0.0, _shoelace_area(xy) - _holes_area_px(holes)) / (scale * scale)
 
     # Unknown type - preserve client value rather than nulling it out.
     return client_value
@@ -541,6 +563,7 @@ def recompute_volume_value(
     scale_pixels_per_unit: float | None,
     depth: float | None,
     client_volume: float | None,
+    holes: Any = None,
 ) -> float | None:
     """Recompute a ``volume`` measurement's ``volume`` column server-side.
 
@@ -582,7 +605,7 @@ def recompute_volume_value(
     # Need a valid scale, a closed polygon (>= 3 points), and a sane depth
     # to reconstruct the volume; otherwise fall back to the client echo.
     if scale > 0 and len(xy) >= 3 and depth is not None and depth >= 0:
-        base_area = _shoelace_area(xy) / (scale * scale)
+        base_area = max(0.0, _shoelace_area(xy) - _holes_area_px(holes)) / (scale * scale)
         return base_area * float(depth)
 
     # Not recomputable - trust the client value but never let a negative
@@ -824,6 +847,59 @@ def _takeoff_documents_dir() -> Path:
     return resolve_data_dir() / _TAKEOFF_DOCUMENTS_SUBDIR
 
 
+def _pdf_version_of(path: Path, doc_id: str) -> int | None:
+    """Version number of ``{doc_id}.v{n}.pdf``; None for any other name."""
+    m = re.fullmatch(rf"{re.escape(doc_id)}\.v(\d+)\.pdf", path.name)
+    return int(m.group(1)) if m else None
+
+
+def _latest_pdf_version(directory: Path, doc_id: str) -> Path | None:
+    """Newest ``{doc_id}.v{n}.pdf`` in ``directory``, or None."""
+    best: Path | None = None
+    best_n = -1
+    try:
+        for cand in directory.glob(f"{doc_id}.v*.pdf"):
+            n = _pdf_version_of(cand, doc_id)
+            if n is not None and n > best_n and cand.is_file():
+                best, best_n = cand, n
+    except OSError:
+        return None
+    return best
+
+
+def render_page_thumbnail(src: Path, doc_id: str, page: int, width: int) -> Path | None:
+    """JPEG thumbnail of one page, rendered once with PyMuPDF and kept on disk.
+
+    The viewer used to draw every thumbnail itself with pdf.js, one or two at a
+    time; the server renders them in parallel and a re-open is instant
+    (OE-DELIVERY 2026-11-26-fsftm-pdf). The cache name carries the file's
+    size and mtime, so an edited drawing (new version file) gets new
+    thumbnails. Returns None for a page that does not exist.
+    """
+    import pymupdf  # noqa: PLC0415
+
+    st = src.stat()
+    cache_dir = _takeoff_documents_dir() / "thumbs"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    out = cache_dir / f"{doc_id}-{st.st_size}-{st.st_mtime_ns}.p{page}.w{width}.jpg"
+    if out.is_file():
+        return out
+    with pymupdf.open(str(src)) as pdf:
+        if not 1 <= page <= pdf.page_count:
+            return None
+        pg = pdf[page - 1]
+        zoom = width / max(1.0, pg.rect.width)
+        pix = pg.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom), alpha=False)
+        data = pix.tobytes("jpg", jpg_quality=82)
+    tmp = out.with_suffix(f".{uuid.uuid4().hex}.tmp")
+    tmp.write_bytes(data)
+    try:
+        tmp.replace(out)
+    except OSError:
+        return tmp  # another request is writing the same file: serve ours
+    return out
+
+
 def _find_existing_takeoff_pdf(doc_id: str) -> Path | None:
     """Resolve ``{doc_id}.pdf`` to an existing file, READ-ONLY back-compat.
 
@@ -841,6 +917,13 @@ def _find_existing_takeoff_pdf(doc_id: str) -> Path | None:
     exists nowhere.
     """
     from app.core.storage import safe_data_roots
+
+    # A drawing edited in the viewer (page tools) is stored as a new numbered
+    # version next to the original; the newest one wins. See
+    # TakeoffService.replace_document_file (OE-DELIVERY 2026-11-26-fsftm-pdf).
+    newest = _latest_pdf_version(_takeoff_documents_dir(), doc_id)
+    if newest is not None:
+        return newest
 
     name = f"{doc_id}.pdf"
     candidates: list[Path] = [_takeoff_documents_dir() / name]
@@ -1358,8 +1441,13 @@ async def _apply_full_parse(doc: Any, pdf_path: Path, filename: str | None) -> b
     return True
 
 
-def _schedule_full_parse(doc_id: Any, pdf_path: Path, filename: str | None) -> None:
-    """Detached background table extraction on its own DB session."""
+def _schedule_full_parse(doc_id: Any, pdf_path: Path, filename: str | None, *, wait_for_path: bool = False) -> None:
+    """Detached background table extraction on its own DB session.
+
+    ``wait_for_path``: an edited drawing (replace_document_file) waits until
+    its own transaction has committed the new ``file_path``, and a result for
+    a version that was replaced meanwhile is discarded.
+    """
     import asyncio
 
     async def _runner() -> None:
@@ -1374,12 +1462,22 @@ def _schedule_full_parse(doc_id: Any, pdf_path: Path, filename: str | None) -> N
                     from app.modules.takeoff.models import TakeoffDocument
 
                     doc = await bg.get(TakeoffDocument, doc_id)
-                    if doc is None:
+                    if doc is None or (wait_for_path and doc.file_path != str(pdf_path)):
+                        if doc is not None and _pdf_version_of(Path(str(doc.file_path or "")), str(doc_id)) is not None:
+                            newer = _pdf_version_of(Path(str(doc.file_path)), str(doc_id)) or 0
+                            mine = _pdf_version_of(pdf_path, str(doc_id)) or 0
+                            if newer > mine:
+                                return  # a newer edit owns the parse now
                         await asyncio.sleep(1.0)
                         continue
                     if not (doc.metadata_ or {}).get("tables_pending"):
                         return
                     await _apply_full_parse(doc, pdf_path, filename)
+                    if wait_for_path:
+                        await bg.refresh(doc, attribute_names=["file_path"])
+                        if doc.file_path != str(pdf_path):
+                            await bg.rollback()  # replaced while parsing: stale
+                            return
                     parsed_once = True
                     await bg.commit()
                     return
@@ -1927,41 +2025,132 @@ class TakeoffService:
         if _is_encrypted_pdf(content):
             raise HTTPException(status_code=400, detail="This PDF is password-protected.")
 
+        file_path = self._next_pdf_version_path(doc)
+        file_path.write_bytes(content)
+        page_count: int | None = None
+        try:
+            import pymupdf  # noqa: PLC0415
+
+            with pymupdf.open(stream=content, filetype="pdf") as pdf:
+                page_count = pdf.page_count
+        except Exception:
+            page_count = None
+        await self._adopt_pdf_version(doc, file_path, page_count, len(content))
+        return doc
+
+    def _next_pdf_version_path(self, doc: TakeoffDocument) -> Path:
+        """Path for the next edited version of ``doc``'s PDF.
+
+        Windows cannot replace a file another reader still has open (the
+        viewer streaming it, the background page parse ...), which made the
+        second or third page move fail with "Access is denied". Every edit is
+        therefore written as a NEW numbered version; lookups take the newest
+        (_find_existing_takeoff_pdf) and older versions are removed once
+        nothing holds them (OE-DELIVERY 2026-11-26-fsftm-pdf).
+        """
         documents_dir = _takeoff_documents_dir()
         documents_dir.mkdir(parents=True, exist_ok=True)
-        file_path = documents_dir / f"{doc.id}.pdf"
-        tmp_path = documents_dir / f"{doc.id}.pdf.tmp"
-        tmp_path.write_bytes(content)
-        tmp_path.replace(file_path)
+        doc_key = str(doc.id)
+        latest = _latest_pdf_version(documents_dir, doc_key)
+        version = (_pdf_version_of(latest, doc_key) or 1) + 1 if latest else 2
+        return documents_dir / f"{doc_key}.v{version}.pdf"
 
-        parsed = await _parse_pdf_fast(file_path, filename=doc.filename)
-        tables_pending = parsed is not None and parsed[0] > 0
-        if parsed is None:
-            parsed = await _parse_pdf_isolated(file_path, filename=doc.filename)
+    async def _adopt_pdf_version(
+        self, doc: TakeoffDocument, file_path: Path, page_count: int | None, size_bytes: int
+    ) -> None:
+        """Point ``doc`` at a freshly written version and tidy older ones."""
+        documents_dir = file_path.parent
+        doc_key = str(doc.id)
+        version = _pdf_version_of(file_path, doc_key) or 0
+        for old in [documents_dir / f"{doc_key}.pdf", *documents_dir.glob(f"{doc_key}.v*.pdf")]:
+            if old == file_path or (_pdf_version_of(old, doc_key) or 0) >= version:
+                continue
+            with contextlib.suppress(OSError):
+                old.unlink()  # still open somewhere: removed on a later edit
+        # The full text / table read runs in the background so the viewer is
+        # not kept waiting.
         metadata: dict[str, Any] = dict(doc.metadata_ or {})
-        if parsed is None:
-            metadata["parse_degraded"] = True
-        else:
-            page_count, page_data, _truncated, _reader_error = parsed
-            pages_without_text = [
-                int(pg.get("page", idx + 1))
-                for idx, pg in enumerate(page_data)
-                if not (pg.get("has_text") if "has_text" in pg else bool(str(pg.get("text", "")).strip()))
-            ]
+        metadata.pop("parse_degraded", None)
+        metadata["tables_pending"] = True
+        if page_count is not None:
             doc.pages = page_count
-            doc.page_data = page_data
-            doc.extracted_text = "\n\n".join(pg["text"] for pg in page_data if pg.get("text"))
-            metadata.pop("parse_degraded", None)
-            metadata["pages_without_text"] = len(pages_without_text)
-            metadata["pages_without_text_list"] = pages_without_text
-            if tables_pending:
-                metadata["tables_pending"] = True
         doc.metadata_ = metadata
-        doc.size_bytes = len(content)
+        doc.size_bytes = size_bytes
         doc.file_path = str(file_path)
         await self.session.flush()
-        if tables_pending:
-            _schedule_full_parse(doc.id, file_path, doc.filename)
+        _schedule_full_parse(doc.id, file_path, doc.filename, wait_for_path=True)
+
+    async def edit_document_pages(self, doc_id: str, edit: dict[str, Any]) -> TakeoffDocument:
+        """Move / rotate / delete / insert pages of a document ON THE SERVER.
+
+        The viewer used to rebuild the whole PDF in the browser and upload it
+        again (seconds on a big drawing set); PyMuPDF does the same edit here
+        in a fraction of a second and the viewer only sends the change
+        (OE-DELIVERY 2026-11-26-fsftm-pdf). Pages are 1-based.
+        """
+        doc = await self.repo.get_by_id(uuid.UUID(doc_id))
+        if doc is None:
+            raise HTTPException(status_code=404, detail="Takeoff document not found")
+        src = _find_existing_takeoff_pdf(doc_id)
+        if src is None and doc.file_path and Path(doc.file_path).exists():
+            src = Path(doc.file_path)
+        if src is None:
+            raise HTTPException(status_code=404, detail="The stored PDF for this document is no longer on disk.")
+        import pymupdf  # noqa: PLC0415
+
+        kind = str(edit.get("kind") or "")
+        try:
+            pdf = pymupdf.open(str(src))
+        except Exception as exc:
+            raise HTTPException(status_code=422, detail="Could not read this PDF.") from exc
+        try:
+            n = pdf.page_count
+
+            def _pages(key: str) -> list[int]:
+                raw = edit.get(key) or []
+                if not isinstance(raw, list) or not all(isinstance(x, int) and 1 <= x <= n for x in raw):
+                    raise HTTPException(status_code=400, detail=f"'{key}' must list page numbers 1..{n}.")
+                return raw
+
+            if kind == "reorder":
+                order = _pages("order")
+                if sorted(order) != list(range(1, n + 1)):
+                    raise HTTPException(status_code=400, detail="Page order must list every page exactly once.")
+                pdf.select([p - 1 for p in order])
+            elif kind == "rotate":
+                deg = edit.get("deg")
+                if deg not in (90, 180, 270):
+                    raise HTTPException(status_code=400, detail="deg must be 90, 180 or 270.")
+                for p in sorted(set(_pages("pages"))):
+                    page = pdf[p - 1]
+                    page.set_rotation((page.rotation + int(deg)) % 360)
+            elif kind == "delete":
+                pages = sorted(set(_pages("pages")))
+                if len(pages) >= n:
+                    raise HTTPException(status_code=400, detail="A drawing must keep at least one page.")
+                pdf.delete_pages([p - 1 for p in pages])
+            elif kind == "insertBlank":
+                after = edit.get("after")
+                count = edit.get("count", 1)
+                if (
+                    not isinstance(after, int)
+                    or not 0 <= after <= n
+                    or not isinstance(count, int)
+                    or not 1 <= count <= 50
+                ):
+                    raise HTTPException(status_code=400, detail="Invalid insert position or count.")
+                # Same size and orientation as the page it follows, as DISPLAYED.
+                ref = pdf[max(0, after - 1)].rect
+                for k in range(count):
+                    pdf.new_page(pno=after + k, width=ref.width, height=ref.height)
+            else:
+                raise HTTPException(status_code=400, detail=f"Unsupported page edit '{kind}'.")
+            file_path = self._next_pdf_version_path(doc)
+            pdf.save(str(file_path))
+            page_count = pdf.page_count
+        finally:
+            pdf.close()
+        await self._adopt_pdf_version(doc, file_path, page_count, file_path.stat().st_size)
         return doc
 
     async def get_or_create_takeoff_from_source(
@@ -2277,12 +2466,14 @@ class TakeoffService:
         never keyed on a PDF filename.
         """
         await self._validate_document_id(data.document_id, data.project_id)
+        create_holes = (data.metadata or {}).get("holes") if isinstance(data.metadata, dict) else None
         recomputed = recompute_measurement_value(
             measurement_type=data.type,
             points=data.points,
             scale_pixels_per_unit=data.scale_pixels_per_unit,
             count_value=data.count_value,
             client_value=data.measurement_value,
+            holes=create_holes,
         )
         # B8 - derive the volume column server-side (area × depth) so the
         # client-sent value can't bypass the geometry recompute when it is
@@ -2293,6 +2484,7 @@ class TakeoffService:
             scale_pixels_per_unit=data.scale_pixels_per_unit,
             depth=data.depth,
             client_volume=data.volume,
+            holes=create_holes,
         )
         measurement = TakeoffMeasurement(
             project_id=data.project_id,
@@ -2988,7 +3180,18 @@ class TakeoffService:
         # Recompute measurement_value if any geometry-relevant field
         # is touched. We need the *effective post-update* state, so
         # we merge patch over current.
-        recompute_triggers = {"points", "scale_pixels_per_unit", "type", "count_value", "measurement_value"}
+        # Cut-out holes live in the metadata blob; a changed blob re-derives
+        # the net area too (OE-DELIVERY 2026-11-26-fsftm-pdf).
+        effective_meta = fields.get("metadata_") if "metadata_" in fields else item.metadata_
+        effective_holes = effective_meta.get("holes") if isinstance(effective_meta, dict) else None
+        recompute_triggers = {
+            "points",
+            "scale_pixels_per_unit",
+            "type",
+            "count_value",
+            "measurement_value",
+            "metadata_",
+        }
         if recompute_triggers & fields.keys():
             effective_type = fields.get("type") if "type" in fields else item.type
             effective_points = fields.get("points") if "points" in fields else (item.points or [])
@@ -3003,6 +3206,7 @@ class TakeoffService:
                 scale_pixels_per_unit=effective_scale,
                 count_value=effective_count,
                 client_value=client_value,
+                holes=effective_holes,
             )
             fields["measurement_value"] = recomputed
 
@@ -3034,7 +3238,7 @@ class TakeoffService:
         # used to slip an arbitrary client volume into a BOQ quantity. This
         # runs independently of the measurement_value block above because a
         # ``depth``/``volume`` patch alone must still re-derive the volume.
-        volume_triggers = {"points", "scale_pixels_per_unit", "type", "depth", "volume"}
+        volume_triggers = {"points", "scale_pixels_per_unit", "type", "depth", "volume", "metadata_"}
         if volume_triggers & fields.keys():
             effective_type = fields.get("type") if "type" in fields else item.type
             effective_points = fields.get("points") if "points" in fields else (item.points or [])
@@ -3054,6 +3258,7 @@ class TakeoffService:
                 scale_pixels_per_unit=effective_scale,
                 depth=effective_depth,
                 client_volume=client_volume,
+                holes=effective_holes,
             )
 
         if not fields:

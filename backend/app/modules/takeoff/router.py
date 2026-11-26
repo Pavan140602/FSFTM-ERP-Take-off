@@ -46,7 +46,7 @@ from pathlib import Path
 from statistics import mean as _mean
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
+from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import delete, select
@@ -4628,6 +4628,64 @@ async def replace_document_file(
         "pages": updated.pages,
         "size_bytes": updated.size_bytes,
     }
+
+
+@router.get(
+    "/documents/{doc_id}/thumbnail/{page}/",
+    dependencies=[Depends(RequirePermission("takeoff.read"))],
+)
+async def document_page_thumbnail(
+    doc_id: str,
+    page: int,
+    user_id: CurrentUserId,
+    session: SessionDep,
+    w: int = Query(480, ge=64, le=1200, description="Thumbnail width in pixels"),
+    service: TakeoffService = Depends(_get_service),
+) -> FileResponse:
+    """One page as a small JPEG for the viewer's thumbnail strip (cached)."""
+    from starlette.concurrency import run_in_threadpool
+
+    from app.modules.takeoff.service import _find_existing_takeoff_pdf, render_page_thumbnail
+
+    doc = await service.get_document(doc_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail=translate("errors.document_not_found", locale=get_locale()))
+    await _verify_takeoff_doc_access(doc, str(user_id) if user_id else "", session)
+    src = _find_existing_takeoff_pdf(doc_id)
+    if src is None and doc.file_path and Path(doc.file_path).exists():
+        src = Path(doc.file_path)
+    if src is None:
+        raise HTTPException(status_code=404, detail="PDF file not found on disk")
+    # Bucket the width so a few sizes are cached, not one per slider pixel.
+    width = min(1200, max(160, int(round(w / 160.0)) * 160))
+    out = await run_in_threadpool(render_page_thumbnail, src, doc_id, page, width)
+    if out is None:
+        raise HTTPException(status_code=404, detail="No such page")
+    return FileResponse(out, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=604800"})
+
+
+@router.post(
+    "/documents/{doc_id}/pages/edit/",
+    dependencies=[Depends(RequirePermission("takeoff.update"))],
+)
+async def edit_document_pages(
+    doc_id: str,
+    user_id: CurrentUserId,
+    session: SessionDep,
+    edit: dict[str, Any] = Body(..., description="kind: reorder|rotate|delete|insertBlank plus its fields"),
+    service: TakeoffService = Depends(_get_service),
+) -> dict[str, Any]:
+    """Move, rotate, delete or insert pages in place, on the server.
+
+    Fast path for the viewer's page tools: only the change is sent, PyMuPDF
+    edits the file and the drawing keeps its id and markups.
+    """
+    doc = await service.get_document(doc_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail=translate("errors.document_not_found", locale=get_locale()))
+    await _verify_takeoff_doc_access(doc, str(user_id) if user_id else "", session)
+    updated = await service.edit_document_pages(doc_id, edit)
+    return {"id": str(updated.id), "pages": updated.pages, "size_bytes": updated.size_bytes}
 
 
 @router.post(

@@ -565,7 +565,44 @@ export type PageEdit =
   | { kind: 'insertBlank'; after: number; count: number; size?: [number, number] }
   | { kind: 'insertPdf'; after: number; other: Uint8Array; otherPages?: number[] }
   | { kind: 'replace'; pages: number[]; other: Uint8Array; otherPages?: number[] }
-  | { kind: 'repair' };
+  | { kind: 'repair' }
+  /** New page order as old page numbers, e.g. [3, 1, 2] (OE-DELIVERY 2026-11-26-fsftm-pdf). */
+  | { kind: 'reorder'; order: number[] };
+
+/** Page edits the server can apply itself (fast path, no file upload). */
+export type ServerPageEdit = Extract<PageEdit, { kind: 'reorder' | 'rotate' | 'delete' | 'insertBlank' }>;
+
+export function isServerPageEdit(edit: PageEdit): edit is ServerPageEdit {
+  return edit.kind === 'reorder' || edit.kind === 'rotate' || edit.kind === 'delete' || edit.kind === 'insertBlank';
+}
+
+/**
+ * Where each page goes for an edit, without touching the PDF bytes - the
+ * same map {@link editPages} returns (OE-DELIVERY 2026-11-26-fsftm-pdf).
+ */
+export function planPageMap(edit: ServerPageEdit, n: number): { pageMap: Record<number, number>; numPages: number } {
+  const map: Record<number, number> = {};
+  if (edit.kind === 'reorder') {
+    edit.order.forEach((oldPage, i) => { map[oldPage] = i + 1; });
+    return { pageMap: map, numPages: n };
+  }
+  if (edit.kind === 'rotate') {
+    for (let i = 1; i <= n; i++) map[i] = i;
+    return { pageMap: map, numPages: n };
+  }
+  if (edit.kind === 'delete') {
+    const del = new Set(edit.pages);
+    let next = 0;
+    for (let i = 1; i <= n; i++) if (!del.has(i)) map[i] = ++next;
+    return { pageMap: map, numPages: next };
+  }
+  let next = edit.after === 0 ? edit.count : 0;
+  for (let i = 1; i <= n; i++) {
+    map[i] = ++next;
+    if (edit.after === i) next += edit.count;
+  }
+  return { pageMap: map, numPages: n + edit.count };
+}
 
 /**
  * Apply a page edit; returns the new bytes and where each original page went
@@ -578,6 +615,17 @@ export async function editPages(bytes: Uint8Array, edit: PageEdit): Promise<{ by
   if (edit.kind === 'repair') {
     for (let i = 1; i <= n; i++) map[i] = i;
     return { bytes: await src.save({ useObjectStreams: true }), pageMap: map, numPages: n };
+  }
+  if (edit.kind === 'reorder') {
+    const order = edit.order.filter((p, i, a) => p >= 1 && p <= n && a.indexOf(p) === i);
+    if (order.length !== n) throw new Error('Page order must list every page exactly once.');
+    // Re-order the page tree in place: no page is copied, so a big drawing
+    // set moves a page in a fraction of the time a rebuild takes.
+    const pages = src.getPages();
+    for (let i = n - 1; i >= 0; i--) src.removePage(i);
+    order.forEach((oldPage) => src.addPage(pages[oldPage - 1]!));
+    order.forEach((oldPage, i) => { map[oldPage] = i + 1; });
+    return { bytes: await src.save(), pageMap: map, numPages: n };
   }
   if (edit.kind === 'rotate') {
     for (const p of edit.pages) {

@@ -30,7 +30,7 @@ interface Props {
   onLock?: (tool: string) => void;
 }
 
-const ITEM = 36; // px per button incl. gap (FSFTM: icon only, name on hover - OE-DELIVERY 2026-11-12-fsftm-ui update 7)
+const ITEM = 54; // px per button incl. gap: icon with its name underneath (OE-DELIVERY 2026-11-26-fsftm-pdf)
 
 export function FSFTMToolStrip({ tools, active, onSelect, areaRef, locked, onLock }: Props) {
   const boxRef = useRef<HTMLDivElement>(null);
@@ -83,7 +83,7 @@ export function FSFTMToolStrip({ tools, active, onSelect, areaRef, locked, onLoc
         data-locked={on && locked ? 'true' : undefined}
         className={clsx(
           'relative flex shrink-0 items-center rounded transition-colors',
-          inMenu ? 'h-7 w-full gap-2 px-2 text-left text-[12px]' : 'h-[42px] w-[54px] flex-col justify-center gap-0.5 px-0.5',
+          inMenu ? 'h-7 w-full gap-2 px-2 text-left text-[12px]' : 'min-h-[50px] w-[66px] flex-col justify-center gap-0.5 px-0.5 py-1',
           // Same look as the left rail: grey icons, blue when on (update 11).
           on ? 'bg-oe-blue text-white' : 'text-content-secondary hover:bg-surface-secondary hover:text-content-primary',
         )}
@@ -93,7 +93,7 @@ export function FSFTMToolStrip({ tools, active, onSelect, areaRef, locked, onLoc
         </span>
         {/* Tool name under the icon - some users go by the name (update 15). */}
         {!inMenu && (
-          <span className="w-full truncate text-center text-[8.5px] leading-[10px]" data-strip-label>
+          <span className="line-clamp-2 w-full whitespace-normal break-words text-center text-[10px] font-medium leading-[11px]" data-strip-label>
             {t.label}
           </span>
         )}
@@ -135,7 +135,7 @@ export function FSFTMToolStrip({ tools, active, onSelect, areaRef, locked, onLoc
       data-cols={1}
     >
       {canUp && (
-        <button type="button" onClick={() => scrollBy(-200)} aria-label="Scroll tools up" className="flex h-5 w-[54px] shrink-0 items-center justify-center rounded text-content-secondary hover:bg-surface-secondary" data-testid="fsftm-tool-strip-up">
+        <button type="button" onClick={() => scrollBy(-200)} aria-label="Scroll tools up" className="flex h-5 w-[66px] shrink-0 items-center justify-center rounded text-content-secondary hover:bg-surface-secondary" data-testid="fsftm-tool-strip-up">
           <ChevronDown size={15} className="rotate-180" />
         </button>
       )}
@@ -153,7 +153,7 @@ export function FSFTMToolStrip({ tools, active, onSelect, areaRef, locked, onLoc
         ))}
       </div>
       {canDown && (
-        <button type="button" onClick={() => scrollBy(200)} aria-label="Scroll tools down" title="More tools" className="flex h-6 w-[54px] shrink-0 items-center justify-center rounded text-content-secondary hover:bg-surface-secondary" data-testid="fsftm-tool-strip-more">
+        <button type="button" onClick={() => scrollBy(200)} aria-label="Scroll tools down" title="More tools" className="flex h-6 w-[66px] shrink-0 items-center justify-center rounded text-content-secondary hover:bg-surface-secondary" data-testid="fsftm-tool-strip-more">
           <ChevronDown size={16} />
         </button>
       )}

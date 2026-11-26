@@ -1,6 +1,6 @@
 # Setting up FSFTM ERP Take-off on another Windows PC
 
-Follow these steps once per PC. After that, run `start-dev.bat` to start the app.
+Follow these steps once per PC. After that, start the app as in step 6.
 
 ## 1. Install the tools (one time)
 
@@ -53,13 +53,19 @@ on this PC. The app still runs without this file; it just won't send email.
 
 ## 6. Start the app
 
-Double-click **`start-dev.bat`** in the project folder, or run it from PowerShell:
+Open the project folder in VS Code and start two terminals:
 
 ```powershell
-.\start-dev.bat
+# Terminal 1 - backend on port 8000
+.\.venv\Scripts\openconstructionerp.exe serve --port 8000
 ```
 
-It opens two windows (backend on port 8000, frontend on port 5173).
+```powershell
+# Terminal 2 - frontend on port 5173
+cd frontend
+npm run dev
+```
+
 Then open **http://localhost:5173** in your browser.
 
 ## Getting the latest code later
@@ -75,69 +81,12 @@ Re-run the two install commands only when `git pull` changed
 `backend/pyproject.toml` or `frontend/package-lock.json`. Running them anyway
 does no harm.
 
-## Fast mode for everyday takeoff work (recommended)
-
-`start-dev.bat` runs the **development** setup: a Vite dev server (about
-0.7 GB of RAM) plus React in its slow debugging mode. That is meant for
-changing the code, not for doing takeoffs.
-
-For daily work use **fast mode** instead:
-
-1. Build the frontend once: double-click **`build-frontend.bat`** (a few minutes).
-2. Start the app: double-click **`start-fast.bat`**, then open
-   **http://localhost:8000** (not 5173).
-
-One backend process serves everything, React runs in production mode (much
-smoother on big drawing sets, no double renders), and about 0.7 GB of memory
-is freed. VS Code is not needed to run it.
-
-`start-fast.bat` rebuilds by itself when the code version changed (after
-`git pull`, or on a fresh clone, where the build is never stored in git), so
-after pulling just start it - the first start takes a few minutes longer.
-Run `build-frontend.bat` by hand only after editing code locally without
-committing. Do not run `start-dev.bat` and `start-fast.bat` at the same time.
-
 **Keeping the PC responsive (16 GB RAM):** close the browser tabs and apps
 you are not using while taking off - Chrome, VS Code and other Electron apps
 (ChatGPT, Cliq, ...) each hold 0.2-2 GB. Keep big drawing sets in single-page
 view, close PDF tabs you no longer need, and turn split view off when you are
 not comparing. If you regularly work with 70+ page sets, 32 GB of RAM is the
 upgrade that helps most.
-
-## Sharing with the team on the office network
-
-One PC runs the app; everyone else on the same network uses it in their
-browser and installs nothing. All projects, drawings and markups live on that
-one PC, so everyone sees the same data.
-
-On the **server PC** (the one with the code):
-
-1. Make Windows treat the office network as **Private** (only your trusted
-   office network): Settings > Network & internet > Ethernet (or Wi-Fi) >
-   Network profile type > **Private**.
-2. The first time, right-click **`start-team.bat`** > **Run as administrator**
-   (it opens port 8000 in Windows Firewall for private networks). After that a
-   normal double-click is enough.
-3. The window shows the address to share, for example
-   `http://192.168.1.189:8000 (Ethernet)`. Use the Ethernet / Wi-Fi address,
-   not a VPN one.
-4. Keep that PC switched on (and not sleeping) and the window open while the
-   team works. Use `start-team.bat` *instead of* `start-fast.bat`, not both.
-
-On **each teammate's PC**: open that address in Chrome or Edge, sign in (or
-register; an admin then activates the new account in the user settings).
-
-Notes:
-
-- `start-team.bat` uses a random login secret stored on the server PC in
-  `%USERPROFILE%\.openestimate\team-jwt-secret.txt` (not in git). Do not share
-  that file. Deleting it signs everyone out and makes a new one.
-- If the server PC's address changes after a restart, ask IT for a fixed
-  address (DHCP reservation) so the link stays the same.
-- PDF rendering happens in each person's browser, so the server PC mostly
-  serves files and saves markups; 16 GB is enough for a small team.
-- Never forward port 8000 on the router to the internet. For access from
-  outside the office use a VPN.
 
 ## Default settings
 

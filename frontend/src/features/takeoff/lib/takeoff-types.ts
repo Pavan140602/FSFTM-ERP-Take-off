@@ -133,6 +133,10 @@ export interface Measurement {
    *  line pattern, a fill colour independent of the line colour, and which
    *  label parts show on the drawing. Undefined = previous behaviour. */
   lineStyle?: 'solid' | 'dashed' | 'dotted' | 'dashdot';
+  /** Label moved away from its default spot, in PDF units (OE-DELIVERY 2026-11-26-fsftm-pdf). */
+  labelOffset?: { dx: number; dy: number };
+  /** Cut-out holes of an area / volume, PDF units (OE-DELIVERY 2026-11-26-fsftm-pdf). */
+  holes?: { x: number; y: number }[][];
   /** FSFTM Start / End line endings (OE-DELIVERY 2026-11-25-fsftm-pdf). */
   lineStart?: import('@/modules/pdf-takeoff/data/line-endings').LineEnding;
   lineEnd?: import('@/modules/pdf-takeoff/data/line-endings').LineEnding;

@@ -10,7 +10,7 @@ import react from '@vitejs/plugin-react';
 import { visualizer } from 'rollup-plugin-visualizer';
 import { VitePWA } from 'vite-plugin-pwa';
 
-/** Low-memory production build for 16 GB PCs (build-frontend.bat sets it). */
+/** Low-memory production build for 16 GB PCs (set OE_LEAN_BUILD=1). */
 const LEAN_BUILD = process.env.OE_LEAN_BUILD === '1';
 import path from 'path';
 import { cpSync, existsSync, readFileSync, readdirSync, createReadStream, statSync } from 'fs';
@@ -189,7 +189,7 @@ export default defineConfig({
   },
   plugins: [
     react(),
-    // OE_LEAN_BUILD=1 (build-frontend.bat): skip the bundle-size report, whose
+    // OE_LEAN_BUILD=1: skip the bundle-size report, whose
     // gzip + brotli pass over every chunk is what runs a 16 GB PC out of memory.
     // CI and normal builds keep it.
     ...(LEAN_BUILD

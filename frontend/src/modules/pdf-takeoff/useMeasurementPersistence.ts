@@ -1,6 +1,26 @@
 // DDC-CWICR-OE: DataDrivenConstruction · OpenConstructionERP
 // Copyright (c) 2026 Artem Boiko / DataDrivenConstruction
 import { isLineEnding, type LineEnding } from './data/line-endings';
+
+/** A stored label offset is two finite numbers. */
+function isLabelOffset(v: unknown): v is { dx: number; dy: number } {
+  const o = v as { dx?: unknown; dy?: unknown } | null;
+  return !!o && typeof o === 'object' && Number.isFinite(o.dx) && Number.isFinite(o.dy);
+}
+/** Stored cut-out holes: lists of 3+ finite points. */
+function cleanHoles(v: unknown): { x: number; y: number }[][] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  const out = v
+    .filter((h): h is unknown[] => Array.isArray(h))
+    .map((h) =>
+      h
+        .map((p) => p as { x?: unknown; y?: unknown })
+        .filter((p) => !!p && Number.isFinite(p.x) && Number.isFinite(p.y))
+        .map((p) => ({ x: p.x as number, y: p.y as number })),
+    )
+    .filter((h) => h.length >= 3);
+  return out.length > 0 ? out : undefined;
+}
 import { cleanLegendSetup } from './data/legend-setup';
 import { cleanLabelStyle, labelStyleOf } from '../../features/takeoff/lib/takeoff-fsftm-props';
 import { cleanTextStyle } from './data/text-box';
@@ -95,6 +115,8 @@ interface Measurement {
   lineStyle?: 'solid' | 'dashed' | 'dotted' | 'dashdot';
   lineStart?: LineEnding;
   lineEnd?: LineEnding;
+  labelOffset?: { dx: number; dy: number };
+  holes?: { x: number; y: number }[][];
   fillColor?: string;
   labelMode?: 'all' | 'value' | 'name' | 'none';
   /** FSFTM Properties toolbar (OE-DELIVERY 2026-11-02-fsftm-properties-bar):
@@ -457,6 +479,8 @@ function toApiFormat(
       // FSFTM-style properties (OE-DELIVERY 2026-11-02-fsftm-properties).
       line_style: m.lineStyle,
       line_start: m.lineStart,
+      label_offset: m.labelOffset,
+      holes: m.holes,
       line_end: m.lineEnd,
       fill_color: m.fillColor,
       label_mode: m.labelMode,
@@ -543,6 +567,8 @@ function syncSignature(m: Measurement): string {
     sa: m.strokeAlpha ?? null,
     ls: m.lineStyle ?? null,
     lnS: m.lineStart ?? null,
+    lo: m.labelOffset ? `${m.labelOffset.dx.toFixed(2)},${m.labelOffset.dy.toFixed(2)}` : null,
+    ho: m.holes && m.holes.length ? m.holes.map((h) => h.map((p) => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' ')).join('|') : null,
     lnE: m.lineEnd ?? null,
     fc: m.fillColor ?? null,
     lm: m.labelMode ?? null,
@@ -648,6 +674,8 @@ function toApiUpdate(
     // FSFTM-style properties (OE-DELIVERY 2026-11-02-fsftm-properties); NULL clears.
     line_style: m.lineStyle ?? null,
     line_start: m.lineStart ?? null,
+    label_offset: m.labelOffset ?? null,
+    holes: m.holes && m.holes.length ? m.holes : null,
     line_end: m.lineEnd ?? null,
     fill_color: m.fillColor ?? null,
     label_mode: m.labelMode ?? null,
@@ -783,6 +811,8 @@ function fromApiFormat(r: MeasurementResponse): Measurement {
     strokeAlpha: (meta.stroke_alpha as number) ?? undefined,
     lineStyle: isLineStyle(meta.line_style) ? meta.line_style : undefined,
     lineStart: isLineEnding(meta.line_start) ? meta.line_start : undefined,
+    labelOffset: isLabelOffset(meta.label_offset) ? meta.label_offset : undefined,
+    holes: cleanHoles(meta.holes),
     lineEnd: isLineEnding(meta.line_end) ? meta.line_end : undefined,
     fillColor: typeof meta.fill_color === 'string' ? meta.fill_color : undefined,
     labelMode: isLabelMode(meta.label_mode) ? meta.label_mode : undefined,

@@ -5,6 +5,9 @@ import { useTranslation } from 'react-i18next';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import clsx from 'clsx';
+import { getShared } from '@/modules/pdf-takeoff/data/shared-state';
+import { WS_API_KEY, type TabDragPayload, type WorkspaceApi } from '@/modules/pdf-takeoff/data/workspace';
+import { ViewerWorkspace } from './components/ViewerWorkspace';
 import {
   FileSearch,
   Upload,
@@ -1330,6 +1333,64 @@ export function TakeoffPage() {
   useEffect(() => {
     if (viewerDoc && !viewerDoc.id.startsWith('temp-')) addOpenDoc(viewerDoc);
   }, [viewerDoc, addOpenDoc]);
+  const MAX_ALIVE_VIEWERS = 4;
+  /** Drawings whose viewer stays mounted, in mount order (stable, so a
+   *  switch never moves DOM nodes); the least recently shown one is dropped
+   *  past MAX_ALIVE_VIEWERS. */
+  const [aliveDocs, setAliveDocs] = useState<OpenDoc[]>([]);
+  const aliveLruRef = useRef<string[]>([]);
+  useEffect(() => {
+    if (!viewerDoc) return;
+    aliveLruRef.current = [...aliveLruRef.current.filter((id) => id !== viewerDoc.id), viewerDoc.id];
+    setAliveDocs((prev) => {
+      let next = prev.some((d) => d.id === viewerDoc.id)
+        ? prev.map((d) => (d.id === viewerDoc.id ? viewerDoc : d))
+        : [...prev, viewerDoc];
+      while (next.length > MAX_ALIVE_VIEWERS) {
+        const drop = aliveLruRef.current.find((id) => id !== viewerDoc.id && next.some((d) => d.id === id));
+        if (!drop) break;
+        aliveLruRef.current = aliveLruRef.current.filter((id) => id !== drop);
+        next = next.filter((d) => d.id !== drop);
+      }
+      return next;
+    });
+  }, [viewerDoc]);
+  // A closed tab's viewer goes away (its teardown saves the drawing).
+  useEffect(() => {
+    setAliveDocs((prev) => {
+      const next = prev.filter((d) => d.id === viewerDocIdRef.current || openDocs.some((o) => o.id === d.id));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [openDocs]);
+  /** Drawings whose viewer has finished loading. Until the newly opened one
+   *  is ready, the drawing that was on screen stays visible (no blank or
+   *  flashing screen while the new file loads). */
+  const [readyViewerIds, setReadyViewerIds] = useState<Set<string>>(() => new Set());
+  const markViewerReady = useCallback((id: string) => {
+    setReadyViewerIds((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
+  }, []);
+  const lastShownViewerRef = useRef<string | null>(null);
+  const aliveViewerDocs = viewerDoc
+    ? aliveDocs.some((d) => d.id === viewerDoc.id)
+      ? aliveDocs
+      : [...aliveDocs, viewerDoc]
+    : [];
+  // The drawing on screen: the requested one once it has loaded, until then
+  // the one that was showing.
+  const wantViewerId = viewerDoc?.id ?? null;
+  const prevShownViewerId = lastShownViewerRef.current;
+  const shownViewerId =
+    wantViewerId &&
+    !readyViewerIds.has(wantViewerId) &&
+    prevShownViewerId &&
+    prevShownViewerId !== wantViewerId &&
+    aliveViewerDocs.some((d) => d.id === prevShownViewerId)
+      ? prevShownViewerId
+      : wantViewerId;
+  if (shownViewerId === wantViewerId) lastShownViewerRef.current = wantViewerId;
+  const openingViewerDoc = shownViewerId !== wantViewerId ? aliveViewerDocs.find((d) => d.id === wantViewerId) : undefined;
+  /** Loading progress per drawing, for the "Opening …" chip. */
+  const [viewerLoadPct, setViewerLoadPct] = useState<Record<string, number | null>>({});
   const switchToTab = (d: OpenDoc) => {
     setActiveDocId(d.id);
     setViewerDoc(d);
@@ -2328,6 +2389,100 @@ export function TakeoffPage() {
 
   /* ── Render ─────────────────────────────────────────────────────────── */
 
+  /* FSFTM keep-alive viewers (OE-DELIVERY 2026-11-26-fsftm-pdf): every
+   * drawing opened in a tab keeps its own viewer mounted in the background
+   * (up to MAX_ALIVE_VIEWERS), so opening another drawing or switching tabs
+   * only changes which one is shown - nothing reloads, nothing blinks, and
+   * each drawing keeps its page, zoom, markups and undo history. Each viewer
+   * still owns one document, so markups can never bleed between drawings
+   * (issue #281). */
+  const renderViewer = (
+    vd: { url: string; name: string; id: string } | null,
+    active: boolean,
+    pane: string | null = null,
+    mirror = false,
+    instanceKey?: string,
+  ) => (
+    <TakeoffViewerModule
+      // Key by the open document id so switching documents via the
+      // filmstrip REMOUNTS the viewer (issue #281). Without this the
+      // component instance is reused and the previous document's
+      // in-memory measurements bleed onto the newly opened one. The
+      // unmount runs the persistence hook's teardown flush, so the
+      // document being left is saved before the new one loads.
+      key={instanceKey ?? vd?.id ?? 'no-doc'}
+      hidden={!active}
+      compact={!!pane}
+      mirror={mirror}
+      instanceKey={instanceKey}
+      onTabDrop={pane ? (tp: TabDragPayload) => getShared<WorkspaceApi>(WS_API_KEY)?.dropTabOnPane(tp, pane) : undefined}
+      onLoadProgress={vd ? (pct: number | null) => setViewerLoadPct((prev) => (prev[vd.id] === pct ? prev : { ...prev, [vd.id]: pct })) : undefined}
+      onDocumentReady={vd && !mirror ? () => markViewerReady(vd.id) : undefined}
+      initialPdfUrl={vd?.url}
+      initialPdfName={vd?.name}
+      initialDocumentId={vd?.id}
+      initialMeasurementId={active ? initialMeasurementId : null}
+      // Scoped to the document deep-linked at mount only - the
+      // viewer remounts (new `key`) on document switch, so an
+      // unscoped page would otherwise leak onto the next
+      // document opened in this session (issue #386).
+      initialPage={
+        vd && vd.id === deepLinkedDocIdRef.current && initialPage
+          ? initialPage
+          : vd
+            ? storedPageFor(vd.id)
+            : undefined
+      }
+      onPageChange={active && !pane ? handleViewerPageChange : undefined}
+      recentDocuments={serverDocuments}
+      onOpenRecentDocument={handleOpenDocInViewer}
+      openDocuments={openDocs.map((d) => ({ id: d.id, name: d.name }))}
+      onSwitchDocument={(id) => {
+        const d = openDocs.find((x) => x.id === id);
+        if (d) switchToTab(d);
+        else handleOpenDocInViewer(id);
+      }}
+      onCloseDocumentTab={closeTab}
+      onUploadFiles={(files) => handleFilesSelected(files.filter((f) => f.size <= MAX_FILE_SIZE_BYTES))}
+      onOpenUploadedDocument={(d) => {
+        // A page tool saved an edited copy (update 15): list it and open it.
+        void refetchServerDocuments();
+        setActiveDocId(d.id);
+        setViewerDoc({ url: `/api/v1/takeoff/documents/${d.id}/download/`, name: d.filename, id: d.id });
+        setSearchParams(
+          (prev) => {
+            const next = new URLSearchParams(prev);
+            next.set('doc', d.id);
+            next.set('tab', 'measurements');
+            next.delete('page');
+            next.delete('name');
+            return next;
+          },
+          { replace: true },
+        );
+      }}
+      onCloseDocument={() => {
+        // Close PDF (update 15): close its tab; another open tab takes over.
+        if (viewerDoc) {
+          closeTab(viewerDoc.id);
+          return;
+        }
+        setViewerDoc(null);
+        setActiveDocId(null);
+        setSearchParams(
+          (prev) => {
+            const next = new URLSearchParams(prev);
+            next.delete('doc');
+            next.delete('page');
+            next.delete('name');
+            return next;
+          },
+          { replace: true },
+        );
+      }}
+    />
+  );
+
   return (
     <div
       className={clsx(
@@ -2814,77 +2969,17 @@ export function TakeoffPage() {
                   </div>
                 }
               >
-                <TakeoffViewerModule
-                  // Key by the open document id so switching documents via the
-                  // filmstrip REMOUNTS the viewer (issue #281). Without this the
-                  // component instance is reused and the previous document's
-                  // in-memory measurements bleed onto the newly opened one. The
-                  // unmount runs the persistence hook's teardown flush, so the
-                  // document being left is saved before the new one loads.
-                  key={viewerDoc?.id ?? 'no-doc'}
-                  initialPdfUrl={viewerDoc?.url}
-                  initialPdfName={viewerDoc?.name}
-                  initialDocumentId={viewerDoc?.id}
-                  initialMeasurementId={initialMeasurementId}
-                  // Scoped to the document deep-linked at mount only - the
-                  // viewer remounts (new `key`) on document switch, so an
-                  // unscoped page would otherwise leak onto the next
-                  // document opened in this session (issue #386).
-                  initialPage={
-                    viewerDoc && viewerDoc.id === deepLinkedDocIdRef.current && initialPage
-                      ? initialPage
-                      : viewerDoc
-                        ? storedPageFor(viewerDoc.id)
-                        : undefined
-                  }
-                  onPageChange={handleViewerPageChange}
-                  recentDocuments={serverDocuments}
-                  onOpenRecentDocument={handleOpenDocInViewer}
-                  openDocuments={openDocs.map((d) => ({ id: d.id, name: d.name }))}
-                  onSwitchDocument={(id) => {
-                    const d = openDocs.find((x) => x.id === id);
-                    if (d) switchToTab(d);
-                    else handleOpenDocInViewer(id);
-                  }}
-                  onCloseDocumentTab={closeTab}
-                  onUploadFiles={(files) => handleFilesSelected(files.filter((f) => f.size <= MAX_FILE_SIZE_BYTES))}
-                  onOpenUploadedDocument={(d) => {
-                    // A page tool saved an edited copy (update 15): list it and open it.
-                    void refetchServerDocuments();
-                    setActiveDocId(d.id);
-                    setViewerDoc({ url: `/api/v1/takeoff/documents/${d.id}/download/`, name: d.filename, id: d.id });
-                    setSearchParams(
-                      (prev) => {
-                        const next = new URLSearchParams(prev);
-                        next.set('doc', d.id);
-                        next.set('tab', 'measurements');
-                        next.delete('page');
-                        next.delete('name');
-                        return next;
-                      },
-                      { replace: true },
-                    );
-                  }}
-                  onCloseDocument={() => {
-                    // Close PDF (update 15): close its tab; another open tab takes over.
-                    if (viewerDoc) {
-                      closeTab(viewerDoc.id);
-                      return;
-                    }
-                    setViewerDoc(null);
-                    setActiveDocId(null);
-                    setSearchParams(
-                      (prev) => {
-                        const next = new URLSearchParams(prev);
-                        next.delete('doc');
-                        next.delete('page');
-                        next.delete('name');
-                        return next;
-                      },
-                      { replace: true },
-                    );
-                  }}
-                />
+                {aliveViewerDocs.length === 0 ? (
+                  renderViewer(null, true)
+                ) : (
+                  <ViewerWorkspace
+                    docs={aliveViewerDocs}
+                    shownId={shownViewerId}
+                    opening={openingViewerDoc}
+                    openingPct={openingViewerDoc ? viewerLoadPct[openingViewerDoc.id] ?? null : null}
+                    renderViewer={(doc, visible, pane, mirror, key) => renderViewer(doc, visible, pane, mirror, key)}
+                  />
+                )}
               </Suspense>
               </>
             )}

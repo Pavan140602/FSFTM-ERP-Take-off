@@ -549,5 +549,3 @@ __pycache__/
 frontend/dist/*
 !frontend/dist/.placeholder
 frontend/stats.html
-# build-frontend.bat builds here first and swaps it into dist/ only on success.
-frontend/dist-new/

@@ -297,9 +297,12 @@ import {
 } from './data/sketch-to-scale';
 import {
   hitTest,
+  measurementTouchesBox,
   insertVertexAt,
   deleteVertexAt,
   translatePoints,
+  carryHoles,
+  hitHoleVertex,
   recomputeMeasurement,
   supportsVariableVertices,
   minVertices,
@@ -483,6 +486,65 @@ interface SplitSyncApi {
  *  OE-DELIVERY 2026-11-26-fsftm-pdf). Scale is set from Document > Set Scale.
  *  Flip to true to bring both back. */
 const SHOW_PAGE_INFO_BANNERS = false as boolean;
+
+/**
+ * Hide the app's own embedded markup layer ("OE Markups", written into PDFs
+ * saved from this viewer) BEFORE the document is shown, so the first paint is
+ * already final. Doing it after the first paint cleared every cached page and
+ * thumbnail and re-rendered the whole drawing - the "reloads once after it
+ * opened" effect (OE-DELIVERY 2026-11-26-fsftm-pdf). Safe to call on any doc.
+ */
+async function hideEmbeddedMarkupLayer(doc: PDFDocumentProxy): Promise<void> {
+  const docAny = doc as unknown as {
+    getPage: (n: number) => Promise<unknown>;
+    getOptionalContentConfig: () => Promise<{ setVisibility: (id: string, v: boolean) => void; [Symbol.iterator](): Iterator<[string, { name?: string }]> }>;
+    __oeNoAnn?: boolean;
+  };
+  if (docAny.__oeNoAnn) return;
+  docAny.__oeNoAnn = true;
+  try {
+    const cfg = await docAny.getOptionalContentConfig();
+    let found = false;
+    for (const [id, g] of cfg as unknown as Iterable<[string, { name?: string }]>) {
+      if (g?.name === pdfPages.OE_LAYER) { cfg.setVisibility(id, false); found = true; }
+    }
+    if (!found) return;
+    const og = docAny.getPage.bind(doc);
+    docAny.getPage = async (n: number) => {
+      const pg = (await og(n)) as { render: (p: Record<string, unknown>) => unknown; __oeNoAnn?: boolean };
+      if (!pg.__oeNoAnn) {
+        pg.__oeNoAnn = true;
+        const r = pg.render.bind(pg);
+        pg.render = (prm: Record<string, unknown>) => r({ ...prm, optionalContentConfigPromise: Promise.resolve(cfg) });
+      }
+      return pg;
+    };
+  } catch {
+    /* no layers: nothing to hide */
+  }
+}
+
+/** Shapes that get the "+" add-point handles on their edges: closed shapes
+ *  (area tool and friends). Lines and polylines do not show them; extend a
+ *  line with Resume markup instead (user request, OE-DELIVERY 2026-11-26-fsftm-pdf). */
+import { createPortal } from 'react-dom';
+import { retainPdf, releasePdf as releasePooledPdf } from './data/pdf-doc-pool';
+import { useSharedState, getShared, setShared, clearShared } from './data/shared-state';
+import { useSmoothProgress } from './data/smooth-progress';
+import { canSplit, layoutRects, leaf, leaves, removeLeaf, resizeAt, splitLeaf, nodeAt, type LayoutNode, type SplitDir } from './data/split-layout';
+import {
+  TAB_DND_MIME,
+  readTabDrag,
+  hasTabDrag,
+  PANE_HOSTING_KEY,
+  PANE_SLOTS_KEY,
+  WS_API_KEY,
+  type TabDragPayload,
+  type PaneHosting,
+  type WorkspaceApi,
+} from './data/workspace';
+
+const ADD_POINT_TYPES = new Set(['area', 'volume', 'perimeter', 'polygon', 'cloud', 'cloudPlus', 'polygonCutout']);
 
 /** Stable empty list: a compared revision shows no markups of this drawing. */
 const NO_MEASUREMENTS: never[] = [];
@@ -769,6 +831,9 @@ interface Measurement {
   area?: number; // Area in real units, only for volume type
   /** For cutouts: the ID of the parent area/volume measurement this cutout subtracts from. */
   cutoutOf?: string;
+  /** Cut-out holes (OE-DELIVERY 2026-11-26-fsftm-pdf): part of the area, so
+   *  they move with it and the value is the net area. */
+  holes?: Point[][];
   text?: string; // Text content for text annotations
   /** FSFTM-style text box style: font, size, B/I/U/S, alignment, colours,
    *  border, opacity (OE-DELIVERY 2026-11-07-text-box). Undefined = the
@@ -796,6 +861,8 @@ interface Measurement {
    *  line pattern, a fill colour independent of the line colour, and which
    *  label parts show on the drawing. Undefined = previous behaviour. */
   lineStyle?: 'solid' | 'dashed' | 'dotted' | 'dashdot';
+  /** Label moved away from its default spot, in PDF units (OE-DELIVERY 2026-11-26-fsftm-pdf). */
+  labelOffset?: { dx: number; dy: number };
   /** FSFTM Start / End line endings (OE-DELIVERY 2026-11-25-fsftm-pdf). */
   lineStart?: LineEnding;
   lineEnd?: LineEnding;
@@ -1624,6 +1691,25 @@ interface TakeoffViewerModuleProps {
    *  list lands (used by the /markups → /takeoff deep-link). Matches either
    *  the frontend id or the server-side UUID. */
   initialMeasurementId?: string | null;
+  /** This viewer is kept alive behind the visible one (another drawing's tab
+   *  is showing): it ignores the keyboard and draws no split panes
+   *  (OE-DELIVERY 2026-11-26-fsftm-pdf). */
+  hidden?: boolean;
+  /** The drawing from ``initialPdfUrl`` finished loading (or failed). */
+  onDocumentReady?: () => void;
+  /** Loading progress of ``initialPdfUrl`` in percent (null = unknown / done). */
+  onLoadProgress?: (pct: number | null) => void;
+  /** Shown inside a split pane: the full editor (canvas, tools, properties,
+   *  page bar) without the window chrome (menus, side panels, tabs). */
+  compact?: boolean;
+  /** A document tab dropped on this viewer (compact panes forward it). */
+  onTabDrop?: (t: TabDragPayload) => void;
+  /** A second editor of a drawing already open elsewhere (same drawing in
+   *  two panes): it shares that drawing's markups and scales live and leaves
+   *  the saving to the first editor (OE-DELIVERY 2026-11-26-fsftm-pdf). */
+  mirror?: boolean;
+  /** Which editor this is, for keyboard focus (defaults to the drawing id). */
+  instanceKey?: string;
   /** Optional 1-based page to restore once a server-loaded document finishes
    *  loading (issue #386 - reopening a document should land on the page it
    *  was left on, not always page 1). Clamped to the loaded document's page
@@ -1742,6 +1828,80 @@ function downscaleCanvas(src: HTMLCanvasElement, targetW: number): HTMLCanvasEle
   return out;
 }
 
+/** FSFTM: "Swap" with a different drawing in the split pane switches the main
+ *  document, which remounts the viewer. The views of both sides are parked
+ *  here and picked up by the new viewer, so each drawing lands on the other
+ *  side exactly as it was (page, zoom, centre) (OE-DELIVERY 2026-11-26-fsftm-pdf). */
+type ViewSnap = { page: number; zoom: number; fx?: number; fy?: number };
+let splitSwapHandoff: null | {
+  mainDocId: string;
+  main: ViewSnap;
+  split?: ViewSnap;
+} = null;
+
+/** A drawing open in a split pane (the loaded document is shared, see pdf-doc-pool). */
+type PaneDoc = { id: string; name: string; doc: PDFDocumentProxy };
+/** An event from a split pane's own editor that sits INSIDE this element's
+ *  DOM (React also delivers it here); the inner editor handles it. */
+function fromNestedEditor(e: { target: EventTarget | null; currentTarget: EventTarget | null }): boolean {
+  const t = e.target as Element | null;
+  const cur = e.currentTarget as Element | null;
+  const inner = t?.closest?.('[data-viewer-root]');
+  if (!inner || !cur) return false;
+  const own = cur.closest?.('[data-viewer-root]');
+  return inner !== own && cur.contains(inner);
+}
+
+/** Hand glyph (lucide "hand") drawn on a label's move badge. */
+const HAND_GLYPH: Path2D[] = typeof Path2D === 'undefined'
+  ? []
+  : [
+      'M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2',
+      'M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2',
+      'M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8',
+      'M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15',
+    ].map((d) => new Path2D(d));
+/** Panes 3 and 4 of the split workspace (pane 2 is the original split pane). */
+type ExtraPane = { key: string; tabs: PaneDoc[]; activeId: string | null; page: number; zoom: number; choosing?: boolean };
+/** Page / zoom / centre per pane tab, kept for the whole workspace. */
+const splitViewMem = new Map<string, ViewSnap>();
+/** Mounted viewers; the shared split workspace is reset when the last goes. */
+let liveViewers = 0;
+/** Editors per drawing (owner + mirrors sharing its markups). */
+const docEditors = new Map<string, number>();
+
+
+/** Drawings opened in the main pane stay loaded for a while, so switching
+ *  back to one (tabs, swap) shows it at once instead of downloading and
+ *  parsing it again (OE-DELIVERY 2026-11-26-fsftm-pdf). */
+const MAIN_PDF_CACHE_MAX = 4;
+const mainPdfCache = new Map<string, PDFDocumentProxy>();
+/** A drawing already loaded somewhere (quick-switch cache or a split pane). */
+function findLoadedPdf(id: string): PDFDocumentProxy | undefined {
+  const cached = mainPdfCache.get(id);
+  if (cached) return cached;
+  for (const x of getShared<PaneDoc[]>('split.tabs') ?? []) if (x.id === id) return x.doc;
+  for (const xp of getShared<ExtraPane[]>('split.extra') ?? []) for (const x of xp.tabs) if (x.id === id) return x.doc;
+  return undefined;
+}
+function cacheMainPdf(id: string, doc: PDFDocumentProxy) {
+  const had = mainPdfCache.get(id);
+  if (had === doc) {
+    mainPdfCache.delete(id);
+    mainPdfCache.set(id, doc);
+    return;
+  }
+  retainPdf(doc);
+  mainPdfCache.delete(id);
+  mainPdfCache.set(id, doc);
+  releasePooledPdf(had); // freed once nothing else shows it
+  while (mainPdfCache.size > MAIN_PDF_CACHE_MAX) {
+    const [oldId, oldDoc] = mainPdfCache.entries().next().value as [string, PDFDocumentProxy];
+    mainPdfCache.delete(oldId);
+    releasePooledPdf(oldDoc);
+  }
+}
+
 function SplitPane({
   pdfDoc,
   page,
@@ -1760,9 +1920,17 @@ function SplitPane({
   docValue = 'self',
   docOptions,
   onPickDoc,
+  tabs = [],
+  onCloseTab,
   docLoading = false,
   selfName,
   syncApiRef,
+  onDropTab,
+  paneKey = 'p2',
+  onAddPane,
+  slot = false,
+  measurementsKey,
+  chooser,
 }: {
   pdfDoc: PDFDocumentProxy;
   page: number;
@@ -1787,13 +1955,59 @@ function SplitPane({
   docValue?: string;
   docOptions?: { id: string; name: string }[];
   onPickDoc?: (id: string) => void;
+  /** Documents open in this pane as tabs (besides the open drawing). */
+  tabs?: { id: string; name: string }[];
+  onCloseTab?: (id: string) => void;
   docLoading?: boolean;
   /** Name of the open drawing, for the "same drawing" choice. */
   selfName?: string;
   /** Exact view sync (OE-DELIVERY 2026-11-25-fsftm-pdf): read / set the point of
    *  the sheet at the centre of this pane, as fractions of the sheet. */
   syncApiRef?: React.MutableRefObject<SplitSyncApi | null>;
+  /** A document tab dragged here from the main pane or another pane. */
+  onDropTab?: (t: TabDragPayload) => void;
+  /** Which pane this is ('p2', 'p3', 'p4'), for tab drags between panes. */
+  paneKey?: string;
+  /** Add another pane to the workspace (shown while fewer than 4). */
+  onAddPane?: () => void;
+  /** The shown drawing is a full editor placed here (its own viewer) - this
+   *  pane only keeps its tab bar (OE-DELIVERY 2026-11-26-fsftm-pdf). */
+  slot?: boolean;
+  /** Read the markups live from the viewer that edits this drawing. */
+  measurementsKey?: string;
+  /** A new pane: ask which drawing to show in it. */
+  chooser?: boolean;
 }) {
+  const [liveMeasurements] = useSharedState<Measurement[] | null>(measurementsKey ?? '__no_live_markups', null);
+  if (measurementsKey && liveMeasurements) measurements = liveMeasurements.filter((m) => m.page === page);
+  const slotElRef = useRef<HTMLDivElement | null>(null);
+  /** A narrow pane keeps its tab names readable: buttons go icon-only. */
+  const paneRootRef = useRef<HTMLDivElement | null>(null);
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const el = paneRootRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setNarrow(el.clientWidth < 520));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const slotRefCb = useCallback(
+    (el: HTMLDivElement | null) => {
+      if (el) {
+        slotElRef.current = el;
+        setShared<Record<string, HTMLElement>>(PANE_SLOTS_KEY, (prev) => ({ ...(prev ?? {}), [paneKey]: el }));
+      } else if (getShared<Record<string, HTMLElement>>(PANE_SLOTS_KEY)?.[paneKey] === slotElRef.current) {
+        setShared<Record<string, HTMLElement>>(PANE_SLOTS_KEY, (prev) => {
+          const next = { ...(prev ?? {}) };
+          delete next[paneKey];
+          return next;
+        });
+        slotElRef.current = null;
+      }
+    },
+    [paneKey],
+  );
+  const [tabDropOver, setTabDropOver] = useState(false);
   /* FSFTM-style split pane (OE-DELIVERY 2026-11-02-fsftm-zoom-anchor):
    * the wheel zooms at the cursor, the point under the cursor stays put
    * (scroll first, then the sheet itself shifts for whatever the scrollbars
@@ -2140,15 +2354,42 @@ function SplitPane({
         active ? 'shadow-[inset_0_2px_0_0_rgb(var(--oe-blue-ch))]' : '',
       )}
       tabIndex={0}
-      onKeyDown={onKeyDown}
+      onKeyDown={(e) => {
+        if (fromNestedEditor(e)) return;
+        onKeyDown(e);
+      }}
       onMouseDown={(e) => {
         onActivate?.();
+        if (fromNestedEditor(e)) return;
         const tgt = e.target as HTMLElement;
         if (tgt.tagName !== 'INPUT' && tgt.tagName !== 'BUTTON') (e.currentTarget as HTMLElement).focus({ preventScroll: true });
       }}
+      ref={paneRootRef}
       data-testid="split-pane"
       data-active={active ? 'true' : undefined}
+      onDragOver={(e) => {
+        if (fromNestedEditor(e) || !onDropTab || !hasTabDrag(e)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        if (!tabDropOver) setTabDropOver(true);
+      }}
+      onDragLeave={(e) => {
+        if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node | null)) setTabDropOver(false);
+      }}
+      onDrop={(e) => {
+        setTabDropOver(false);
+        if (fromNestedEditor(e)) return;
+        const t = onDropTab ? readTabDrag(e) : null;
+        if (!t || (t.from === 'split' && t.pane === paneKey)) return;
+        e.preventDefault();
+        onDropTab?.(t);
+      }}
     >
+      {tabDropOver && (
+        <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center border-2 border-dashed border-oe-blue bg-oe-blue/10 text-sm font-semibold text-oe-blue">
+          Drop to open in this pane
+        </div>
+      )}
       {/* Pane toolbar: floats over the sheet (top-right) so this pane's
           viewing area matches the main pane exactly (no strip pushing the
           sheet down; sync stays exact). OE-DELIVERY 2026-11-25-fsftm-pdf. */}
@@ -2157,22 +2398,65 @@ function SplitPane({
         data-testid="split-toolbar"
       >
         {onPickDoc && (
-          <select
-            value={docValue}
-            onChange={(e) => onPickDoc(e.target.value)}
-            onKeyDown={(e) => e.stopPropagation()}
-            className="h-full max-w-[300px] min-w-0 cursor-pointer truncate border-0 border-r border-black/20 bg-[#d9d9d9] pl-3 pr-6 text-[12px] text-content-primary focus:outline-none dark:border-white/10 dark:bg-[#3a3a3a] dark:text-white"
-            title="Document shown in this pane - pick another drawing (e.g. the old revision) to compare"
-            data-testid="split-doc-select"
-          >
-            <option value="self">{selfName ?? 'This drawing'}</option>
-            {(docOptions ?? []).map((d) => (
-              <option key={d.id} value={d.id}>{d.name}</option>
-            ))}
-            <option value="__file">Open a PDF from this computer…</option>
-          </select>
+          <div className={clsx('flex h-full min-w-[110px] flex-1 items-stretch overflow-x-auto transition-opacity', !active && 'opacity-75')} role="tablist" aria-label="Documents in the split pane" data-testid="split-tabs">
+            {/* The "follows the main drawing" tab only shows while it is the
+                pane's view; panes otherwise keep their own drawings. */}
+            {[...(docValue === 'self' || tabs.length === 0 ? [{ id: 'self', name: selfName ?? 'This drawing' }] : []), ...tabs].map((tb) => {
+              const on = tb.id === docValue;
+              return (
+                <div
+                  key={tb.id}
+                  role="tab"
+                  aria-selected={on}
+                  className={clsx(
+                    'group flex max-w-[220px] shrink-0 items-center gap-1 border-r border-black/20 pl-3 pr-1 text-[12px] dark:border-white/10',
+                    on ? 'bg-[#d9d9d9] text-content-primary dark:bg-[#3a3a3a] dark:text-white' : 'text-content-secondary hover:bg-black/5 dark:text-neutral-400 dark:hover:bg-white/5',
+                  )}
+                  title={tb.id === 'self' ? tb.name : `${tb.name} - drag to the other pane to move it there`}
+                  data-testid="split-tab"
+                  draggable={tb.id !== 'self'}
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData(TAB_DND_MIME, JSON.stringify({ from: 'split', id: tb.id, name: tb.name, pane: paneKey } satisfies TabDragPayload));
+                    e.dataTransfer.effectAllowed = 'move';
+                  }}
+                >
+                  <button type="button" className="min-w-0 truncate text-left" onClick={() => { if (!on) onPickDoc(tb.id); }}>
+                    {tb.name}
+                  </button>
+                  {tb.id !== 'self' && onCloseTab && (
+                    <button
+                      type="button"
+                      onClick={() => onCloseTab(tb.id)}
+                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-content-secondary hover:bg-red-600 hover:text-white"
+                      aria-label={`Close ${tb.name}`}
+                      data-testid="split-tab-close"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+            <select
+              value=""
+              onChange={(e) => { if (e.target.value) onPickDoc(e.target.value); e.target.value = ''; }}
+              onKeyDown={(e) => e.stopPropagation()}
+              className="h-full w-8 shrink-0 cursor-pointer appearance-none border-0 bg-transparent text-center text-[14px] text-content-secondary hover:bg-black/5 focus:outline-none dark:hover:bg-white/10"
+              title="Open another drawing in this pane"
+              aria-label="Open another drawing in this pane"
+              data-testid="split-doc-select"
+            >
+              <option value="">+</option>
+              {(docOptions ?? []).filter((d) => !tabs.some((tb) => tb.id === d.id)).map((d) => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+              <option value="__file">Open a PDF from this computer…</option>
+            </select>
+          </div>
         )}
         {docLoading && <Loader2 size={12} className="animate-spin text-content-tertiary" />}
+        {!slot && (
+          <>
         <span className="ml-1 text-[10px] tabular-nums text-content-tertiary" title="Page shown in this pane - use the page bar below while this pane is active">p.{page}</span>
         <span className="flex-1" />
         <span className="mx-1 h-4 w-px bg-border" />
@@ -2204,6 +2488,21 @@ function SplitPane({
         >
           <Maximize2 size={14} />
         </button>
+          </>
+        )}
+        {slot && <span className="flex-1" />}
+        {onAddPane && (
+          <button
+            type="button"
+            onClick={onAddPane}
+            className="ml-1 flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-semibold text-oe-blue hover:bg-oe-blue/10"
+            title="Add another pane (up to 4) to open one more drawing side by side"
+            data-testid="split-add-pane"
+          >
+            <Columns2 size={12} />
+            {!narrow && '+ Pane'}
+          </button>
+        )}
         {onSwap && (
           <button
             type="button"
@@ -2213,7 +2512,7 @@ function SplitPane({
             data-testid="split-swap"
           >
             <ArrowLeftRight size={12} />
-            Swap
+            {!narrow && 'Swap'}
           </button>
         )}
         <button
@@ -2228,9 +2527,35 @@ function SplitPane({
       </div>
       {/* Pane canvas: wheel = zoom at the cursor, left/middle drag = pan,
           double-click = fit width (OE-DELIVERY 2026-11-02-fsftm-zoom-anchor). */}
+      {chooser && onPickDoc && (
+        <div className="absolute inset-x-0 bottom-0 top-7 z-20 flex flex-col items-center justify-center gap-2 bg-surface-secondary/95 p-4" data-testid="split-chooser">
+          <div className="text-sm font-semibold text-content-primary">Open a drawing in this pane</div>
+          <div className="flex max-h-[60%] w-full max-w-xs flex-col gap-1 overflow-y-auto">
+            <button type="button" onClick={() => onPickDoc('self')} className="truncate rounded border border-border bg-surface-primary px-2 py-1.5 text-left text-xs hover:border-oe-blue hover:text-oe-blue">
+              Same drawing{selfName ? ` (${selfName})` : ''}
+            </button>
+            {(docOptions ?? []).map((d) => (
+              <button key={d.id} type="button" onClick={() => onPickDoc(d.id)} className="truncate rounded border border-border bg-surface-primary px-2 py-1.5 text-left text-xs hover:border-oe-blue hover:text-oe-blue" title={d.name}>
+                {d.name}
+              </button>
+            ))}
+            <button type="button" onClick={() => onPickDoc('__file')} className="rounded border border-dashed border-border px-2 py-1.5 text-left text-xs text-content-secondary hover:border-oe-blue hover:text-oe-blue">
+              From computer…
+            </button>
+          </div>
+          <div className="text-[11px] text-content-tertiary">or drag a tab here</div>
+        </div>
+      )}
+      {slot && (
+        <div
+          ref={slotRefCb}
+          className="relative flex min-h-0 min-w-0 flex-1 flex-col"
+          data-testid="split-slot"
+        />
+      )}
       <div
         ref={scrollRef}
-        className="relative flex min-h-0 flex-1 cursor-grab overflow-auto active:cursor-grabbing"
+        className={clsx('relative flex min-h-0 flex-1 cursor-grab overflow-auto active:cursor-grabbing', slot && '!hidden')}
         onMouseDown={(e) => {
           if (e.button === 0 || e.button === 1) {
             dragRef.current = { x: e.clientX, y: e.clientY };
@@ -2457,8 +2782,24 @@ export default function TakeoffViewerModule({
   onSwitchDocument,
   onCloseDocumentTab,
   onUploadFiles,
+  hidden = false,
+  onDocumentReady,
+  onLoadProgress,
+  compact = false,
+  onTabDrop,
+  mirror = false,
+  instanceKey,
 }: TakeoffViewerModuleProps = {}) {
   const { t, i18n } = useTranslation();
+  // Keyboard goes to ONE viewer: the visible one, and among the editors on
+  // screen (main + split panes) the one last clicked.
+  const [wsFocus] = useSharedState<string | null>('ws.focus', null);
+  const hiddenRef = useRef(hidden);
+  const hiddenPropRef = useRef(hidden);
+  hiddenPropRef.current = hidden;
+  /** Background / pane editors never show the split panes: they do not
+   *  follow split changes (no re-render per pane zoom step). */
+  const splitPaused = hidden || compact;
 
   // PDF state
   const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null);
@@ -2514,6 +2855,7 @@ export default function TakeoffViewerModule({
   const [isLoading, setIsLoading] = useState(false);
   /** Download progress % while a server PDF loads (range-request streaming). Null when idle. */
   const [loadProgress, setLoadProgress] = useState<number | null>(null);
+  const smoothLoad = useSmoothProgress(loadProgress);
 
   /* ── Page thumbnails sidebar ──────────────────────────────────────────
    * A left strip of small page previews for multi-page sets (click to jump,
@@ -2521,7 +2863,7 @@ export default function TakeoffViewerModule({
    * live in features/takeoff/lib/takeoff-thumbnails.ts; this state only drives
    * the strip. Thumbnails render into throwaway offscreen canvases (never the
    * live canvas/overlay) so they cannot disturb the main page render. */
-  const [showThumbnails, setShowThumbnails] = useState<boolean>(() => {
+  const [showThumbnails, setShowThumbnails] = useSharedState<boolean>('ui.showThumbnails', () => {
     try {
       return localStorage.getItem('takeoff.showThumbnails') !== 'false';
     } catch {
@@ -2533,7 +2875,7 @@ export default function TakeoffViewerModule({
   }, [showThumbnails]);
   /** Collapse the right Properties/Ledger sidebar for a near-full-viewport
    *  measuring mode, mirroring the Pages strip toggle (#315). Persisted. */
-  const [showSidebar, setShowSidebar] = useState<boolean>(() => {
+  const [showSidebar, setShowSidebar] = useSharedState<boolean>('ui.showSidebar', () => {
     try {
       return localStorage.getItem('takeoff.showSidebar') !== 'false';
     } catch {
@@ -2563,7 +2905,7 @@ export default function TakeoffViewerModule({
   /** The workspace covers the window only while a drawing is open; with no
    *  drawing the normal page (Current & recent drawings, upload) shows
    *  instead of a blank white window (OE-DELIVERY 2026-11-05-upload-progress). */
-  const workspaceOn = fsftmWorkspace && !!pdfDoc;
+  const workspaceOn = fsftmWorkspace && !!pdfDoc && !compact;
   /** Pin the workspace to the browser window. An ancestor of the viewer
    *  acts as the containing block for fixed elements (the page is offset a
    *  few pixels), so `inset: 0` alone leaves a strip of the ERP header
@@ -2596,9 +2938,9 @@ export default function TakeoffViewerModule({
       clear();
     };
   }, [workspaceOn, isTakeoffFullscreen, pdfDoc]);
-  const [leftStripWidth, setLeftStripWidth] = useState<number>(() =>
+  const [leftStripWidth, setLeftStripWidth] = useSharedState<number>('ui.leftStripWidth', () =>
     readPanelWidth(LEFT_STRIP_KEY, LEFT_STRIP_DEFAULT, LEFT_STRIP_MIN, leftStripMax()));
-  const [rightPanelWidth, setRightPanelWidth] = useState<number>(() =>
+  const [rightPanelWidth, setRightPanelWidth] = useSharedState<number>('ui.rightPanelWidth', () =>
     readPanelWidth(RIGHT_PANEL_KEY, RIGHT_PANEL_DEFAULT, RIGHT_PANEL_MIN, rightPanelMax()));
   /** Live mirrors so the pointer handlers always read fresh widths without
    *  re-subscribing (same pattern as showSidebarRef above). */
@@ -2767,10 +3109,10 @@ export default function TakeoffViewerModule({
 
 
   /* ── Bottom ledger bar: vertical resize, mirroring the side panels ─── */
-  const [showLedger, setShowLedger] = useState<boolean>(() => {
+  const [showLedger, setShowLedger] = useSharedState<boolean>('ui.showLedger', () => {
     try { return localStorage.getItem(LEDGER_SHOW_KEY) !== '0'; } catch { return true; }
   });
-  const [ledgerHeight, setLedgerHeight] = useState<number>(() =>
+  const [ledgerHeight, setLedgerHeight] = useSharedState<number>('ui.ledgerHeight', () =>
     readPanelWidth(LEDGER_HEIGHT_KEY, LEDGER_DEFAULT, LEDGER_MIN, ledgerMax()));
   useEffect(() => {
     try { localStorage.setItem(LEDGER_SHOW_KEY, showLedger ? '1' : '0'); } catch { /* ignore */ }
@@ -2982,6 +3324,7 @@ export default function TakeoffViewerModule({
   useEffect(() => {
     if (!pdfDoc) return;
     const onKey = (e: KeyboardEvent) => {
+      if (hiddenRef.current) return;
       if (e.key === 'F11') {
         e.preventDefault();
         toggleTakeoffFullscreen();
@@ -3010,29 +3353,61 @@ export default function TakeoffViewerModule({
   /* Split-screen view (FSFTM-style): a second independent read-only pane
    * showing the same PDF. 'vertical' = panes side by side, 'horizontal' =
    * panes stacked. The second pane has its own page + zoom. */
-  const [splitMode, setSplitMode] = useState<'off' | 'horizontal' | 'vertical'>('off');
+  const [sharedSplitMode, setSplitMode] = useSharedState<'off' | 'horizontal' | 'vertical'>('split.mode', 'off', hidden);
+  /** A pane's editor is never split itself: it lays out as one full pane. */
+  const splitMode = compact ? 'off' : sharedSplitMode;
   /** Share of the split area the MAIN pane takes (0.15-0.85), dragged on the
    *  divider and remembered (OE-DELIVERY 2026-11-25-fsftm-pdf). */
-  const [splitRatio, setSplitRatio] = useState<number>(() => {
+  const [splitRatio] = useSharedState<number>('split.ratio', () => {
     try {
       const v = Number(localStorage.getItem('takeoff.splitRatio'));
       return v >= 0.15 && v <= 0.85 ? v : 0.5;
     } catch { return 0.5; }
-  });
+  }, splitPaused);
   useEffect(() => {
     try { localStorage.setItem('takeoff.splitRatio', String(splitRatio)); } catch { /* ignore */ }
   }, [splitRatio]);
   const splitAreaRef = useRef<HTMLDivElement>(null);
   /** Which pane the keyboard drives while split is on. */
   const [splitActive, setSplitActive] = useState(false);
+  /** A split-pane tab is being dragged over the main pane. */
+  const [mainTabDropOver, setMainTabDropOver] = useState(false);
   const splitActiveRef = useRef(false);
   splitActiveRef.current = splitActive && splitMode !== 'off';
-  const [splitPage, setSplitPage] = useState(1);
-  const [splitZoom, setSplitZoom] = useState(1);
+  const [splitPage, setSplitPage] = useSharedState('split.page', 1, splitPaused);
+  const [splitZoom, setSplitZoom] = useSharedState('split.zoom', 1, splitPaused);
+  /** Panes 3 and 4 (OE-DELIVERY 2026-11-26-fsftm-pdf). */
+  const [extraPanes, setExtraPanes] = useSharedState<ExtraPane[]>('split.extra', [], splitPaused);
+  const extraPanesRef = useRef(extraPanes);
+  extraPanesRef.current = extraPanes;
+  const [activeExtraPane, setActiveExtraPane] = useState<string | null>(null);
+  /** Nested split layout: any pane splits again (OE-DELIVERY 2026-11-26-fsftm-pdf). */
+  const [splitTree, setSplitTree] = useSharedState<LayoutNode | null>('split.tree', null, hidden);
+  const splitTreeRef = useRef(splitTree);
+  splitTreeRef.current = splitTree;
+  const [splitError, setSplitError] = useState<string | null>(null);
 
   /** Toggle split mode; when opening, park the second pane on a different
    *  page than the main view so the two views start out distinct. */
   const toggleSplit = (mode: 'horizontal' | 'vertical') => {
+    const dir: SplitDir = mode === 'vertical' ? 'row' : 'col';
+    // A split pane's editor (or a background one) asks the main editor.
+    if (compact || hidden) {
+      getShared<WorkspaceApi>(WS_API_KEY)?.split?.(dir);
+      return;
+    }
+    if (sharedSplitMode !== 'off' && splitTreeRef.current) {
+      splitFocusedRef.current?.(dir);
+      return;
+    }
+    if (sharedSplitMode === 'off' && documentId && pdfDoc && !splitTabsRef.current.some((x) => x.id === documentId)) {
+      retainPdf(pdfDoc);
+      setSplitTabs((prev) => [...prev, { id: documentId, name: fileName ?? 'Drawing', doc: pdfDoc }]);
+      setSplitTabId(documentId);
+    } else if (sharedSplitMode === 'off' && documentId && splitTabsRef.current.some((x) => x.id === documentId)) {
+      setSplitTabId(documentId);
+    }
+    setSplitTree({ kind: 'split', dir, children: [leaf('main'), leaf('p2')], sizes: [0.5, 0.5] });
     setSplitMode((prev) => {
       if (prev === mode) return 'off';
       const total = totalPages || 1;
@@ -3217,8 +3592,11 @@ export default function TakeoffViewerModule({
   /** page number -> data-URL of a small rendered preview, lazily filled and
    *  LRU-capped (see capThumbCache) so a 300-page set never holds 300 bitmaps. */
   const [thumbs, setThumbs] = useState<Record<number, string>>({});
+  /** Pages being dragged in the thumbnail grid, and where they would land. */
+  const [thumbDrag, setThumbDrag] = useState<number[] | null>(null);
+  const [thumbDrop, setThumbDrop] = useState<{ page: number; side: 'before' | 'after' } | null>(null);
   /** FSFTM thumbnail grid cell width in px (slider under the grid), persisted. */
-  const [thumbSize, setThumbSize] = useState<number>(() => {
+  const [thumbSize, setThumbSize] = useSharedState<number>('ui.thumbSize', () => {
     try {
       const v = Number(localStorage.getItem('takeoff.thumbSize'));
       return v >= THUMB_SIZE_MIN && v <= THUMB_SIZE_MAX ? v : 120;
@@ -3292,6 +3670,7 @@ export default function TakeoffViewerModule({
   useEffect(() => {
     if (!detectPickMode) return;
     const onKey = (e: KeyboardEvent) => {
+      if (hiddenRef.current) return;
       if (e.key === 'Escape') {
         setDetectPickMode(false);
         window.dispatchEvent(new CustomEvent('oe-detect:pickmode', { detail: { on: false, fromViewer: true } }));
@@ -3442,7 +3821,12 @@ export default function TakeoffViewerModule({
     );
   };
 
-  const [measurements, setMeasurements] = useState<Measurement[]>([]);
+  /* Markups and page scales live in a per-drawing store, so a second editor
+   * of the same drawing (another split pane) draws into the SAME list and
+   * both show every change at once (OE-DELIVERY 2026-11-26-fsftm-pdf). A
+   * local drop without an id gets a key of its own. */
+  const shareKeyRef = useRef(initialDocumentId || `local-${Math.random().toString(36).slice(2)}`);
+  const [measurements, setMeasurements] = useSharedState<Measurement[]>(`doc.meas.${shareKeyRef.current}`, []);
   /** FSFTM "Resume markup" (OE-DELIVERY 2026-11-25-fsftm-pdf): id of the line
    *  being continued. While set, the polyline tool's finish updates that
    *  markup instead of creating a new one, and the original is not drawn. */
@@ -3498,7 +3882,24 @@ export default function TakeoffViewerModule({
   // is keyed by 1-indexed page with a single document default for pages that
   // have not been calibrated yet. ``scale`` below is the effective scale for
   // the *current* page; the rest of the module reads it unchanged.
-  const [pageScales, setPageScales] = useState<PageScales>(emptyPageScales);
+  const [pageScales, setPageScales] = useSharedState<PageScales>(`doc.scales.${shareKeyRef.current}`, emptyPageScales);
+  // The first editor of a drawing starts from a clean list (the saved copy
+  // then loads into it); a mirror joins whatever is there.
+  useEffect(() => {
+    const k = shareKeyRef.current;
+    const n = docEditors.get(k) ?? 0;
+    if (n === 0 && !mirror) {
+      setShared(`doc.meas.${k}`, []);
+      setShared(`doc.scales.${k}`, emptyPageScales());
+    }
+    docEditors.set(k, n + 1);
+    return () => {
+      const left = (docEditors.get(k) ?? 1) - 1;
+      if (left > 0) docEditors.set(k, left);
+      else docEditors.delete(k);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // While a shape is in progress, ``scale`` is the scale of the viewport its
   // first point sits in (FSFTM: a measurement belongs to the viewport it
   // starts in), so live readouts and the create paths read the right ratio
@@ -3562,6 +3963,7 @@ export default function TakeoffViewerModule({
   useEffect(() => {
     if (!cloudLeader) return;
     const onKey = (e: KeyboardEvent) => {
+      if (hiddenRef.current) return;
       if (e.key === 'Escape') {
         cloudLeaderRef.current = null;
         setCloudLeader(null);
@@ -3605,7 +4007,7 @@ export default function TakeoffViewerModule({
 
   // Sidebar right-panel tab: "Properties" (existing) or "Ledger" (new).
   // Persisted to localStorage so the choice survives reloads.
-  const [sidebarTab, setSidebarTab] = useState<'properties' | 'tools' | 'colours' | 'ai' | 'auto'>(() => {
+  const [sidebarTab, setSidebarTab] = useSharedState<'properties' | 'tools' | 'colours' | 'ai' | 'auto'>('ui.sidebarTab', () => {
     try {
       const saved = localStorage.getItem('takeoff.sidebarTab');
       return saved === 'tools' || saved === 'colours' || saved === 'auto' ? saved : 'properties';
@@ -3971,7 +4373,7 @@ export default function TakeoffViewerModule({
    * measurement intersecting it joins `selectedLedgerIds`. Shift+click
    * toggles a single measurement in/out of the set. The rect lives in PDF
    * coordinates; the overlay draw effect paints it. */
-  const marqueeRef = useRef<{ start: Point; current: Point } | null>(null);
+  const marqueeRef = useRef<{ start: Point; current: Point; additive?: boolean } | null>(null);
   const [marqueeRect, setMarqueeRect] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   /** Zoom-to-area (marquee zoom): when armed, dragging on the canvas draws a
    *  rectangle and zooms to fit it. The button lives in the bottom pager bar. */
@@ -4116,6 +4518,8 @@ export default function TakeoffViewerModule({
   /** Mirror of hoverInfo so the right-click context-menu handler can read the
    *  measurement under the cursor without adding hoverInfo to its deps. */
   const hoverInfoRef = useRef(hoverInfo);
+  /** Select tool: move cursor over a markup, crosshair over a grip. */
+  const [selectHoverCursor, setSelectHoverCursor] = useState<'move' | 'crosshair' | 'grab' | null>(null);
   hoverInfoRef.current = hoverInfo;
 
   /** Right-click context menu for a measurement (select tool). Positioned at
@@ -4144,6 +4548,13 @@ export default function TakeoffViewerModule({
   const multiplyDistanceRef = useRef(multiplyDistance);
   multiplyDistanceRef.current = multiplyDistance;
   const [multiplyCopies, setMultiplyCopies] = useState(8);
+  /** FSFTM live tracking (OE-DELIVERY 2026-11-26-fsftm-pdf): copies follow the
+   *  mouse at the set spacing (e.g. 2'-0" o.c.); a click places them. */
+  const [multiplyTrack, setMultiplyTrack] = useState(true);
+  const multiplyTrackRef = useRef(false);
+  const trackPlanRef = useRef<{ dir: Point; copies: number } | null>(null);
+  const trackMultiplyRef = useRef<(pt: Point) => void>(() => {});
+  const multiplyConfirmRef = useRef<() => void>(() => {});
   const multiplyCopiesRef = useRef(multiplyCopies);
   multiplyCopiesRef.current = multiplyCopies;
   const multiplyDirectionRef = useRef(multiplyDirection);
@@ -4668,6 +5079,63 @@ export default function TakeoffViewerModule({
   // this id. Resolved below from the explicit prop or the download URL; null
   // for a freshly dropped local file (which then persists locally only).
   const [documentId, setDocumentId] = useState<string | null>(initialDocumentId ?? null);
+  const focusKey = instanceKey ?? documentId;
+  /* ONE set of controls (OE-DELIVERY 2026-11-26-fsftm-pdf): the menu bar,
+   * rails, panels, tool strip, toolbar, page bar and ledger sit where the main
+   * editor lays them out, and they belong to the drawing last clicked - a
+   * split pane's own editor fills them (portal) while it has the focus, so
+   * every tool and command works on that pane. Nothing moves on screen. */
+  const isChromeHost = !hidden && !compact;
+  const [visibleEditors, setVisibleEditors] = useSharedState<string[]>('ws.editors', []);
+  useEffect(() => {
+    if (hidden || !focusKey) return;
+    const k = focusKey;
+    setVisibleEditors((prev) => (prev.includes(k) ? prev : [...prev, k]));
+    return () => setVisibleEditors((prev) => prev.filter((x) => x !== k));
+  }, [hidden, focusKey, setVisibleEditors]);
+  const ownsChrome = !hidden && (wsFocus === focusKey || (isChromeHost && (!wsFocus || !visibleEditors.includes(wsFocus))));
+  const [slotMenu] = useSharedState<HTMLElement | null>('ws.chrome.menu', null);
+  const [slotRail] = useSharedState<HTMLElement | null>('ws.chrome.rail', null);
+  const [slotThumbs] = useSharedState<HTMLElement | null>('ws.chrome.thumbs', null);
+  const [slotStrip] = useSharedState<HTMLElement | null>('ws.chrome.strip', null);
+  const [slotToolbar] = useSharedState<HTMLElement | null>('ws.chrome.toolbar', null);
+  const [slotBottom] = useSharedState<HTMLElement | null>('ws.chrome.bottom', null);
+  const [slotLedger] = useSharedState<HTMLElement | null>('ws.chrome.ledger', null);
+  const [slotSide] = useSharedState<HTMLElement | null>('ws.chrome.side', null);
+  const chromeSlots: Record<string, HTMLElement | null> = {
+    menu: slotMenu, rail: slotRail, thumbs: slotThumbs, strip: slotStrip,
+    toolbar: slotToolbar, bottom: slotBottom, ledger: slotLedger, side: slotSide,
+  };
+  const chromeSlotRefs = useMemo(() => {
+    const out: Record<string, (el: HTMLElement | null) => void> = {};
+    for (const name of ['menu', 'rail', 'thumbs', 'strip', 'toolbar', 'bottom', 'ledger', 'side']) {
+      let mine: HTMLElement | null = null;
+      out[name] = (el) => {
+        const key = `ws.chrome.${name}`;
+        if (el) {
+          mine = el;
+          setShared(key, el);
+        } else if (getShared(key) === mine) {
+          setShared(key, null);
+          mine = null;
+        }
+      };
+    }
+    return out;
+  }, []);
+  /** Where a set of controls goes: the main editor marks the spot. */
+  const chromeSlot = (name: string) =>
+    isChromeHost ? <div ref={chromeSlotRefs[name]} style={{ display: 'contents' }} data-chrome-slot={name} /> : null;
+  /** The controls themselves, from the editor that has the focus. */
+  const chrome = (name: string, node: React.ReactNode) => {
+    const el = chromeSlots[name];
+    return ownsChrome && el ? createPortal(node, el) : null;
+  };
+  const [toolReq] = useSharedState<{ key: string; tool: string; n: number } | null>('ws.toolReq', null);
+  hiddenRef.current = hidden || (!!wsFocus && !!focusKey && wsFocus !== focusKey);
+  /** Latest document id for callbacks that outlive a render (thumbnails). */
+  const documentIdRef = useRef(documentId);
+  documentIdRef.current = documentId;
   /* ── Ledger custom columns ──────────────────────────────────────────
    * User-defined ledger columns, persisted per document in localStorage.
    * Cell values ride on `measurement.customFields` (metadata round-trip). */
@@ -4700,7 +5168,7 @@ export default function TakeoffViewerModule({
   }, [measurements, ledgerDocKey]);
 
   /* ── FSFTM left panel, sheet index, overlay, sync, units, text (OE-DELIVERY 2026-11-02-fsftm-left-panel) ── */
-  const [leftTab, setLeftTab] = useState<'thumbs' | 'index' | 'layers' | 'side' | 'measure' | 'scale'>(() => {
+  const [leftTab, setLeftTab] = useSharedState<'thumbs' | 'index' | 'layers' | 'side' | 'measure' | 'scale'>('ui.leftTab', () => {
     try {
       const v = localStorage.getItem('takeoff.leftTab');
       return v === 'index' || v === 'layers' || v === 'side' || v === 'measure' || v === 'scale' ? v : 'thumbs';
@@ -4720,7 +5188,7 @@ export default function TakeoffViewerModule({
   /* ── FSFTM dock (OE-DELIVERY 2026-11-02-fsftm-dock): every panel docks on the LEFT behind one vertical
    * icon rail, like FSFTM. Clicking the open panel's icon closes it (the rail
    * stays at the edge); clicking any icon opens that panel. */
-  const [panelSide, setPanelSide] = useState<'left' | 'right'>(() => {
+  const [panelSide, setPanelSide] = useSharedState<'left' | 'right'>('ui.panelSide', () => {
     try { return localStorage.getItem('takeoff.panelSide') === 'right' ? 'right' : 'left'; } catch { return 'left'; }
   });
   useEffect(() => {
@@ -4838,16 +5306,26 @@ export default function TakeoffViewerModule({
   useEffect(() => {
     if (!pdfDoc) return;
     let cancelled = false;
-    setDetectedSheets({});
+    const remap = docEditRemapRef.current && docEditRemapRef.current.doc === pdfDoc ? docEditRemapRef.current : null;
+    const carried: Record<number, SheetEntry> = {};
+    if (remap) {
+      for (const [k, v] of Object.entries(detectedSheetsRef.current)) {
+        const np = remap.map[Number(k)];
+        if (np !== undefined && !remap.changed.has(np)) carried[np] = v;
+      }
+    }
+    setDetectedSheets(carried);
     (async () => {
       // Never compete with the first page on screen: wait until it is drawn.
       for (let w = 0; w < 80 && mainRenderedPageRef.current === 0; w++) {
         await new Promise<void>((r) => setTimeout(r, 150));
         if (cancelled) return;
       }
-      const found: Record<number, SheetEntry> = {};
+      const found: Record<number, SheetEntry> = { ...carried };
       const n = Math.min(pdfDoc.numPages, 400);
       for (let p = 1; p <= n; p++) {
+        // After a page edit only the changed pages are read again.
+        if (remap && !remap.changed.has(p)) continue;
         // A breath between pages keeps panning / drawing smooth on big sets.
         if (p > 5) await new Promise<void>((r) => setTimeout(r, 30));
         if (cancelled) return;
@@ -4891,7 +5369,43 @@ export default function TakeoffViewerModule({
   const [overlayCfg, setOverlayCfg] = useState<{ page: number; color: 'red' | 'blue' | 'green'; opacity: number; dx: number; dy: number; src?: 'self' | 'compare' } | null>(null);
   /** Revision compare (OE-DELIVERY 2026-11-25-fsftm-pdf): another drawing (the
    *  old or new revision) shown in the split pane and usable as overlay. */
-  const [compareDoc, setCompareDoc] = useState<{ id: string; name: string; doc: PDFDocumentProxy } | null>(null);
+  /** Split-pane document tabs (OE-DELIVERY 2026-11-26-fsftm-pdf): several
+   *  drawings can be open in the split pane; `splitTabId` is the one shown
+   *  ('self' = the open drawing). `compareDoc` is the shown one, if any. */
+  type SplitTab = { id: string; name: string; doc: PDFDocumentProxy };
+  const [splitTabs, setSplitTabs] = useSharedState<SplitTab[]>('split.tabs', [], splitPaused);
+  const [splitTabId, setSplitTabId] = useSharedState<string>('split.tabId', 'self', splitPaused);
+  const compareDoc = splitTabs.find((x) => x.id === splitTabId) ?? null;
+  const splitTabsRef = useRef(splitTabs);
+  splitTabsRef.current = splitTabs;
+  /** Per split tab: page, zoom and centre, so switching tabs never jumps. */
+  const splitViewMemRef = useRef(splitViewMem);
+  const splitTabIdRef = useRef(splitTabId);
+  splitTabIdRef.current = splitTabId;
+  const splitPageRef = useRef(splitPage);
+  splitPageRef.current = splitPage;
+  const splitZoomRef = useRef(splitZoom);
+  splitZoomRef.current = splitZoom;
+  /** Show split tab `id` (with `pages` pages), restoring where it was left. */
+  const activateSplitTab = (id: string, pages: number) => {
+    const cur = splitTabIdRef.current;
+    if (cur !== id) {
+      const f = splitSyncApiRef.current?.centerFrac();
+      splitViewMemRef.current.set(cur, { page: splitPageRef.current, zoom: splitZoomRef.current, fx: f?.fx, fy: f?.fy });
+    }
+    setSplitTabId(id);
+    const mem = splitViewMemRef.current.get(id);
+    if (mem) {
+      setSplitPage(Math.min(Math.max(1, mem.page), Math.max(1, pages)));
+      setSplitZoom(mem.zoom);
+      if (mem.fx !== undefined && mem.fy !== undefined) {
+        const { fx, fy } = mem;
+        window.setTimeout(() => splitSyncApiRef.current?.centerOn(fx, fy), 250);
+      }
+    } else {
+      setSplitPage((sp) => Math.min(Math.max(1, sp), Math.max(1, pages)));
+    }
+  };
   const [compareLoading, setCompareLoading] = useState(false);
   const compareFileRef = useRef<HTMLInputElement>(null);
   /** Top-bar "+" menu and its file input (multi-file tabs). */
@@ -4899,23 +5413,69 @@ export default function TakeoffViewerModule({
   const openFilesRef = useRef<HTMLInputElement>(null);
   const compareDocRef = useRef(compareDoc);
   compareDocRef.current = compareDoc;
-  const releasePdf = (d: PDFDocumentProxy | undefined) => {
-    try { void (d as unknown as { destroy?: () => Promise<void> } | undefined)?.destroy?.(); } catch { /* ignore */ }
+  const releasePdf = (d: PDFDocumentProxy | undefined) => releasePooledPdf(d);
+  // The split workspace is shared by every open drawing's viewer; it is
+  // cleared (and its drawings freed) only when the last viewer goes away.
+  useEffect(() => {
+    liveViewers += 1;
+    return () => {
+      liveViewers -= 1;
+      window.setTimeout(() => {
+        if (liveViewers > 0) return;
+        for (const x of getShared<PaneDoc[]>('split.tabs') ?? []) releasePooledPdf(x.doc);
+        for (const xp of getShared<ExtraPane[]>('split.extra') ?? []) for (const x of xp.tabs) releasePooledPdf(x.doc);
+        clearShared('split.');
+        splitViewMem.clear();
+      }, 0);
+    };
+  }, []);
+  // The drawing on screen is held while shown (shared with panes / cache).
+  useEffect(() => {
+    retainPdf(pdfDoc);
+    return () => releasePooledPdf(pdfDoc);
+  }, [pdfDoc]);
+  /** Show a document in the split pane: adds it as a tab (or re-selects it);
+   *  null shows the open drawing. Other split tabs stay open. */
+  const replaceCompareDoc = (next: SplitTab | null) => {
+    if (next) {
+      setSplitTabs((prev) => {
+        const have = prev.find((x) => x.id === next.id);
+        if (have && have.doc !== next.doc) releasePdf(next.doc);
+        return have ? prev : [...prev, next];
+      });
+      activateSplitTab(next.id, next.doc.numPages);
+    } else {
+      activateSplitTab('self', Math.max(1, totalPagesRef.current));
+    }
   };
-  useEffect(() => () => { releasePdf(compareDocRef.current?.doc); }, []);
-  const replaceCompareDoc = (next: { id: string; name: string; doc: PDFDocumentProxy } | null) => {
-    const prev = compareDocRef.current;
-    if (prev && prev.doc !== next?.doc) releasePdf(prev.doc);
-    setCompareDoc(next);
-    setSplitPage((sp) => Math.min(Math.max(1, sp), next ? next.doc.numPages : Math.max(1, totalPagesRef.current)));
+  /** Close one split-pane tab and release its PDF. */
+  const closeSplitTab = (id: string) => {
+    const tab = splitTabsRef.current.find((x) => x.id === id);
+    if (tab) releasePdf(tab.doc);
+    const rest = splitTabsRef.current.filter((x) => x.id !== id);
+    setSplitTabs((prev) => prev.filter((x) => x.id !== id));
+    splitViewMemRef.current.delete(id);
+    if (splitTabId === id) {
+      const next = rest[rest.length - 1];
+      if (next) activateSplitTab(next.id, next.doc.numPages);
+      else activateSplitTab('self', Math.max(1, totalPagesRef.current));
+    }
   };
   const loadCompareDoc = async (id: string, name: string) => {
+    {
+      const open = splitTabsRef.current.find((x) => x.id === id);
+      if (open) {
+        activateSplitTab(id, open.doc.numPages);
+        return;
+      }
+    }
     setCompareLoading(true);
     try {
       const token = useAuthStore.getState().accessToken;
       const headers: Record<string, string> = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
       const doc = await openPdfUrl(`/api/v1/takeoff/documents/${encodeURIComponent(id)}/download/`, headers, { fastImages: true }).promise;
+      retainPdf(doc);
       replaceCompareDoc({ id, name, doc });
     } catch (err) {
       addToast({ type: 'error', title: 'Could not open that drawing', message: err instanceof Error ? err.message : String(err) });
@@ -4923,10 +5483,370 @@ export default function TakeoffViewerModule({
       setCompareLoading(false);
     }
   };
+  const loadCompareDocRef = useRef(loadCompareDoc);
+  loadCompareDocRef.current = loadCompareDoc;
+  /** Load a project drawing for a pane (held by the caller). */
+  const fetchPaneDoc = async (id: string, name: string): Promise<PaneDoc | null> => {
+    const cached = mainPdfCache.get(id);
+    if (cached) {
+      retainPdf(cached);
+      return { id, name, doc: cached };
+    }
+    try {
+      const token = useAuthStore.getState().accessToken;
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const doc = await openPdfUrl(`/api/v1/takeoff/documents/${encodeURIComponent(id)}/download/`, headers, { fastImages: true }).promise;
+      retainPdf(doc);
+      return { id, name, doc };
+    } catch (err) {
+      addToast({ type: 'error', title: 'Could not open that drawing', message: err instanceof Error ? err.message : String(err) });
+      return null;
+    }
+  };
+  /** The drawing a main-pane tab stands for, already loaded when possible. */
+  const docForMainTab = async (t: { id: string; name: string }): Promise<PaneDoc | null> => {
+    if (pdfDoc && t.id === (documentId ?? '__local')) {
+      retainPdf(pdfDoc);
+      return { id: t.id, name: t.name, doc: pdfDoc };
+    }
+    return fetchPaneDoc(t.id, t.name);
+  };
+  /** Take a drawing OUT of a pane (moving it): the loaded document comes along. */
+  const takeFromPane = (pane: string, id: string): PaneDoc | null => {
+    if (id === 'self') {
+      if (!pdfDoc) return null;
+      retainPdf(pdfDoc);
+      return { id: documentId ?? '__local', name: fileName ?? 'Drawing', doc: pdfDoc };
+    }
+    if (pane === 'p2') {
+      const tab = splitTabsRef.current.find((x) => x.id === id);
+      if (!tab) return null;
+      const f = splitTabIdRef.current === id ? splitSyncApiRef.current?.centerFrac() : null;
+      if (splitTabIdRef.current === id) splitViewMem.set(id, { page: splitPageRef.current, zoom: splitZoomRef.current, fx: f?.fx, fy: f?.fy });
+      const rest = splitTabsRef.current.filter((x) => x.id !== id);
+      setSplitTabs((prev) => prev.filter((x) => x.id !== id));
+      // The pane keeps showing one of its own drawings, not the main one.
+      if (splitTabIdRef.current === id) setSplitTabId(rest[rest.length - 1]?.id ?? 'self');
+      return tab;
+    }
+    const xp = extraPanesRef.current.find((x) => x.key === pane);
+    const tab = xp?.tabs.find((x) => x.id === id);
+    if (!xp || !tab) return null;
+    if (xp.activeId === id) splitViewMem.set(id, { page: xp.page, zoom: xp.zoom });
+    setExtraPanes((prev) =>
+      prev.map((x) =>
+        x.key !== pane
+          ? x
+          : { ...x, tabs: x.tabs.filter((t) => t.id !== id), activeId: x.activeId === id ? (x.tabs.find((t) => t.id !== id)?.id ?? null) : x.activeId },
+      ),
+    );
+    return tab;
+  };
+  /** Put a drawing (held by the caller) into a pane and show it there. */
+  const putIntoPane = (pane: string, tab: PaneDoc) => {
+    // A local drawing without an id can only follow the main pane.
+    const isMain = tab.id === '__local';
+    if (pane === 'p2') {
+      if (isMain || splitTabsRef.current.some((x) => x.id === tab.id)) {
+        releasePooledPdf(tab.doc);
+        if (isMain) activateSplitTab('self', Math.max(1, totalPagesRef.current));
+        else activateSplitTab(tab.id, tab.doc.numPages);
+        return;
+      }
+      setSplitTabs((prev) => [...prev, tab]);
+      activateSplitTab(tab.id, tab.doc.numPages);
+      return;
+    }
+    const mem = splitViewMem.get(tab.id);
+    setExtraPanes((prev) =>
+      prev.map((x) => {
+        if (x.key !== pane) return x;
+        if (isMain || x.tabs.some((t) => t.id === tab.id)) {
+          releasePooledPdf(tab.doc);
+          return { ...x, activeId: isMain ? null : tab.id };
+        }
+        return { ...x, tabs: [...x.tabs, tab], activeId: tab.id, page: mem?.page ?? 1, zoom: mem?.zoom ?? x.zoom, choosing: false };
+      }),
+    );
+  };
+  const putIntoPaneRef = useRef(putIntoPane);
+  putIntoPaneRef.current = putIntoPane;
+  /** A tab dropped on pane `target` (from the main tab bar or another pane). */
+  const dropTabOnPane = async (t: TabDragPayload, target: string) => {
+    if (t.from === 'split' && (t.pane ?? 'p2') === target) return;
+    const tab = t.from === 'main' ? await docForMainTab(t) : takeFromPane(t.pane ?? 'p2', t.id);
+    if (tab) putIntoPane(target, tab);
+  };
+  const dropTabOnPaneRef = useRef(dropTabOnPane);
+  dropTabOnPaneRef.current = dropTabOnPane;
+  /** A pane tab dropped on the main pane: that drawing becomes the main one
+   *  (it keeps its page and zoom); the previous one stays in the main tabs. */
+  const moveTabToMain = (t: TabDragPayload) => {
+    if (t.id === 'self') return;
+    const pane = t.pane ?? 'p2';
+    if (t.id.startsWith('file:') || !onSwitchDocument) {
+      addToast({ type: 'info', title: 'Cannot move this drawing', message: 'Upload it to the project first, then it can move to the main pane.' });
+      return;
+    }
+    let view: ViewSnap | undefined;
+    if (pane === 'p2' && splitTabIdRef.current === t.id) {
+      const f = splitSyncApiRef.current?.centerFrac();
+      view = { page: splitPageRef.current, zoom: splitZoomRef.current, fx: f?.fx, fy: f?.fy };
+    } else {
+      const xp = extraPanesRef.current.find((x) => x.key === pane);
+      view = xp && xp.activeId === t.id ? { page: xp.page, zoom: xp.zoom } : splitViewMem.get(t.id);
+    }
+    const tab = takeFromPane(pane, t.id);
+    if (!tab) return;
+    if (tab.id === documentId) {
+      releasePooledPdf(tab.doc);
+      return;
+    }
+    cacheMainPdf(tab.id, tab.doc); // the main viewer picks the loaded copy up
+    releasePooledPdf(tab.doc);
+    if (view) splitSwapHandoff = { mainDocId: tab.id, main: view };
+    onSwitchDocument(tab.id);
+  };
+  /** Make split-pane drawing `tab` the main drawing and put the current main
+   *  drawing in its place in the split pane. Both keep their view. */
+  const handSplitDocToMain = (tab: PaneDoc, tabView: ViewSnap, mainView: ViewSnap) => {
+    if (tab.id.startsWith('file:') || !onSwitchDocument || !documentId || !pdfDoc || splitMode === 'off') {
+      addToast({ type: 'info', title: 'Cannot move this drawing', message: 'Upload it to the project first, then it can move to the main pane.' });
+      return;
+    }
+    retainPdf(pdfDoc);
+    const mine: PaneDoc = { id: documentId, name: fileName ?? 'Drawing', doc: pdfDoc };
+    setSplitTabs((prev) => {
+      const rest = prev.filter((x) => x.id !== documentId);
+      if (rest.length !== prev.length) releasePooledPdf(pdfDoc); // already there
+      return rest.map((x) => (x.id === tab.id ? mine : x));
+    });
+    splitViewMem.set(documentId, mainView);
+    setSplitTabId(documentId);
+    setSplitPage(mainView.page);
+    setSplitZoom(mainView.zoom);
+    cacheMainPdf(tab.id, tab.doc);
+    releasePooledPdf(tab.doc);
+    splitSwapHandoff = { mainDocId: tab.id, main: tabView, split: mainView };
+    onSwitchDocument(tab.id);
+  };
+  // The visible main viewer tells TakeoffPage which panes show a project
+  // drawing as a full editor (one pane per drawing; a second pane showing
+  // the same drawing mirrors it).
+  const paneHostable = (id: string | null | undefined) => !!id && !id.startsWith('file:') && id !== '__local';
+  const hostingNow: PaneHosting = [];
+  const inLayout = new Set(leaves(splitTree));
+  if (splitMode !== 'off' && !hidden && !compact && pdfDoc) {
+    if (inLayout.has('p2') && compareDoc && paneHostable(compareDoc.id)) hostingNow.push({ pane: 'p2', id: compareDoc.id, name: compareDoc.name });
+    for (const xp of extraPanes) {
+      if (!inLayout.has(xp.key)) continue;
+      const sh = xp.tabs.find((x) => x.id === xp.activeId);
+      if (sh && paneHostable(sh.id)) hostingNow.push({ pane: xp.key, id: sh.id, name: sh.name });
+    }
+  }
+  const hostingSig = hostingNow.map((h) => `${h.pane}:${h.id}`).join('|');
+  const p2IsEditor = hostingNow.some((h) => h.pane === 'p2');
+  /** A pane's box in the split area (3 px gutter on inner edges). */
+  const paneRects = splitTree ? layoutRects(splitTree).panes : {};
+  const paneBox = (key: string): React.CSSProperties => {
+    const r = paneRects[key];
+    if (!r) return { display: 'none' };
+    const g = (edge: number) => (edge > 1e-6 && edge < 1 - 1e-6 ? 3 : 0);
+    const gl = g(r.x);
+    const gr = g(r.x + r.w);
+    const gt = g(r.y);
+    const gb = g(r.y + r.h);
+    return {
+      position: 'absolute',
+      left: `calc(${r.x * 100}% + ${gl}px)`,
+      top: `calc(${r.y * 100}% + ${gt}px)`,
+      width: `calc(${r.w * 100}% - ${gl + gr}px)`,
+      height: `calc(${r.h * 100}% - ${gt + gb}px)`,
+    };
+  };
+  /** The editor shown in a pane (same rule as ViewerWorkspace: the main
+   *  drawing, or a drawing already shown in an earlier pane, is a mirror). */
+  const paneEditorKey = (pane: string): string | null => {
+    const i = hostingNow.findIndex((h) => h.pane === pane);
+    if (i < 0) return null;
+    const h = hostingNow[i]!;
+    const earlier = hostingNow.findIndex((x) => x.id === h.id) < i;
+    return h.id === documentId || earlier ? `${h.id}@${pane}` : h.id;
+  };
+  /** Clicking a pane (its tab bar too) hands it the controls. */
+  const focusPane = (pane: string) => {
+    const k = paneEditorKey(pane);
+    if (k && getShared('ws.focus') !== k) setShared('ws.focus', k);
+  };
+  useEffect(() => {
+    if (hidden || compact) return;
+    setShared<PaneHosting>(PANE_HOSTING_KEY, (prev) => {
+      const prevSig = (prev ?? []).map((h) => `${h.pane}:${h.id}`).join('|');
+      return prevSig === hostingSig ? prev : hostingNow;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hostingSig, hidden, compact]);
+  useEffect(() => {
+    if (hidden || compact) return;
+    setShared<WorkspaceApi>(WS_API_KEY, {
+      dropTabOnPane: (tp, pane) => { void dropTabOnPaneRef.current?.(tp, pane); },
+      split: (dir) => splitFocusedRef.current?.(dir),
+    });
+  }, [hidden, compact]);
+  /** The pane the user is working in (the drawing last clicked). */
+  const focusedLeaf = (): string => {
+    const f = getShared<string | null>('ws.focus');
+    const tree = splitTreeRef.current;
+    const panes = leaves(tree).filter((k) => k !== 'main');
+    if (f && f !== focusKey) {
+      const hit = panes.find((k) => paneEditorKey(k) === f);
+      if (hit) return hit;
+    }
+    if (splitActiveRef.current && panes.includes('p2')) return 'p2';
+    if (activeExtraPane && panes.includes(activeExtraPane)) return activeExtraPane;
+    return 'main';
+  };
+  /** Split the pane in use in two (side by side / stacked), if there is
+   *  room; otherwise say so, like a desktop PDF tool. */
+  const splitFocused = (dir: SplitDir) => {
+    const tree = splitTreeRef.current;
+    const area = splitAreaRef.current;
+    if (!tree || !area) return;
+    const target = focusedLeaf();
+    const r = layoutRects(tree).panes[target];
+    if (!r) return;
+    if (!canSplit(area.clientWidth * r.w, area.clientHeight * r.h, dir)) {
+      setSplitError('The view is too small to split any further');
+      return;
+    }
+    const used = leaves(tree).concat(extraPanesRef.current.map((x) => x.key));
+    let n = 3;
+    while (used.includes(`p${n}`)) n++;
+    const key = `p${n}`;
+    setExtraPanes((prev) => [...prev, { key, tabs: [], activeId: null, page: currentPageRef.current, zoom: 1, choosing: true }]);
+    setSplitTree(splitLeaf(tree, target, dir, key));
+    setActiveExtraPane(key);
+  };
+  const splitFocusedRef = useRef(splitFocused);
+  splitFocusedRef.current = splitFocused;
+  /** Add a pane next to the one in use; with split off, split first. */
+  const addPane = () => {
+    if (splitMode === 'off') {
+      toggleSplit('vertical');
+      return;
+    }
+    splitFocused(splitTreeRef.current?.kind === 'split' && splitTreeRef.current.dir === 'col' ? 'col' : 'row');
+  };
+  /** Take pane `key` out of the layout; the last one left turns split off. */
+  const dropFromLayout = (key: string) => {
+    const tree = splitTreeRef.current;
+    const next = tree ? removeLeaf(tree, key) : null;
+    if (!next || leaves(next).length <= 1) {
+      closeAllPanes();
+      setSplitTree(null);
+      setSplitMode('off');
+      setSyncViews(false);
+      setSplitActive(false);
+      return;
+    }
+    setSplitTree(next);
+  };
+  const closeExtraPane = (key: string) => {
+    const xp = extraPanesRef.current.find((x) => x.key === key);
+    for (const x of xp?.tabs ?? []) releasePooledPdf(x.doc);
+    setExtraPanes((prev) => prev.filter((x) => x.key !== key));
+    dropFromLayout(key);
+  };
+  const closeAllPanes = () => {
+    for (const xp of extraPanesRef.current) for (const x of xp.tabs) releasePooledPdf(x.doc);
+    setExtraPanes([]);
+    setSplitTree(null);
+  };
+  // Split turned off elsewhere (menu, Unsplit): drop the layout and panes.
+  useEffect(() => {
+    if (!isChromeHost || sharedSplitMode !== 'off' || !splitTreeRef.current) return;
+    closeAllPanes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sharedSplitMode, isChromeHost]);
+  // Split on without a layout yet (an older session): main | pane 2.
+  useEffect(() => {
+    if (!isChromeHost || sharedSplitMode === 'off' || splitTreeRef.current) return;
+    setSplitTree({ kind: 'split', dir: sharedSplitMode === 'vertical' ? 'row' : 'col', children: [leaf('main'), leaf('p2')], sizes: [0.5, 0.5] });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sharedSplitMode, isChromeHost]);
+  /** Show tab `id` ('self' = the main drawing) in extra pane `key`. */
+  const pickInExtraPane = async (key: string, id: string) => {
+    const xp = extraPanesRef.current.find((x) => x.key === key);
+    if (!xp) return;
+    if (id === '__file') {
+      fileTargetPaneRef.current = key;
+      compareFileRef.current?.click();
+      return;
+    }
+    setExtraPanes((prev) => prev.map((x) => (x.key === key && x.choosing ? { ...x, choosing: false } : x)));
+    if (xp.activeId) splitViewMem.set(`${key}:${xp.activeId}`, { page: xp.page, zoom: xp.zoom });
+    if (id === 'self') {
+      const own = documentId && pdfDoc ? await docForMainTab({ id: documentId, name: fileName ?? 'Drawing' }) : null;
+      if (own) putIntoPane(key, own);
+      else setExtraPanes((prev) => prev.map((x) => (x.key === key ? { ...x, activeId: null } : x)));
+      return;
+    }
+    const open = xp.tabs.find((x) => x.id === id);
+    if (open) {
+      const mem = splitViewMem.get(`${key}:${id}`);
+      setExtraPanes((prev) => prev.map((x) => (x.key === key ? { ...x, activeId: id, page: mem?.page ?? x.page, zoom: mem?.zoom ?? x.zoom } : x)));
+      return;
+    }
+    const name = (recentDocuments ?? []).find((d) => d.id === id)?.filename ?? 'Drawing';
+    const tab = await fetchPaneDoc(id, name);
+    if (tab) putIntoPane(key, tab);
+  };
+  const closeExtraTab = (key: string, id: string) => {
+    const tab = takeFromPane(key, id);
+    releasePooledPdf(tab?.doc);
+  };
+  /** Swap the two panes; each side keeps its page, zoom and centre. */
+  const swapSplitPanes = () => {
+    const mainF = mainCenterFrac();
+    const splitF = splitSyncApiRef.current?.centerFrac() ?? null;
+    const mainView: ViewSnap = { page: currentPageRef.current, zoom: zoomRef.current, fx: mainF?.fx, fy: mainF?.fy };
+    const splitView: ViewSnap = { page: splitPageRef.current, zoom: splitZoomRef.current, fx: splitF?.fx, fy: splitF?.fy };
+    const other = compareDocRef.current;
+    setSplitActive(false);
+    if (other) {
+      // A different drawing: it becomes the main document, this one goes right.
+      handSplitDocToMain(other, splitView, mainView);
+      return;
+    }
+    // Same drawing on both sides: swap page, zoom and centre in place.
+    const r = { zoom: splitView.zoom, sl: 0, st: 0, zoomed: false, fx: splitView.fx, fy: splitView.fy };
+    restoreViewRef.current = r;
+    goToPage(splitView.page);
+    setSplitPage(mainView.page);
+    setSplitZoom(mainView.zoom);
+    window.setTimeout(() => {
+      if (mainView.fx !== undefined && mainView.fy !== undefined) splitSyncApiRef.current?.centerOn(mainView.fx, mainView.fy);
+      // Same page and zoom: no re-render triggers the restore, do it here.
+      if (restoreViewRef.current === r) {
+        restoreViewRef.current = null;
+        if (r.fx !== undefined && r.fy !== undefined) mainCenterOn(r.fx, r.fy);
+      }
+    }, 300);
+  };
+  /** Which pane the "From computer" picker opens into (p2 by default). */
+  const fileTargetPaneRef = useRef<string>('p2');
   const loadCompareFile = async (file: File) => {
+    const target = fileTargetPaneRef.current;
+    fileTargetPaneRef.current = 'p2';
     setCompareLoading(true);
     try {
       const doc = await openPdf(await file.arrayBuffer(), { fastImages: true }).promise;
+      retainPdf(doc);
+      if (target !== 'p2') {
+        putIntoPaneRef.current?.(target, { id: `file:${file.name}`, name: file.name, doc });
+        return;
+      }
       replaceCompareDoc({ id: `file:${file.name}`, name: file.name, doc });
     } catch (err) {
       addToast({ type: 'error', title: 'Could not open that PDF', message: err instanceof Error ? err.message : String(err) });
@@ -5015,7 +5935,7 @@ export default function TakeoffViewerModule({
 
   /** FSFTM Sync: the split pane follows the main view (page offset, zoom,
    *  scroll position) for checking two sheets / revisions together. */
-  const [syncViews, setSyncViews] = useState(false);
+  const [syncViews, setSyncViews] = useSharedState('split.sync', false, hidden);
   const syncDeltaRef = useRef(0);
 
   const [customColumns, setCustomColumns] = useState<string[]>([]);
@@ -5161,11 +6081,12 @@ export default function TakeoffViewerModule({
   // PDF / Excel export in-flight flags (drive button spinner state).
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingXlsx, setIsExportingXlsx] = useState(false);
-  const { saveNow, clearPersisted, syncing, registerDeletion, hasUnsavedChanges, storageInfo } = useMeasurementPersistence({
-    fileName,
+  const { saveNow, clearPersisted, syncing, registerDeletion: registerOwnDeletion, hasUnsavedChanges, storageInfo } = useMeasurementPersistence({
+    // A mirror never loads or saves: the drawing's first editor does.
+    fileName: mirror ? null : fileName,
     // Stable document UUID drives both the localStorage key and server sync
     // (issue #238); a null id (fresh local drop) keeps everything local.
-    documentId,
+    documentId: mirror ? null : documentId,
     measurements,
     // Pass the stable useState setters directly (NOT inline arrows): an
     // inline-arrow setter changes identity every render, which used to tear
@@ -5186,8 +6107,27 @@ export default function TakeoffViewerModule({
     scale,
     // The header project wins; the document's own project fills in when no
     // project is active so a server document still loads its measurements.
-    projectId: activeProjectId || docProjectId,
+    projectId: mirror ? null : activeProjectId || docProjectId,
   });
+  // A markup deleted in a mirror is deleted on the server by the owner.
+  useEffect(() => {
+    if (mirror) return;
+    const k = `doc.del.${shareKeyRef.current}`;
+    setShared(k, () => registerOwnDeletion); // a function value: set via an updater
+    return () => {
+      if (getShared(k) === registerOwnDeletion) setShared(k, null);
+    };
+  }, [mirror, registerOwnDeletion]);
+  const registerDeletion = useCallback(
+    (serverId: string | undefined) => {
+      if (!mirror) {
+        registerOwnDeletion(serverId);
+        return;
+      }
+      getShared<((sid: string | undefined) => void) | null>(`doc.del.${shareKeyRef.current}`)?.(serverId);
+    },
+    [mirror, registerOwnDeletion],
+  );
 
   /* ── Seed default-label counters from hydrated measurements (issue #384) ─
    * The per-type counters (annotationCounterRef) reset to 0 on every load path
@@ -5248,6 +6188,40 @@ export default function TakeoffViewerModule({
   /** Where the previous paste landed, so a repeat paste at the same spot
    *  steps diagonally instead of stacking copies on top of each other. */
   const lastPasteRef = useRef<{ x: number; y: number; n: number } | null>(null);
+  /** FSFTM movable labels: label boxes from the last paint (device px) and
+   *  the label being dragged. */
+  const labelHitRef = useRef<Map<string, { x: number; y: number; w: number; h: number }>>(new Map());
+  const labelDragRef = useRef<{ id: string; startX: number; startY: number; dx0: number; dy0: number; before: Measurement } | null>(null);
+  /** Label under the pointer / being moved: drawn with a move box + grip. */
+  const [labelHoverId, setLabelHoverId] = useState<string | null>(null);
+  const [labelDragId, setLabelDragId] = useState<string | null>(null);
+  useEffect(() => {
+    const move = (ev: MouseEvent) => {
+      const d = labelDragRef.current;
+      if (!d) return;
+      const z = zoomRef.current || 1;
+      const dx = d.dx0 + (ev.clientX - d.startX) / z;
+      const dy = d.dy0 + (ev.clientY - d.startY) / z;
+      setMeasurements((prev) => prev.map((x) => (x.id === d.id ? { ...x, labelOffset: { dx, dy } } : x)));
+    };
+    const up = () => {
+      const d = labelDragRef.current;
+      if (!d) return;
+      labelDragRef.current = null;
+      setLabelDragId(null);
+      const after = measurementsRef.current.find((x) => x.id === d.id);
+      if (after && (after.labelOffset?.dx !== d.dx0 || after.labelOffset?.dy !== d.dy0)) {
+        pushUndo({ kind: 'edit_geometry', measurementId: d.id, previousMeasurement: d.before, nextMeasurement: { ...after, points: [...after.points] } });
+      }
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+    return () => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   /** Markups on the current page that sit on top of another markup. */
   const stackedOnPage = useMemo(
     () => findStackedMarkups(measurements.filter((m) => m.page === currentPage && !m.suggested), 4),
@@ -5377,6 +6351,7 @@ export default function TakeoffViewerModule({
     try {
       const arrayBuffer = await file.arrayBuffer();
       const doc = await openPdf(arrayBuffer, { fastImages: true }).promise;
+      await hideEmbeddedMarkupLayer(doc);
       setPdfDoc(doc);
       setTotalPages(doc.numPages);
       setCurrentPage(1);
@@ -5470,9 +6445,12 @@ export default function TakeoffViewerModule({
 
   /* ── Load PDF from URL (filmstrip click / deep link) ────────────── */
 
+  /** Set when the URL load fails, so the upload landing shows again. */
+  const [urlLoadFailed, setUrlLoadFailed] = useState(false);
   useEffect(() => {
     if (!initialPdfUrl) return;
     let cancelled = false;
+    setUrlLoadFailed(false);
     setIsLoading(true);
     setLoadProgress(null);
     (async () => {
@@ -5485,16 +6463,25 @@ export default function TakeoffViewerModule({
         // first page after ~1-2 MB instead of waiting for the full download.
         // Falls back to a full download automatically if the server ignores
         // Range requests.
-        const loadingTask = openPdfUrl(initialPdfUrl, httpHeaders, { fastImages: true });
-        loadingTask.onProgress = (progressData: { loaded: number; total: number }) => {
-          if (cancelled) return;
-          const { loaded, total } = progressData;
-          if (total > 0) {
-            setLoadProgress(Math.min(99, Math.round((loaded / total) * 100)));
-          }
-        };
-        const doc = await loadingTask.promise;
+        const cachedDoc = initialDocumentId ? findLoadedPdf(initialDocumentId) : undefined;
+        let doc: PDFDocumentProxy;
+        if (cachedDoc) {
+          doc = cachedDoc;
+        } else {
+          const loadingTask = openPdfUrl(initialPdfUrl, httpHeaders, { fastImages: true });
+          loadingTask.onProgress = (progressData: { loaded: number; total: number }) => {
+            if (cancelled) return;
+            const { loaded, total } = progressData;
+            if (total > 0) {
+              const pct = Math.min(99, Math.round((loaded / total) * 100));
+              setLoadProgress(pct);
+              onLoadProgress?.(pct);
+            }
+          };
+          doc = await loadingTask.promise;
+        }
         if (cancelled) return;
+        await hideEmbeddedMarkupLayer(doc);
         setPdfDoc(doc);
         setTotalPages(doc.numPages);
         refreshPageLabels(doc);
@@ -5524,6 +6511,7 @@ export default function TakeoffViewerModule({
         setIsDraggingRect(false);
       } catch (err) {
         if (cancelled) return;
+        setUrlLoadFailed(true);
         console.error('Failed to load PDF from URL:', err);
         addToast({
           type: 'error',
@@ -5534,6 +6522,8 @@ export default function TakeoffViewerModule({
         if (!cancelled) {
           setIsLoading(false);
           setLoadProgress(null);
+          onLoadProgress?.(null);
+          onDocumentReady?.();
         }
       }
     })();
@@ -5870,7 +6860,108 @@ export default function TakeoffViewerModule({
       m.delete(oldest);
     }
   };
+  /* FSFTM: every drawing keeps its own zoom and scroll position, so going back
+   * to it (tabs, compare, reopening) shows it exactly as it was left instead of
+   * jumping (OE-DELIVERY 2026-11-26-fsftm-pdf). Not re-applied after an
+   * in-place page edit, which keeps the view as it is. */
+  const viewKey = documentId ? `takeoff.view.${documentId}` : fileName ? `takeoff.view.local.${fileName}` : null;
+  /** The drawing had a saved view when it opened (it returns to that view). */
+  const hadSavedViewRef = useRef(false);
+  const restoreViewRef = useRef<{ zoom: number; sl: number; st: number; zoomed: boolean; fx?: number; fy?: number } | null>(null);
+  const mainCenterOnRef = useRef<((fx: number, fy: number) => void) | null>(null);
   useEffect(() => {
+    if (!pdfDoc || !viewKey) return;
+    if (docEditRemapRef.current && docEditRemapRef.current.doc === pdfDoc) return;
+    try {
+      const v = JSON.parse(localStorage.getItem(viewKey) || 'null') as { zoom?: number; sl?: number; st?: number } | null;
+      restoreViewRef.current = v && typeof v.zoom === 'number' && v.zoom > 0 ? { zoom: v.zoom, sl: v.sl ?? 0, st: v.st ?? 0, zoomed: false } : null;
+      hadSavedViewRef.current = !!restoreViewRef.current;
+    } catch {
+      restoreViewRef.current = null;
+    }
+  }, [pdfDoc, viewKey]);
+  useEffect(() => {
+    const r = restoreViewRef.current;
+    if (!r || !pdfDoc || mainRenderedPageRef.current !== currentPage) return;
+    if (!r.zoomed) {
+      r.zoomed = true;
+      if (Math.abs(zoomRef.current - r.zoom) > 1e-3) {
+        setZoom(r.zoom);
+        setRenderZoom(r.zoom);
+        return; // scroll once the new size is laid out
+      }
+    }
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const c = containerRef.current;
+      if (!c || restoreViewRef.current !== r) return;
+      if (r.fx !== undefined && r.fy !== undefined && mainCenterOnRef.current) {
+        mainCenterOnRef.current(r.fx, r.fy);
+      } else {
+        c.scrollLeft = r.sl;
+        c.scrollTop = r.st;
+      }
+      restoreViewRef.current = null;
+    }));
+  }, [pdfDoc, renderNonce, zoom, currentPage]);
+  // Live markups of this drawing for split panes that mirror it.
+  useEffect(() => {
+    if (documentId) setShared(`doc.m.${documentId}`, orderedMeasurements);
+  }, [documentId, orderedMeasurements]);
+  // Keep this drawing (and its latest page edits) loaded for quick returns.
+  useEffect(() => {
+    if (pdfDoc && documentId) cacheMainPdf(documentId, pdfDoc);
+  }, [pdfDoc, documentId]);
+  // Pick up a pane move / swap (see splitSwapHandoff), also when this
+  // drawing's viewer was already open in the background.
+  useEffect(() => {
+    const h = splitSwapHandoff;
+    if (!pdfDoc || !h || h.mainDocId !== documentId || hidden) return;
+    splitSwapHandoff = null;
+    setCurrentPage(Math.min(Math.max(1, h.main.page), pdfDoc.numPages));
+    const r = { zoom: h.main.zoom, sl: 0, st: 0, zoomed: false, fx: h.main.fx, fy: h.main.fy };
+    restoreViewRef.current = r;
+    setSplitActive(false);
+    const sv = h.split;
+    window.setTimeout(() => {
+      if (sv?.fx !== undefined && sv.fy !== undefined) splitSyncApiRef.current?.centerOn(sv.fx, sv.fy);
+      if (restoreViewRef.current === r) {
+        restoreViewRef.current = null;
+        if (r.fx !== undefined && r.fy !== undefined) mainCenterOnRef.current?.(r.fx, r.fy);
+      }
+    }, 320);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pdfDoc, documentId, hidden]);
+  useEffect(() => {
+    if (!viewKey) return;
+    const c = containerRef.current;
+    const write = () => {
+      if (restoreViewRef.current) return; // not until the saved view is back
+      try {
+        localStorage.setItem(viewKey, JSON.stringify({ zoom: zoomRef.current, page: currentPageRef.current, sl: c?.scrollLeft ?? 0, st: c?.scrollTop ?? 0 }));
+      } catch { /* ignore */ }
+    };
+    let timer = 0;
+    const onScroll = () => { window.clearTimeout(timer); timer = window.setTimeout(write, 250); };
+    onScroll();
+    c?.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      c?.removeEventListener('scroll', onScroll);
+      window.clearTimeout(timer);
+      write();
+    };
+  }, [viewKey, zoom, currentPage]);
+
+  useEffect(() => {
+    const remap = docEditRemapRef.current;
+    if (remap && remap.doc === pdfDoc) {
+      const next = new Map<number, { bz: number; lw: boolean; canvas: HTMLCanvasElement }>();
+      for (const [k, v] of pageCacheRef.current) {
+        const np = remap.map[k];
+        if (np !== undefined && !remap.changed.has(np)) next.set(np, v);
+      }
+      pageCacheRef.current = next;
+      return;
+    }
     pageCacheRef.current = new Map();
   }, [pdfDoc]);
   const prefetchTokenRef = useRef(0);
@@ -6330,6 +7421,35 @@ export default function TakeoffViewerModule({
     // Skip pages already rendered (thumbsRef) or currently rendering (queue).
     if (queue.has(n) || thumbsRef.current[n] !== undefined) return;
     queue.add(n);
+    // FSFTM fast thumbnails (OE-DELIVERY 2026-11-26-fsftm-pdf): a drawing that
+    // lives on the server gets its thumbnails rendered (and cached) there, in
+    // parallel - the browser only downloads small JPEGs.
+    const serverDocId = documentIdRef.current;
+    if (serverDocId) {
+      try {
+        const headers: Record<string, string> = { 'X-DDC-Client': 'OE/1.0' };
+        const token = getAuthToken();
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const res = await fetch(`/api/v1/takeoff/documents/${encodeURIComponent(serverDocId)}/thumbnail/${n}/?w=${THUMB_MAX_WIDTH * 2}&v=${encodeURIComponent(mainDoc.fingerprints?.[0] ?? '')}`, { headers });
+        if (res.ok) {
+          const blob = await res.blob();
+          const url = await new Promise<string>((resolve, reject) => {
+            const fr = new FileReader();
+            fr.onload = () => resolve(String(fr.result));
+            fr.onerror = () => reject(fr.error);
+            fr.readAsDataURL(blob);
+          });
+          if (pdfDocRef.current !== mainDoc) return;
+          void thumbCachePut(thumbKeyRef.current(n), url);
+          setThumbs((prev) => capThumbCache({ ...prev, [n]: url }, currentPageRef.current));
+          return;
+        }
+      } catch {
+        /* server thumbnail unavailable: fall back to rendering it here */
+      } finally {
+        if (thumbsRef.current[n] !== undefined) queue.delete(n);
+      }
+    }
     try {
       const page = await doc.getPage(n);
       // Render at 2x for sharp thumbnails on retina displays (displayed at ~120px CSS).
@@ -6384,7 +7504,7 @@ export default function TakeoffViewerModule({
    *  whenever new pages are asked for (a slow sheet never holds the others
    *  up); no idle pauses, only a short hold while the user pans / zooms. */
   const pumpThumbQueue = (): void => {
-    const lanes = Math.max(2, THUMB_LANES);
+    const lanes = documentIdRef.current ? 6 : Math.max(2, THUMB_LANES);
     const busy = thumbLanesBusyRef.current;
     for (let li = 0; li < lanes && busy.size < Math.min(lanes, thumbPendingRef.current.size + busy.size); li++) {
       if (busy.has(li)) continue;
@@ -6516,6 +7636,8 @@ export default function TakeoffViewerModule({
 
     ctx.lineWidth = 2 * dpr;
     ctx.font = `${12 * dpr}px sans-serif`;
+    // Label boxes are re-recorded on every paint (movable labels).
+    labelHitRef.current.clear();
 
     /** Draw an annotation label with a semi-transparent background at (lx, ly).
      *
@@ -6592,6 +7714,53 @@ export default function TakeoffViewerModule({
      * which is the single control for this stack. (The toolbar Names toggle
      * only gates the other badge types now, so the two controls can't fight
      * each other and hide the label unexpectedly.) */
+    /** Label move cue (OE-DELIVERY 2026-11-26-fsftm-pdf): a thin outline that
+     *  hugs the caption text plus a small grip dot above it, shown while the
+     *  label is pointed at / dragged (solid) or its markup is selected (dashed). */
+    const drawLabelCue = (id: string, x: number, y: number, w: number, h: number) => {
+      if (activeTool !== 'select') return;
+      const live = id === labelHoverId || id === labelDragId;
+      if (!live && id !== selectedMeasurementId) return;
+      const pad = 2 * dpr;
+      ctx.save();
+      ctx.strokeStyle = '#2563EB';
+      ctx.lineWidth = Math.max(1, dpr);
+      ctx.setLineDash(live ? [] : [3 * dpr, 2 * dpr]);
+      ctx.globalAlpha = live ? 0.9 : 0.55;
+      ctx.beginPath();
+      if (typeof ctx.roundRect === 'function') ctx.roundRect(x - pad, y - pad, w + pad * 2, h + pad * 2, 2 * dpr);
+      else ctx.rect(x - pad, y - pad, w + pad * 2, h + pad * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+      // Hand badge above the caption: "grab here to move the label".
+      const r = 7 * dpr;
+      const gx = x + w / 2;
+      const gy = y - pad - r - 2 * dpr;
+      ctx.beginPath();
+      ctx.moveTo(gx, y - pad);
+      ctx.lineTo(gx, gy + r);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(gx, gy, r, 0, Math.PI * 2);
+      ctx.fillStyle = live ? '#2563EB' : '#ffffff';
+      ctx.fill();
+      ctx.lineWidth = Math.max(1, dpr);
+      ctx.strokeStyle = '#2563EB';
+      ctx.stroke();
+      ctx.save();
+      const k = (r * 1.45) / 24; // lucide "hand" glyph, 24x24
+      ctx.translate(gx - 12 * k, gy - 12 * k);
+      ctx.scale(k, k);
+      ctx.lineWidth = 2.2;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = live ? '#ffffff' : '#2563EB';
+      for (const d of HAND_GLYPH) ctx.stroke(d);
+      ctx.restore();
+      ctx.restore();
+    };
+
     const drawLabelStack = (
       m: Measurement,
       cx: number, // device px (already scaled by dpr * zoom)
@@ -6630,6 +7799,28 @@ export default function TakeoffViewerModule({
         }
       }
       if (!showName && !showMaterial && !showValue) return;
+      // FSFTM movable labels (OE-DELIVERY 2026-11-26-fsftm-pdf): a dragged label
+      // sits at its offset (no leader line), and every label records its box
+      // so the Select tool can grab and move it.
+      {
+        const off = m.labelOffset;
+        if (off && (off.dx !== 0 || off.dy !== 0)) {
+          cx += off.dx * dpr * zoom;
+          cy += off.dy * dpr * zoom;
+          labelAngle = 0;
+        }
+        const zsHit = labelStyle === 'fsftm' ? zoom : 1;
+        const fsHit = Math.max(m.labelTextSize ?? labelTextSize, m.labelDimSize ?? labelDimSize) * dpr * zsHit;
+        const longest = Math.max(showName ? name.length : 0, showMaterial ? material.length : 0, showValue ? value.length : 0);
+        const linesHit = (showName ? 1 : 0) + (showMaterial ? 1 : 0) + (showValue ? 1 : 0);
+        const lbox = {
+          x: cx,
+          y: cy,
+          w: Math.max(24 * dpr, longest * fsHit * 0.62 + 10 * dpr),
+          h: Math.max(14 * dpr, linesHit * fsHit * 1.35 + 6 * dpr),
+        };
+        labelHitRef.current.set(m.id, lbox);
+      }
       // Auto Takeoff lines (beams, joists, walls ...): profile above the line,
       // length below, both centred on it and turned with it - horizontal,
       // vertical or inclined - like a dimension, so the callout on the sheet
@@ -6656,6 +7847,17 @@ export default function TakeoffViewerModule({
           ctx.font = `${wt}${fsB}px ${fam}`;
           ctx.textBaseline = 'top';
           ctx.fillText(value, 0, half + fsB * 0.15);
+        }
+        {
+          ctx.font = `${wt}${fsA}px ${fam}`;
+          const wA = showName ? ctx.measureText(name).width : 0;
+          ctx.font = `${wt}${fsB}px ${fam}`;
+          const wB = showValue ? ctx.measureText(value).width : 0;
+          const top = showName ? -half - fsA * 1.15 : half;
+          const bottom = showValue ? half + fsB * 1.15 : -half;
+          const w = Math.max(wA, wB, 1);
+          if (labelAngle === 0) labelHitRef.current.set(m.id, { x: cx, y: cy + (top + bottom) / 2, w, h: bottom - top });
+          drawLabelCue(m.id, -w / 2, top, w, bottom - top);
         }
         ctx.restore();
         ctx.textAlign = 'left';
@@ -6715,12 +7917,16 @@ export default function TakeoffViewerModule({
       // Rotate the pill around its center to match the line direction.
       const rcx = pcx;
       const rcy = pcy;
+      // The grab box is exactly the caption text (the earlier estimate was
+      // larger and sat off-centre).
+      if (labelAngle === 0) labelHitRef.current.set(m.id, { x: pcx, y: pcy, w: boxW, h: boxH });
       ctx.save();
       if (labelAngle !== 0) {
         ctx.translate(rcx, rcy);
         ctx.rotate(labelAngle);
         ctx.translate(-rcx, -rcy);
       }
+      drawLabelCue(m.id, pcx - boxW / 2, pcy - boxH / 2, boxW, boxH);
       // Pill background in the user's label colour (badge style only).
       if (!fsftm) {
         ctx.fillStyle = labelBgColor;
@@ -6777,8 +7983,10 @@ export default function TakeoffViewerModule({
       const base = measurements.find((mm) => mm.id === dragPreview.measurementId);
       if (!base || base.page !== currentPage) return null;
       const patch = dragPreview.patch;
+      const previewHoles = carryHoles(base, dragPreview.points);
       return {
         ...base,
+        ...(previewHoles ? { holes: previewHoles } : {}),
         points: dragPreview.points,
         value: patch.value,
         label: patch.label,
@@ -6788,6 +7996,41 @@ export default function TakeoffViewerModule({
         ...(patch.height !== undefined ? { height: patch.height } : {}),
       };
     })();
+
+    // FSFTM cutouts are real holes in their area (OE-DELIVERY 2026-11-26-fsftm-pdf):
+    // collect them per parent so the area fill leaves them empty.
+    const cutoutsByParent = new Map<string, Measurement[]>();
+    for (const cm of measurements) {
+      if (cm.page !== currentPage || !cm.cutoutOf || hiddenMeasurements.has(cm.id)) continue;
+      if (cm.type !== 'polygonCutout' && cm.type !== 'ellipseCutout') continue;
+      const list = cutoutsByParent.get(cm.cutoutOf);
+      if (list) list.push(cm);
+      else cutoutsByParent.set(cm.cutoutOf, [cm]);
+    }
+    // Areas on this page that are shown: their cutouts are holes, whatever
+    // order the shapes are painted in.
+    const drawnParents = new Set<string>(
+      measurements
+        .filter((am) => am.page === currentPage && (am.type === 'area' || am.type === 'volume') && am.points.length >= 3 && !hiddenMeasurements.has(am.id) && !hiddenGroups.has(am.group) && !hiddenTypes.has(am.type))
+        .map((am) => am.id),
+    );
+    const addCutoutSubpaths = (parentId: string) => {
+      for (const c of cutoutsByParent.get(parentId) ?? []) {
+        if (c.type === 'polygonCutout' && c.points.length >= 3) {
+          ctx.moveTo(c.points[0]!.x * dpr * zoom, c.points[0]!.y * dpr * zoom);
+          for (let i = 1; i < c.points.length; i++) ctx.lineTo(c.points[i]!.x * dpr * zoom, c.points[i]!.y * dpr * zoom);
+          ctx.closePath();
+        } else if (c.type === 'ellipseCutout' && c.points.length === 2) {
+          const cp = c.points[0]!;
+          const ep = c.points[1]!;
+          const rx = Math.abs(ep.x - cp.x) * dpr * zoom;
+          const ry = Math.abs(ep.y - cp.y) * dpr * zoom;
+          ctx.moveTo(cp.x * dpr * zoom + rx, cp.y * dpr * zoom);
+          ctx.ellipse(cp.x * dpr * zoom, cp.y * dpr * zoom, rx, ry, 0, 0, Math.PI * 2);
+          ctx.closePath();
+        }
+      }
+    };
 
     // Draw completed measurements on current page (respecting group visibility).
     // Iterate the ordered projection (issue #379) so an explicit z-order drives
@@ -6951,6 +8194,13 @@ export default function TakeoffViewerModule({
           ctx.lineTo(pt.x * dpr * zoom, pt.y * dpr * zoom);
         }
         ctx.closePath();
+        addCutoutSubpaths(m.id);
+        for (const h of m.holes ?? []) {
+          if (h.length < 3) continue;
+          ctx.moveTo(h[0]!.x * dpr * zoom, h[0]!.y * dpr * zoom);
+          for (let i = 1; i < h.length; i++) ctx.lineTo(h[i]!.x * dpr * zoom, h[i]!.y * dpr * zoom);
+          ctx.closePath();
+        }
         // An opening deduction (area void) renders in a warning red with a
         // dashed outline so the estimator can see at a glance which areas are
         // being subtracted from the net.
@@ -6960,14 +8210,14 @@ export default function TakeoffViewerModule({
           ctx.fillStyle = '#ef4444';
           ctx.strokeStyle = '#ef4444';
           ctx.globalAlpha = m.fillAlpha ?? 0.18;
-          ctx.fill();
+          ctx.fill('evenodd');
           ctx.globalAlpha = 1;
           ctx.setLineDash([6 * dpr, 4 * dpr]);
           ctx.stroke();
           ctx.restore();
         } else {
           ctx.globalAlpha = m.fillAlpha ?? 0.15;
-          ctx.fill();
+          ctx.fill('evenodd');
           ctx.globalAlpha = 1;
           ctx.stroke();
         }
@@ -7001,7 +8251,10 @@ export default function TakeoffViewerModule({
         drawLabelStack(m, cx, cy);
       }
 
-      if (m.type === 'polygonCutout' && m.points.length >= 3) {
+      if (m.type === 'polygonCutout' && m.points.length >= 3 && m.cutoutOf && drawnParents.has(m.cutoutOf)) {
+        // Erased from the area: the hole is the whole drawing (no label, no
+        // extra layer). It stays selectable, so its points can still be edited.
+      } else if (m.type === 'polygonCutout' && m.points.length >= 3) {
         const firstPt = m.points[0]!;
         ctx.save();
         ctx.strokeStyle = '#ef4444';
@@ -7024,7 +8277,9 @@ export default function TakeoffViewerModule({
         drawLabelStack(m, cx, cy);
       }
 
-      if (m.type === 'ellipseCutout' && m.points.length === 2) {
+      if (m.type === 'ellipseCutout' && m.points.length === 2 && m.cutoutOf && drawnParents.has(m.cutoutOf)) {
+        // Erased from the area (see polygonCutout above).
+      } else if (m.type === 'ellipseCutout' && m.points.length === 2) {
         const cp = m.points[0]!;
         const ep = m.points[1]!;
         const cx = cp.x * dpr * zoom;
@@ -8213,7 +9468,7 @@ export default function TakeoffViewerModule({
         }
 
         // Midpoint "+" add-vertex handles (variable-vertex types only).
-        if (supportsVariableVertices(selected.type) && pts.length >= 2 && !preview) {
+        if (supportsVariableVertices(selected.type) && ADD_POINT_TYPES.has(selected.type) && pts.length >= 2 && !preview) {
           const closed = selected.type === 'area' || selected.type === 'volume' || selected.type === 'cloud';
           const segCount = closed ? pts.length : pts.length - 1;
           ctx.strokeStyle = accent;
@@ -8253,6 +9508,33 @@ export default function TakeoffViewerModule({
           ctx.lineWidth = 2 * dpr;
           ctx.strokeStyle = accent;
           ctx.stroke();
+        }
+
+        // Cut-out holes: dashed outline and their own grabbable points.
+        {
+          const selHoles = preview ? carryHoles(selected, preview.points) : selected.holes;
+          for (const h of selHoles ?? []) {
+            if (h.length < 3) continue;
+            ctx.strokeStyle = accent;
+            ctx.lineWidth = 1.5 * dpr;
+            ctx.setLineDash([5 * dpr, 4 * dpr]);
+            ctx.beginPath();
+            ctx.moveTo(h[0]!.x * dpr * zoom, h[0]!.y * dpr * zoom);
+            for (let i = 1; i < h.length; i++) ctx.lineTo(h[i]!.x * dpr * zoom, h[i]!.y * dpr * zoom);
+            ctx.closePath();
+            ctx.stroke();
+            ctx.setLineDash([]);
+            if (h.length > 64) continue; // round holes: no point grips
+            for (const p of h) {
+              ctx.beginPath();
+              ctx.arc(p.x * dpr * zoom, p.y * dpr * zoom, 4 * dpr, 0, Math.PI * 2);
+              ctx.fillStyle = '#ffffff';
+              ctx.fill();
+              ctx.lineWidth = 2 * dpr;
+              ctx.strokeStyle = accent;
+              ctx.stroke();
+            }
+          }
         }
 
         // Live value readout + bowtie warning while dragging.
@@ -8502,7 +9784,7 @@ export default function TakeoffViewerModule({
       ctx.stroke();
       ctx.restore();
     }
-  }, [measurements, orderedMeasurements, activePoints, currentPage, zoom, settingScale, scalePoints, activeTool, hiddenGroups, hiddenMeasurements, scale, pageScales, annotationColor, rectStartPoint, isDraggingRect, selectedMeasurementId, selectedLedgerIds, marqueeRect, boxDragRect, zoomAreaRect, dragPreview, liveCursor, panning, searchMatches, activeMatchIdx, measurementSystem, snapPoint, snapIsContent, snapKind, showLabels, showDimensions, labelTextSize, labelMaterialSize, labelDimSize, labelTextColor, labelNameColor, labelMaterialColor, labelDimColor, labelBgColor, labelShowName, labelShowMaterial, labelShowDimension, renderNonce, groupColorMap, multiplyGhosts, offsetGhost, legendTextColor, legendBgColor, legendBorderStyle, legendStyle, legendPadTop, legendPadBottom, legendPadLeft, legendPadRight, showTextInput, editingTextId, viewportDraft, hiddenTypes, labelStyle, autoHighlightAll, autoShowColumns, labelFontCss, labelFontStyle, displayUnitPref, autoRoleFilter, markupTextPrompt, cloudLeader]);
+  }, [measurements, orderedMeasurements, activePoints, currentPage, zoom, settingScale, scalePoints, activeTool, hiddenGroups, hiddenMeasurements, scale, pageScales, annotationColor, rectStartPoint, isDraggingRect, selectedMeasurementId, selectedLedgerIds, marqueeRect, boxDragRect, zoomAreaRect, dragPreview, liveCursor, panning, searchMatches, activeMatchIdx, measurementSystem, snapPoint, snapIsContent, snapKind, showLabels, showDimensions, labelTextSize, labelMaterialSize, labelDimSize, labelTextColor, labelNameColor, labelMaterialColor, labelDimColor, labelBgColor, labelShowName, labelShowMaterial, labelShowDimension, renderNonce, groupColorMap, multiplyGhosts, offsetGhost, legendTextColor, legendBgColor, legendBorderStyle, legendStyle, legendPadTop, legendPadBottom, legendPadLeft, legendPadRight, showTextInput, editingTextId, viewportDraft, hiddenTypes, labelStyle, autoHighlightAll, autoShowColumns, labelFontCss, labelFontStyle, displayUnitPref, autoRoleFilter, markupTextPrompt, cloudLeader, labelHoverId, labelDragId]);
 
   /* ── Canvas click handler ────────────────────────────────────────── */
 
@@ -8559,26 +9841,6 @@ export default function TakeoffViewerModule({
     }
     return null;
   }, [measurements, selectedMeasurementId, currentPage]);
-
-  /** Recalculate a parent area's net value after cutouts change. */
-  const updateParentForCutout = useCallback((parentId: string) => {
-    setMeasurements((prev) => {
-      const parent = prev.find((m) => m.id === parentId);
-      if (!parent) return prev;
-      const cutouts = prev.filter((m) => m.cutoutOf === parentId);
-      const cutoutArea = cutouts.reduce((s, c) => s + c.value, 0);
-      // Parent value stores gross; net = gross - cutouts. We store net in value.
-      // To avoid compounding, we need the gross. Store gross in a custom field.
-      const gross = (parent as any)._grossArea ?? parent.value;
-      const net = Math.max(0, gross - cutoutArea);
-      return prev.map((m) => {
-        if (m.id !== parentId) return m;
-        const updated = { ...m, value: net, _grossArea: gross } as Measurement & { _grossArea: number };
-        updated.label = `${formatMeasurement(net, m.unit)} (net)`;
-        return updated;
-      });
-    });
-  }, []);
 
   const nextAnnotation = useCallback(
     (type: string) => {
@@ -9021,6 +10283,11 @@ export default function TakeoffViewerModule({
   const handleCanvasClick = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       if (textSelArmedRef.current) return; // the Text Select tool owns the clicks
+      // Multiply with live tracking: this click places the copies.
+      if (multiplyTrackRef.current) {
+        multiplyConfirmRef.current();
+        return;
+      }
       // Ctrl / Shift on this click decide straight vs free (update 15).
       modsRef.current = { ctrl: e.ctrlKey || e.metaKey, shift: e.shiftKey };
       // Take the typed Sketch-to-Scale point now so an early return below can
@@ -9560,29 +10827,21 @@ export default function TakeoffViewerModule({
           const ep = newPoints[1]!;
           const rxPx = Math.abs(ep.x - cp.x);
           const ryPx = Math.abs(ep.y - cp.y);
-          // Approximate as circle with average radius for area calc
-          const rPx = (rxPx + ryPx) / 2;
-          const areaPx = Math.PI * rPx * rPx;
-          const realArea = toRealArea(areaPx, scale);
-          // Find parent area: selected area, or area containing the center
-          const parent = findParentArea(cp);
-          const newMeasurement: Measurement = {
-            id: `m_${Date.now()}`,
-            type: 'ellipseCutout',
-            points: newPoints,
-            value: realArea,
-            unit: `${scale.unitLabel}²`,
-            label: `-${formatMeasurement(realArea, scale.unitLabel + '²')}`,
-            annotation: nextAnnotation('ellipseCutout'),
-            ...toolFieldSpread(),
-            page: currentPage,
-            group: activeGroup,
-            cutoutOf: parent?.id,
-          };
-          pushUndo({ kind: 'complete_measurement', measurement: newMeasurement, previousActivePoints: [...activePoints] });
-          setMeasurements((prev) => [...prev, newMeasurement]);
           setActivePoints([]);
-          if (parent) updateParentForCutout(parent.id);
+          const parent = findParentArea(cp);
+          if (!parent) {
+            addToast({ type: 'info', title: 'Draw the cut-out inside an area', message: 'Select the area first, or start the cut-out on top of it.' });
+            return;
+          }
+          if (rxPx < 0.5 || ryPx < 0.5) return;
+          // Round hole: kept as a fine polygon so it fills, moves and
+          // measures exactly like any other hole.
+          const ring: Point[] = [];
+          for (let i = 0; i < 72; i++) {
+            const a = (i / 72) * Math.PI * 2;
+            ring.push({ x: cp.x + rxPx * Math.cos(a), y: cp.y + ryPx * Math.sin(a) });
+          }
+          addHoleToAreaRef.current(parent, ring);
         } else {
           pushUndo({ kind: 'add_point', tool: 'ellipseCutout', point });
         }
@@ -10001,30 +11260,20 @@ export default function TakeoffViewerModule({
       return;
     }
 
-    // Polygon Cutout: close polygon with double-click, subtract from parent area
+    // Polygon / rectangle cutout (OE-DELIVERY 2026-11-26-fsftm-pdf): the
+    // outline becomes a hole IN the area under it (or the selected area): the
+    // area's fill leaves it open, the value drops by it, and the two move and
+    // edit as one markup.
     if (activeTool === 'polygonCutout' && pts.length >= 3) {
-      const pixArea = polygonAreaPixels(pts);
-      const realArea = toRealArea(pixArea, scale);
       const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
       const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
       const parent = findParentArea({ x: cx, y: cy });
-      const newMeasurement: Measurement = {
-        id: `m_${Date.now()}`,
-        type: 'polygonCutout',
-        points: [...pts],
-        value: realArea,
-        unit: `${scale.unitLabel}²`,
-        label: `-${formatMeasurement(realArea, scale.unitLabel + '²')}`,
-        annotation: nextAnnotation('polygonCutout'),
-        ...toolFieldSpread(),
-        page: currentPage,
-        group: activeGroup,
-        cutoutOf: parent?.id,
-      };
-      pushUndo({ kind: 'complete_measurement', measurement: newMeasurement, previousActivePoints: [...pts] });
-      setMeasurements((prev) => [...prev, newMeasurement]);
       setActivePoints([]);
-      if (parent) updateParentForCutout(parent.id);
+      if (!parent) {
+        addToast({ type: 'info', title: 'Draw the cut-out inside an area', message: 'Select the area first, or start the cut-out on top of it.' });
+        return;
+      }
+      addHoleToAreaRef.current(parent, [...pts]);
       return;
     }
 
@@ -10383,29 +11632,15 @@ export default function TakeoffViewerModule({
       setSelectedLedgerIds(new Set());
       return;
     }
-    const hits = editableOnPage().filter((m) => {
-      if (m.flattened) return false;
-      if (m.points.length === 0) return false;
-      let bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity;
-      for (const p of m.points) {
-        if (p.x < bx0) bx0 = p.x;
-        if (p.y < by0) by0 = p.y;
-        if (p.x > bx1) bx1 = p.x;
-        if (p.y > by1) by1 = p.y;
-      }
-      // BBox overlap (either direction), with a small tolerance so single
-      // points / thin lines inside the box are caught.
-      const tol = 2;
-      return bx0 - tol <= x1 && bx1 + tol >= x0 && by0 - tol <= y1 && by1 + tol >= y0;
-    });
-    setSelectedLedgerIds(new Set(hits.map((m) => m.id)));
-    if (hits.length === 1) setSelectedMeasurementId(hits[0]!.id);
-    else if (hits.length > 1) setSelectedMeasurementId(hits[hits.length - 1]!.id);
-    else setSelectedMeasurementId(null);
-    if (hits.length > 0) {
-      addToast({ type: 'info', title: `${hits.length} measurement${hits.length === 1 ? '' : 's'} selected` });
-    }
-  }, [editableOnPage, addToast]);
+    const box = { x0, y0, x1, y1 };
+    const hits = editableOnPage().filter((m) => !m.flattened && m.points.length > 0 && measurementTouchesBox(m, box, 2 / (zoomRef.current || 1)));
+    // Shift / Ctrl + drag adds to the current selection.
+    const ids = new Set(mq.additive ? selectedLedgerIdsRef.current : []);
+    for (const m of hits) ids.add(m.id);
+    setSelectedLedgerIds(ids);
+    if (hits.length > 0) setSelectedMeasurementId(hits[hits.length - 1]!.id);
+    else if (ids.size === 0) setSelectedMeasurementId(null);
+  }, [editableOnPage]);
 
   /** FSFTM Zoom tool release (OE-DELIVERY 2026-11-02-fsftm-zoom):
    *  a click zooms in (Alt/Shift: out) by one step around the point; a drag
@@ -10594,8 +11829,10 @@ export default function TakeoffViewerModule({
         const updated = prev.map((m) => {
           if (m.id !== id) return m;
           const patch = recomputeMeasurement(m, nextPoints, editScaleFor(m, nextPoints));
+          const carried = carryHoles(m, nextPoints);
           const next: Measurement = {
             ...m,
+            ...(carried ? { holes: carried } : {}),
             points: nextPoints,
             value: patch.value,
             label: patch.label,
@@ -10637,8 +11874,10 @@ export default function TakeoffViewerModule({
           // the whole gesture as ONE creation undo frame.
           const base = drag.original;
           const patch = recomputeMeasurement(base, drag.lastPoints, editScaleFor(base, drag.lastPoints));
+          const cloneHoles = carryHoles(base, drag.lastPoints);
           const finalClone: Measurement = {
             ...base,
+            ...(cloneHoles ? { holes: cloneHoles } : {}),
             points: drag.lastPoints,
             value: patch.value,
             label: patch.label,
@@ -10684,6 +11923,65 @@ export default function TakeoffViewerModule({
     [commitGeometryEdit, pushUndo],
   );
 
+  /** Cut-out hole point drag (OE-DELIVERY 2026-11-26-fsftm-pdf). */
+  const holeDragRef = useRef<{ id: string; hole: number; index: number; before: Measurement; moved: boolean } | null>(null);
+  const withHoles = (m: Measurement, holes: Point[][] | undefined): Measurement => {
+    const base: Measurement = { ...m, holes: holes && holes.length ? holes : undefined };
+    const patch = recomputeMeasurement(base, base.points, editScaleFor(base, base.points));
+    return {
+      ...base,
+      value: patch.value,
+      label: patch.label,
+      unit: patch.unit ?? base.unit,
+      ...(patch.area !== undefined ? { area: patch.area } : {}),
+    };
+  };
+  const withHolesRef = useRef(withHoles);
+  withHolesRef.current = withHoles;
+  useEffect(() => {
+    const move = (ev: MouseEvent) => {
+      const d = holeDragRef.current;
+      if (!d) return;
+      const p = pointerToPdfRef.current?.(ev);
+      if (!p) return;
+      d.moved = true;
+      setMeasurements((prev) =>
+        prev.map((x) => {
+          if (x.id !== d.id || !x.holes?.[d.hole]) return x;
+          const holes = x.holes.map((h, hi) => (hi === d.hole ? h.map((q, vi) => (vi === d.index ? p : q)) : h));
+          return withHolesRef.current(x, holes);
+        }),
+      );
+    };
+    const up = () => {
+      const d = holeDragRef.current;
+      if (!d) return;
+      holeDragRef.current = null;
+      const after = measurementsRef.current.find((x) => x.id === d.id);
+      if (d.moved && after) {
+        pushUndo({ kind: 'edit_geometry', measurementId: d.id, previousMeasurement: d.before, nextMeasurement: { ...after, points: [...after.points] } });
+      }
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+    return () => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  /** Cut a hole out of an area: the hole becomes part of the area. */
+  const addHoleToArea = (parent: Measurement, hole: Point[]) => {
+    const live = measurementsRef.current.find((x) => x.id === parent.id) ?? parent;
+    const before: Measurement = { ...live, points: [...live.points] };
+    const next = withHoles(live, [...(live.holes ?? []), hole]);
+    setMeasurements((prev) => prev.map((x) => (x.id === live.id ? next : x)));
+    pushUndo({ kind: 'edit_geometry', measurementId: live.id, previousMeasurement: before, nextMeasurement: { ...next, points: [...next.points] } });
+    setSelectedMeasurementId(live.id);
+  };
+  const addHoleToAreaRef = useRef(addHoleToArea);
+  addHoleToAreaRef.current = addHoleToArea;
+
   /** Flush the pending arrow-key nudge burst into undo frames: one
    *  edit_geometry frame per moved markup, previous = its position
    *  before the burst started. */
@@ -10722,7 +12020,11 @@ export default function TakeoffViewerModule({
           if (!bag.originals.has(m.id)) {
             bag.originals.set(m.id, { ...m, points: [...m.points] });
           }
-          return { ...m, points: translatePoints(m.points, dx, dy) };
+          return {
+            ...m,
+            points: translatePoints(m.points, dx, dy),
+            ...(m.holes ? { holes: m.holes.map((h) => translatePoints(h, dx, dy)) } : {}),
+          };
         }),
       );
       if (bag.timer) window.clearTimeout(bag.timer);
@@ -10878,6 +12180,35 @@ export default function TakeoffViewerModule({
         const ae = document.activeElement as HTMLElement | null;
         if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'SELECT')) ae.blur();
       }
+      // FSFTM movable labels: Select tool + press on a label = drag the label.
+      if (e.button === 0 && activeToolRef.current === 'select' && !deepModeRef.current && overlayRef.current) {
+        const ov = overlayRef.current;
+        const r = ov.getBoundingClientRect();
+        if (r.width > 0) {
+          const k = ov.width / r.width;
+          const px = (e.clientX - r.left) * k;
+          const py = (e.clientY - r.top) * k;
+          let hitId: string | null = null;
+          for (const [id, b] of labelHitRef.current) {
+            if (Math.abs(px - b.x) <= b.w / 2 && Math.abs(py - b.y) <= b.h / 2) hitId = id;
+          }
+          const hm = hitId ? measurementsRef.current.find((x) => x.id === hitId) : undefined;
+          if (hm && !hm.locked && hm.page === currentPageRef.current) {
+            labelDragRef.current = {
+              id: hm.id,
+              startX: e.clientX,
+              startY: e.clientY,
+              dx0: hm.labelOffset?.dx ?? 0,
+              dy0: hm.labelOffset?.dy ?? 0,
+              before: { ...hm, points: [...hm.points] },
+            };
+            setLabelDragId(hm.id);
+            setSelectedMeasurementId(hm.id);
+            e.preventDefault();
+            return;
+          }
+        }
+      }
       // Text Select tool (update 21): start a text drag.
       if (textSelArmedRef.current && e.button === 0) {
         const tp = pointerToPdf(e);
@@ -10971,6 +12302,17 @@ export default function TakeoffViewerModule({
       const onPage = editableOnPage();
       const selId = selectedMeasurementIdRef.current;
 
+      // A point of a cut-out hole on the selected area: drag that point.
+      {
+        const hs = onPage.find((m) => m.id === selId);
+        const hh = hs && !hs.locked && !e.shiftKey && !e.ctrlKey && !e.metaKey ? hitHoleVertex(pt, hs.holes, z) : null;
+        if (hs && hh && (hs.holes?.[hh[0]]?.length ?? 0) <= 64) {
+          holeDragRef.current = { id: hs.id, hole: hh[0], index: hh[1], before: { ...hs, points: [...hs.points] }, moved: false };
+          setHoverInfo(null);
+          e.preventDefault();
+          return;
+        }
+      }
       // Prefer the already-selected measurement so its handles win even when
       // another shape overlaps; otherwise scan top-to-bottom (reverse z).
       const ordered: Measurement[] = [];
@@ -11063,6 +12405,12 @@ export default function TakeoffViewerModule({
         }
 
         if (m.id !== selId) setSelectedMeasurementId(m.id);
+        // A plain click on a markup that is not part of the current
+        // multi-selection selects just that markup (the old set used to
+        // linger, so Delete or a drag hit markups no longer highlighted).
+        if (!m.markupGroupId && selectedLedgerIdsRef.current.size > 0 && !selectedLedgerIdsRef.current.has(m.id)) {
+          setSelectedLedgerIds(new Set());
+        }
         // Grouped markups co-select (Step 4): the whole group becomes
         // the multi-selection so bulk actions treat it as one unit.
         if (m.markupGroupId) {
@@ -11165,7 +12513,7 @@ export default function TakeoffViewerModule({
             moved: false,
             lastPoints: [...m.points],
           };
-        } else if (hit.kind === 'edge' && supportsVariableVertices(m.type)) {
+        } else if (hit.kind === 'edge' && supportsVariableVertices(m.type) && ADD_POINT_TYPES.has(m.type)) {
           // Insert a vertex at the segment midpoint and immediately drag it.
           const grown = insertVertexAt(m.points, hit.index);
           const newIndex = hit.index + 1;
@@ -11224,7 +12572,7 @@ export default function TakeoffViewerModule({
         return;
       }
       activeVertexRef.current = null;
-      marqueeRef.current = { start: pt, current: pt };
+      marqueeRef.current = { start: pt, current: pt, additive: e.shiftKey || e.ctrlKey || e.metaKey };
       setMarqueeRect({ x0: pt.x, y0: pt.y, x1: pt.x, y1: pt.y });
       e.preventDefault();
     },
@@ -11312,6 +12660,7 @@ export default function TakeoffViewerModule({
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       modsRef.current = { ctrl: e.ctrlKey || e.metaKey, shift: e.shiftKey };
       lastPointerPdfRef.current = pointerToPdfRef.current?.(e) ?? null;
+      if (multiplyTrackRef.current && lastPointerPdfRef.current) trackMultiplyRef.current(lastPointerPdfRef.current);
       if (textSelArmedRef.current && textSelStartRef.current && (e.buttons & 1)) {
         const tp = pointerToPdf(e);
         const st = textSelStartRef.current;
@@ -11607,7 +12956,28 @@ export default function TakeoffViewerModule({
       // Hover tooltip: in select mode, surface the topmost measurement under
       // the cursor (value / group / linked BOQ). Reuses the same hit-test the
       // selection path uses so the hover target matches what a click selects.
-      if (activeTool === 'select' && pt) {
+      let overLabel: string | null = null;
+      if (activeTool === 'select' && pt && !deepModeRef.current && overlayRef.current && !dragRef.current) {
+        const ov = overlayRef.current;
+        const r = ov.getBoundingClientRect();
+        if (r.width > 0) {
+          const k = ov.width / r.width;
+          const px = (e.clientX - r.left) * k;
+          const py = (e.clientY - r.top) * k;
+          for (const [id, b] of labelHitRef.current) {
+            if (Math.abs(px - b.x) <= b.w / 2 && Math.abs(py - b.y) <= b.h / 2) overLabel = id;
+          }
+          if (overLabel) {
+            const lm = measurementsRef.current.find((x) => x.id === overLabel);
+            if (!lm || lm.locked || lm.page !== currentPageRef.current) overLabel = null;
+          }
+        }
+      }
+      setLabelHoverId((prev) => (prev === overLabel ? prev : overLabel));
+      if (activeTool === 'select' && pt && overLabel) {
+        setSelectHoverCursor((prev) => (prev === 'grab' ? prev : 'grab'));
+        if (hoverInfo) setHoverInfo(null);
+      } else if (activeTool === 'select' && pt) {
         const z = zoomRef.current || 1;
         const onPage = editableOnPage();
         let foundId: string | null = null;
@@ -11618,6 +12988,13 @@ export default function TakeoffViewerModule({
             break;
           }
         }
+        let cur: 'move' | 'crosshair' | null = null;
+        if (foundId) {
+          const fm = onPage.find((x) => x.id === foundId);
+          const fh = fm ? hitTest(pt, fm, z, fm.id === selectedMeasurementIdRef.current) : null;
+          cur = fm?.locked ? null : fh && (fh.kind === 'vertex' || fh.kind === 'edge' || fh.kind === 'text-resize') ? 'crosshair' : 'move';
+        }
+        setSelectHoverCursor((prev) => (prev === cur ? prev : cur));
         if (foundId) {
           const rect = overlayRef.current?.getBoundingClientRect();
           setHoverInfo({
@@ -11637,6 +13014,7 @@ export default function TakeoffViewerModule({
 
   /** Clear the transient HUD / hover state when the pointer leaves the canvas. */
   const handleCanvasMouseLeave = useCallback(() => {
+    setLabelHoverId(null);
     if (liveCursor) setLiveCursor(null);
     if (hoverInfo) setHoverInfo(null);
     setSnapPoint((cur) => (cur ? null : cur));
@@ -12202,9 +13580,9 @@ export default function TakeoffViewerModule({
   }, []);
 
   const fitToViewport = useCallback(
-    (mode: 'width' | 'page') => {
+    (mode: 'width' | 'page'): number | null => {
       const page = pageSizePdf();
-      if (!page) return;
+      if (!page) return null;
       const vp = viewportSize();
       const next = computeFitZoom(page.width, page.height, vp.width, vp.height, mode);
       zoomTo(next);
@@ -12230,11 +13608,53 @@ export default function TakeoffViewerModule({
           c.scrollTop = Math.max(0, (page.height * next - c.clientHeight) / 2);
         }
       });
+      return next;
     },
     [pageSizePdf, viewportSize, resetPan, zoomTo],
   );
 
   const zoomFit = useCallback(() => fitToViewport('page'), [fitToViewport]);
+  const lastToolReqRef = useRef(0);
+  useEffect(() => {
+    if (!toolReq || toolReq.key !== focusKey || toolReq.n === lastToolReqRef.current) return;
+    lastToolReqRef.current = toolReq.n;
+    selectToolRef.current?.(toolReq.tool as MeasureTool);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [toolReq]);
+  /* A drawing opened in a split pane fits the pane the first time it shows
+   * (unless it has a saved view to return to) - a big sheet at 100% in a
+   * narrow pane looked cropped (OE-DELIVERY 2026-11-26-fsftm-pdf). */
+  const paneFitDoneRef = useRef(false);
+  useEffect(() => {
+    if (!compact || !pdfDoc || paneFitDoneRef.current) return;
+    const c = containerRef.current;
+    if (!c || c.clientWidth === 0 || mainRenderedPageRef.current !== currentPageRef.current) return;
+    paneFitDoneRef.current = true;
+    // Let the pane finish laying out (slot attach, page bar) before fitting.
+    if (!hadSavedViewRef.current) window.setTimeout(() => { paneAutoZoomRef.current = fitToViewport('page'); }, 250);
+  });
+  /** Zoom the pane fit chose; while it is unchanged (the user has not
+   *  zoomed), a resized pane fits again. */
+  const paneAutoZoomRef = useRef<number | null>(null);
+  useEffect(() => {
+    const c = containerRef.current;
+    if (!c || !compact) return;
+    let timer = 0;
+    const ro = new ResizeObserver(() => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        const auto = paneAutoZoomRef.current;
+        // Only a pane on screen re-fits (a parked one sits in the full-size stack).
+        if (hiddenPropRef.current || auto === null || c.clientWidth === 0 || Math.abs(zoomRef.current - auto) > 1e-3) return;
+        paneAutoZoomRef.current = fitToViewport('page');
+      }, 150);
+    });
+    ro.observe(c);
+    return () => {
+      window.clearTimeout(timer);
+      ro.disconnect();
+    };
+  }, [compact, pdfDoc, fitToViewport]);
 
   /** Zoom + pan so the selected measurement(s) on the current page fill the
    *  viewport with a margin. No-op (with a hint toast) when nothing on the
@@ -12462,6 +13882,8 @@ export default function TakeoffViewerModule({
     if (!root) return;
     const handleRootWheel = (e: WheelEvent) => {
       if (!e.ctrlKey && !e.metaKey) return;
+      // A split pane's own editor sits inside this one: it zooms itself.
+      if ((e.target as Element | null)?.closest?.('[data-viewer-root]') !== root) return;
       const container = containerRef.current;
       if (!container) return;
       e.preventDefault();
@@ -13909,32 +15331,89 @@ export default function TakeoffViewerModule({
    *  and sheet labels move with their pages (rotated pages turn their markups).
    *  Nothing is saved as a copy, so there is no re-open pause. */
   const pageEditBusyRef = useRef(false);
-  const runPageEdit = async (
+  /** After an in-place page edit: old page -> new page, and the new pages whose
+   *  CONTENT changed (inserted / rotated). Everything else - page bitmaps,
+   *  thumbnails, sheet labels, words - is carried over instead of reloaded. */
+  const docEditRemapRef = useRef<{ doc: PDFDocumentProxy; map: Record<number, number>; changed: Set<number> } | null>(null);
+  /** Label of the page edit being applied (shown on the thumbnail panel). */
+  const [pageEditBusy, setPageEditBusy] = useState<string | null>(null);
+  const runPageEditNow = async (
     edit: pdfPages.PageEdit,
     suffix: string,
-    rotate?: { pages: Set<number>; deg: 90 | 180 | 270 },
-    goTo?: number,
+    rotate: { pages: Set<number>; deg: 90 | 180 | 270 } | undefined,
+    goTo: number | undefined,
+    thumbsAlready: boolean,
   ) => {
-    if (!pdfDoc || pageEditBusyRef.current) return;
+    // Runs from a queue: always work on the LATEST document / page.
+    const pdfDoc = pdfDocRef.current;
+    if (!pdfDoc) return;
+    const currentPage = currentPageRef.current;
     pageEditBusyRef.current = true;
     try {
-      const orig = await pdfDoc.getData();
       // Page sizes before the edit (rotation turns points inside them).
       const before = new Map<number, { w: number; h: number }>();
       if (rotate) for (const pg of rotate.pages) { const vp = await viewportOf(pg); before.set(pg, { w: vp.width, h: vp.height }); }
-      const r = await pdfPages.editPages(orig, edit);
-      const map = r.pageMap;
       const projectId = selectedProjectId || activeProjectId || '';
-      if (documentId && projectId) {
-        const fd = new FormData();
-        fd.append('file', new Blob([r.bytes as BlobPart], { type: 'application/pdf' }), fileName || 'drawing.pdf');
-        const headers: Record<string, string> = { 'X-DDC-Client': 'OE/1.0' };
-        const token = getAuthToken();
-        if (token) headers['Authorization'] = `Bearer ${token}`;
-        const res = await fetch(`/api/v1/takeoff/documents/${encodeURIComponent(documentId)}/file/`, { method: 'PUT', headers, body: fd });
-        if (!res.ok) throw new Error(`Saving the edited drawing failed (${res.status})`);
+      const headers: Record<string, string> = { 'X-DDC-Client': 'OE/1.0' };
+      const token = getAuthToken();
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      let map: Record<number, number>;
+      let newDoc: PDFDocumentProxy;
+      let thumbsRemapped = false;
+      let thumbsBefore: Record<number, string> | null = null;
+      if (documentId && projectId && pdfPages.isServerPageEdit(edit)) {
+        // FAST PATH (OE-DELIVERY 2026-11-26-fsftm-pdf): the server edits the
+        // file (a fraction of a second, even on a big set) and the viewer
+        // re-opens it by byte ranges - only the parts it needs are fetched;
+        // page images, thumbnails and labels carry over below.
+        map = pdfPages.planPageMap(edit, pdfDoc.numPages).pageMap;
+        // Show the new order in the thumbnails at once (fraction of a second);
+        // put it back if the server refuses the edit.
+        if (thumbsAlready) {
+          thumbsRemapped = true;
+        } else if (edit.kind !== 'rotate') {
+          thumbsBefore = thumbsRef.current;
+          const early: Record<number, string> = {};
+          for (const [k, v] of Object.entries(thumbsRef.current)) {
+            const np = map[Number(k)];
+            if (np !== undefined) early[np] = v;
+          }
+          setThumbs(early);
+          thumbsRemapped = true;
+        }
+        const res = await fetch(`/api/v1/takeoff/documents/${encodeURIComponent(documentId)}/pages/edit/`, {
+          method: 'POST',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify(edit),
+        });
+        if (!res.ok) {
+          let detail = '';
+          try { detail = ((await res.json()) as { detail?: string }).detail ?? ''; } catch { /* ignore */ }
+          if (thumbsBefore) setThumbs(thumbsBefore);
+          else if (thumbsAlready) setThumbs({}); // redraw them from the real document
+          throw new Error(`Saving the page change failed (${res.status})${detail ? `: ${detail}` : ''}`);
+        }
+        newDoc = await openPdfUrl(`/api/v1/takeoff/documents/${encodeURIComponent(documentId)}/download/?v=${Date.now()}`, headers, { fastImages: true }).promise;
+      } else {
+        // Local file (or an edit that needs other bytes): edit in the browser.
+        const orig = await pdfDoc.getData();
+        const r = await pdfPages.editPages(orig, edit);
+        map = r.pageMap;
+        if (documentId && projectId) {
+          const fd = new FormData();
+          fd.append('file', new Blob([r.bytes as BlobPart], { type: 'application/pdf' }), fileName || 'drawing.pdf');
+          const res = await fetch(`/api/v1/takeoff/documents/${encodeURIComponent(documentId)}/file/`, { method: 'PUT', headers, body: fd });
+          if (!res.ok) throw new Error(`Saving the edited drawing failed (${res.status})`);
+        }
+        newDoc = await openPdf(r.bytes.slice().buffer as ArrayBuffer, { fastImages: true }).promise;
       }
-      const newDoc = await openPdf(r.bytes.slice().buffer as ArrayBuffer, { fastImages: true }).promise;
+      await hideEmbeddedMarkupLayer(newDoc);
+      // New pages whose content is new or turned: only those are re-rendered.
+      const changed = new Set<number>();
+      const mappedTo = new Set(Object.values(map));
+      for (let pg = 1; pg <= newDoc.numPages; pg++) if (!mappedTo.has(pg)) changed.add(pg);
+      if (rotate) for (const pg of rotate.pages) { const np = map[pg]; if (np !== undefined) changed.add(np); }
+      docEditRemapRef.current = { doc: newDoc, map, changed };
 
       // Markups: move to the new page numbers, turn on rotated pages, drop deleted pages.
       const nextMs: Measurement[] = [];
@@ -13984,9 +15463,27 @@ export default function TakeoffViewerModule({
       redoStackRef.current = [];
       setUndoCount(0);
       setRedoCount(0);
-      setThumbs({});
+      // Thumbnails and page words follow their pages; changed pages redo.
+      if (!thumbsRemapped) setThumbs((prev) => {
+        const out: Record<number, string> = {};
+        for (const [k, v] of Object.entries(prev)) {
+          const np = map[Number(k)];
+          if (np !== undefined && !changed.has(np)) out[np] = v;
+        }
+        return out;
+      });
+      {
+        const words = new Map<number, Word[]>();
+        for (const [k, v] of pageWordsRef.current) {
+          const np = map[k];
+          if (np !== undefined && !changed.has(np)) words.set(np, v);
+        }
+        pageWordsRef.current = words;
+      }
       setThumbSel(new Set());
-      pageWordsRef.current.clear();
+      // The main canvas still shows the old document: do not capture it as
+      // the new current page's thumbnail before the new page has rendered.
+      mainRenderedPageRef.current = 0;
       setMeasurements(nextMs);
       setPdfDoc(newDoc);
       setTotalPages(newDoc.numPages);
@@ -14003,6 +15500,40 @@ export default function TakeoffViewerModule({
     } finally {
       pageEditBusyRef.current = false;
     }
+  };
+
+  /** Page edits run one after another; a page DRAG shows its new order in the
+   *  thumbnails at once and the server work follows in the background, so the
+   *  user can keep moving pages without waiting (OE-DELIVERY 2026-11-26-fsftm-pdf). */
+  const pageEditChainRef = useRef<Promise<void>>(Promise.resolve());
+  const pendingPageEditsRef = useRef(0);
+  const runPageEdit = (
+    edit: pdfPages.PageEdit,
+    suffix: string,
+    rotate?: { pages: Set<number>; deg: 90 | 180 | 270 },
+    goTo?: number,
+  ): Promise<void> => {
+    if (!pdfDocRef.current) return Promise.resolve();
+    const onServer = !!documentIdRef.current && !!(selectedProjectId || activeProjectId) && edit.kind === 'reorder';
+    if (onServer && edit.kind === 'reorder') {
+      const plan = pdfPages.planPageMap(edit, totalPagesRef.current).pageMap;
+      setThumbs((prev) => {
+        const out: Record<number, string> = {};
+        for (const [k, v] of Object.entries(prev)) {
+          const np = plan[Number(k)];
+          if (np !== undefined) out[np] = v;
+        }
+        return out;
+      });
+    }
+    pendingPageEditsRef.current += 1;
+    setPageEditBusy(suffix);
+    const run = pageEditChainRef.current.then(() => runPageEditNow(edit, suffix, rotate, goTo, onServer));
+    pageEditChainRef.current = run.catch(() => undefined);
+    return run.finally(() => {
+      pendingPageEditsRef.current -= 1;
+      if (pendingPageEditsRef.current <= 0) setPageEditBusy(null);
+    });
   };
   const extractToBytes = async (pages: number[]) => {
     const orig = await pdfDoc!.getData();
@@ -14829,6 +16360,43 @@ export default function TakeoffViewerModule({
     drawMultiplyGhost(ctx, ghost, z, dpr, label);
   }, []);
 
+  multiplyTrackRef.current = multiplyTrack && !!multiplyDialog;
+  trackMultiplyRef.current = (pt: Point) => {
+    const dlg = multiplyDialogRef.current;
+    if (!dlg) return;
+    const src = measurementsRef.current.find((m) => m.id === dlg.measurementId);
+    if (!src || src.points.length === 0) return;
+    const pgScale = scaleForPage(pageScalesRef.current, src.page);
+    if (!pgScale || !(pgScale.pixelsPerUnit > 0)) return;
+    const meters = parseDistanceToMeters(multiplyDistanceRef.current, multiplyUnitRef.current);
+    if (meters == null || !(meters > 0)) return;
+    const distPdf = meters * pgScale.pixelsPerUnit;
+    const cx = src.points.reduce((sum, q) => sum + q.x, 0) / src.points.length;
+    const cy = src.points.reduce((sum, q) => sum + q.y, 0) / src.points.length;
+    const vx = pt.x - cx;
+    const vy = pt.y - cy;
+    const len = Math.hypot(vx, vy);
+    if (len < distPdf * 0.5) {
+      trackPlanRef.current = null;
+      setMultiplyGhosts(null);
+      multiplyPreviewRef.current = null;
+      return;
+    }
+    // Free direction, snapped to straight / 45 deg when close (8 deg).
+    let ang = Math.atan2(vy, vx);
+    const snapped = Math.round(ang / (Math.PI / 4)) * (Math.PI / 4);
+    if (Math.abs(ang - snapped) < (8 * Math.PI) / 180) ang = snapped;
+    const dir = { x: Math.cos(ang), y: Math.sin(ang) };
+    const copies = Math.max(1, Math.min(99, Math.floor((len + distPdf * 0.25) / distPdf)));
+    const prev = trackPlanRef.current;
+    if (prev && prev.copies === copies && Math.abs(prev.dir.x - dir.x) < 1e-6 && Math.abs(prev.dir.y - dir.y) < 1e-6) return;
+    trackPlanRef.current = { dir, copies };
+    const arr: Point[][] = [];
+    for (let i = 1; i <= copies; i++) arr.push(src.points.map((q) => ({ x: q.x + dir.x * distPdf * i, y: q.y + dir.y * distPdf * i })));
+    multiplyPreviewRef.current = arr;
+    setMultiplyGhosts({ points: arr, srcCenter: { x: cx, y: cy }, dir, distPdf, copies });
+  };
+
   /** Live ghost preview: recompute the copy offsets whenever the dialog
    *  inputs change. Stored in state so the canvas draw effect repaints
    *  automatically via its dependency array. Always on while the dialog is
@@ -14841,6 +16409,7 @@ export default function TakeoffViewerModule({
       multiplyPreviewRef.current = null;
       return;
     }
+    if (multiplyTrack) return; // the mouse drives the preview (live tracking)
     const resolved = resolveMultiply(false);
     if (!resolved) {
       // Don't clear here — drawGhostNow() (called synchronously from input
@@ -14878,13 +16447,24 @@ export default function TakeoffViewerModule({
     // Belt-and-suspenders: bump the nonce too, in case the state update alone
     // does not retrigger the overlay draw on some React batching paths.
     setRenderNonce((n) => n + 1);
-  }, [multiplyDialog, resolveMultiply]);
+  }, [multiplyDialog, resolveMultiply, multiplyTrack]);
 
   /** Multiply confirm: FSFTM-style linear copies. */
   const handleMultiplyConfirm = useCallback(() => {
     const resolved = resolveMultiply(true);
     if (!resolved) return;
-    const { src, copies, distPdf, dir } = resolved;
+    const { src, distPdf } = resolved;
+    let { copies, dir } = resolved;
+    if (multiplyTrack) {
+      const plan = trackPlanRef.current;
+      if (!plan) {
+        addToast({ type: 'info', title: 'Move the mouse first', message: 'Move the mouse away from the markup to set the direction, then click to place the copies.' });
+        return;
+      }
+      copies = plan.copies;
+      dir = plan.dir;
+    }
+    trackPlanRef.current = null;
     const clones: Measurement[] = [];
     const baseTs = Date.now();
     for (let i = 1; i <= copies; i++) {
@@ -14918,7 +16498,8 @@ export default function TakeoffViewerModule({
         plural: clones.length === 1 ? 'y' : 'ies',
       }),
     });
-  }, [resolveMultiply, pushUndo, addToast, t]);
+  }, [resolveMultiply, pushUndo, addToast, t, multiplyTrack]);
+  multiplyConfirmRef.current = handleMultiplyConfirm;
 
   /** Compute ghost offset point arrays for a source measurement. Returns null
    *  if the distance is invalid or scale is missing. */
@@ -15543,8 +17124,109 @@ export default function TakeoffViewerModule({
       panCommitTimerRef.current = window.setTimeout(() => setPanOffset(panOffsetRef.current), 120);
     }
   }, []);
+  mainCenterOnRef.current = mainCenterOn;
+  /* A drawing's editor is MOVED between the main area and split panes (its
+   * host element is re-parented). The browser drops scroll offsets of a
+   * moved element, so remember the view centre and put it back after a move
+   * or a compact / full switch (OE-DELIVERY 2026-11-26-fsftm-pdf). */
+  const lastCenterRef = useRef<{ fx: number; fy: number } | null>(null);
+  const restoreCenter = useCallback((f: { fx: number; fy: number }) => {
+    const c = containerRef.current;
+    const cv = canvasRef.current;
+    if (!c || !cv) return;
+    const cr = cv.getBoundingClientRect();
+    // No leftover pan from the old size; the page re-centres by scrolling
+    // only (a page that fits simply sits centred).
+    setPanOffset({ x: 0, y: 0 });
+    panOffsetRef.current = { x: 0, y: 0 };
+    if (panWrapRef.current) panWrapRef.current.style.transform = '';
+    if (cr.width <= c.clientWidth && cr.height <= c.clientHeight) return;
+    requestAnimationFrame(() => {
+      const r = cv.getBoundingClientRect();
+      const vr = c.getBoundingClientRect();
+      c.scrollLeft += r.left + f.fx * r.width - (vr.left + c.clientWidth / 2);
+      c.scrollTop += r.top + f.fy * r.height - (vr.top + c.clientHeight / 2);
+    });
+  }, []);
   useEffect(() => {
-    if (!syncViews || splitMode === 'off') return;
+    const c = containerRef.current;
+    if (!c) return;
+    let raf = 0;
+    const remember = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        if (c.clientWidth > 0 && c.isConnected) {
+          const f = mainCenterFrac();
+          if (f) lastCenterRef.current = f;
+        }
+      });
+    };
+    remember();
+    c.addEventListener('scroll', remember, { passive: true });
+    let wasZero = c.clientWidth === 0;
+    const ro = new ResizeObserver(() => {
+      const zero = c.clientWidth === 0 || !c.isConnected;
+      const f = lastCenterRef.current;
+      if (wasZero && !zero && f) {
+        requestAnimationFrame(() => requestAnimationFrame(() => restoreCenter(f)));
+      }
+      wasZero = zero;
+    });
+    ro.observe(c);
+    return () => {
+      cancelAnimationFrame(raf);
+      c.removeEventListener('scroll', remember);
+      ro.disconnect();
+    };
+  }, [pdfDoc, mainCenterFrac, restoreCenter]);
+  useEffect(() => {
+    const f = lastCenterRef.current;
+    if (!f) return;
+    requestAnimationFrame(() => requestAnimationFrame(() => restoreCenter(f)));
+    // Only when the editor switches between pane and full layout.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [compact]);
+  /* Sync between EDITORS (OE-DELIVERY 2026-11-26-fsftm-pdf): with Sync on,
+   * the drawing in use leads - page, zoom and the point at the centre - and
+   * every other pane's drawing follows, also when they are different PDFs
+   * (old vs new revision). */
+  const [syncView] = useSharedState<{ from: string; fx: number; fy: number; zoom: number; page: number; n: number } | null>('ws.syncView', null, hidden);
+  useEffect(() => {
+    if (!syncViews || hidden || !pdfDoc || !focusKey) return;
+    const c = containerRef.current;
+    if (!c) return;
+    let raf = 0;
+    const publish = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        if (getShared('ws.focus') !== focusKey) return;
+        const f = mainCenterFrac();
+        if (!f) return;
+        setShared('ws.syncView', { from: focusKey, fx: f.fx, fy: f.fy, zoom: zoomRef.current, page: currentPageRef.current, n: Date.now() });
+      });
+    };
+    publish();
+    c.addEventListener('scroll', publish, { passive: true });
+    return () => {
+      cancelAnimationFrame(raf);
+      c.removeEventListener('scroll', publish);
+    };
+  }, [syncViews, hidden, pdfDoc, focusKey, zoom, currentPage, renderNonce, mainCenterFrac]);
+  useEffect(() => {
+    const v = syncView;
+    if (!v || !syncViews || hidden || !pdfDoc || v.from === focusKey) return;
+    if (getShared('ws.focus') === focusKey) return; // the leader never follows
+    if (v.page !== currentPageRef.current && v.page >= 1 && v.page <= pdfDoc.numPages) goToPage(v.page);
+    if (Math.abs(zoomRef.current - v.zoom) > 1e-3) zoomTo(v.zoom);
+    requestAnimationFrame(() => requestAnimationFrame(() => mainCenterOn(v.fx, v.fy)));
+    // Also when this drawing finishes loading or sync is switched on.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [syncView, syncViews, pdfDoc, hidden]);
+  useEffect(() => {
+    // The page-preview sync below is only for a pane that is NOT an editor.
+    if (!syncViews || splitMode === 'off' || p2IsEditor) return;
     let raf = 0;
     const tick = () => {
       raf = requestAnimationFrame(tick);
@@ -15560,7 +17242,7 @@ export default function TakeoffViewerModule({
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [syncViews, splitMode, mainCenterFrac, mainCenterOn]);
+  }, [syncViews, splitMode, mainCenterFrac, mainCenterOn, p2IsEditor]);
   /* Page number and zoom follow the leader. */
   useEffect(() => {
     if (!syncViews || splitMode === 'off' || syncLeaderRef.current !== 'main') return;
@@ -17838,8 +19520,8 @@ export default function TakeoffViewerModule({
       case 'prevPage': goToPage(cp - 1); break;
       case 'firstPage': goToPage(1); break;
       case 'lastPage': goToPage(totalPagesRef.current || 1); break;
-      case 'splitVertical': if (splitMode !== 'vertical') toggleSplit('vertical'); break;
-      case 'splitHorizontal': if (splitMode !== 'horizontal') toggleSplit('horizontal'); break;
+      case 'splitVertical': toggleSplit('vertical'); break;
+      case 'splitHorizontal': toggleSplit('horizontal'); break;
       case 'toggleSplit': if (splitMode === 'off') toggleSplit('vertical'); else { setSplitMode('off'); setSyncViews(false); } break;
       case 'unsplit': setSplitMode('off'); setSyncViews(false); break;
       case 'singlePage': setPageMode('single'); break;
@@ -17887,6 +19569,7 @@ export default function TakeoffViewerModule({
    *  selection). */
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (hiddenRef.current) return;
       // Track the live Shift state so the draw path can engage ortho without
       // flipping the persistent toggle. Updated on every keydown regardless of
       // focus so it never goes stale.
@@ -18302,6 +19985,7 @@ export default function TakeoffViewerModule({
       }
     };
     const upHandler = (e: KeyboardEvent) => {
+      if (hiddenRef.current) return;
       shiftHeldRef.current = e.shiftKey;
       modsRef.current = { ctrl: e.ctrlKey || e.metaKey, shift: e.shiftKey };
       if (e.code === 'Space' || e.key === ' ') {
@@ -18493,8 +20177,29 @@ export default function TakeoffViewerModule({
       {/* Header removed — the parent TakeoffPage already shows the page
           title / subtitle, so the duplicate is pure noise. */}
 
+      {/* FSFTM: opening a drawing from the library (or switching tabs /
+          compare) remounts the viewer; show a quiet loading screen instead of
+          flashing the upload landing (OE-DELIVERY 2026-11-26-fsftm-pdf). */}
+      {!pdfDoc && initialPdfUrl && !urlLoadFailed && (
+        <div className={clsx('flex items-center justify-center bg-surface-secondary', compact ? 'min-h-0 flex-1' : '-mx-4 sm:-mx-7 -mt-6 -mb-6 min-h-[60vh]')} data-testid="pdf-opening">
+          <div className="flex w-64 flex-col items-center gap-2 text-sm text-content-secondary">
+            <div className="flex items-center gap-2">
+              <Loader2 size={16} className="animate-spin" />
+              <span className="truncate">{t('takeoff_viewer.opening_drawing', { defaultValue: 'Opening drawing' })} {initialPdfName ? `· ${initialPdfName}` : ''}</span>
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-tertiary" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={smoothLoad ?? undefined}>
+              {smoothLoad !== null ? (
+                <div className="h-full rounded-full bg-oe-blue" style={{ width: `${Math.max(3, smoothLoad)}%` }} />
+              ) : (
+                <div className="h-full w-1/3 animate-pulse rounded-full bg-oe-blue/60" />
+              )}
+            </div>
+            <span className="text-xs tabular-nums text-content-tertiary" data-testid="pdf-opening-pct">{smoothLoad !== null ? `${smoothLoad}%` : 'Connecting…'}</span>
+          </div>
+        </div>
+      )}
       {/* Landing (BIM-style) — when no PDF loaded */}
-      {!pdfDoc && (
+      {!pdfDoc && (!initialPdfUrl || urlLoadFailed) && (
         <div className="-mx-4 sm:-mx-7 -mt-6 -mb-6 min-h-full bg-gradient-to-br from-slate-50 via-white to-blue-50/50 dark:from-gray-900 dark:via-gray-900 dark:to-blue-950/20">
           <div className="max-w-7xl mx-auto px-6 pt-8 pb-6">
 
@@ -18681,7 +20386,7 @@ export default function TakeoffViewerModule({
         </div>
       )}
 
-      {isLoading && (
+      {isLoading && !(initialPdfUrl && !pdfDoc) && (
         <div className="flex flex-col items-center justify-center gap-3 py-20">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-oe-blue border-t-transparent" />
           {loadProgress != null && (
@@ -18700,6 +20405,7 @@ export default function TakeoffViewerModule({
           In normal mode this wrapper is layout-transparent. */}
       <div
         ref={viewerRootRef}
+        data-viewer-root=""
         className={clsx(
           'flex flex-1 min-h-0 min-w-0 flex-col',
           isTakeoffFullscreen && 'bg-surface-primary p-3 overflow-auto',
@@ -18804,7 +20510,9 @@ export default function TakeoffViewerModule({
       {/* FSFTM-style menu bar (OE-DELIVERY 2026-11-02-fsftm-workspace): File / Edit / View / Document /
           Measure / Markup / Tools / Window / Help, each calling the same
           commands as the toolbars. */}
-      {pdfDoc && (
+      {chromeSlot('menu')}
+      {chrome('menu', (
+      pdfDoc && (
         <FSFTMMenuBar
           title={
             <span className="mr-1 flex items-center gap-1 rounded bg-oe-blue px-1.5 py-0.5 text-[11px] font-bold text-white">
@@ -18882,8 +20590,8 @@ export default function TakeoffViewerModule({
                 { separator: true },
                 { label: 'Single Page', checked: pageMode === 'single', onClick: () => setPageMode('single') },
                 { label: 'Continuous', checked: pageMode === 'continuous', onClick: () => setPageMode('continuous') },
-                { label: 'Split Vertical', checked: splitMode === 'vertical', onClick: () => toggleSplit('vertical') },
-                { label: 'Split Horizontal', checked: splitMode === 'horizontal', onClick: () => toggleSplit('horizontal') },
+                { label: 'Split Vertical', checked: sharedSplitMode === 'vertical', onClick: () => toggleSplit('vertical') },
+                { label: 'Split Horizontal', checked: sharedSplitMode === 'horizontal', onClick: () => toggleSplit('horizontal') },
                 { separator: true },
                 {
                   label: 'Dimension Units',
@@ -19024,7 +20732,8 @@ export default function TakeoffViewerModule({
             </div>
           }
         />
-      )}
+      )
+      ))}
       {showFraming && (
         <FramingLayoutDialog
           onClose={() => setShowFraming(false)}
@@ -19075,8 +20784,10 @@ export default function TakeoffViewerModule({
         >
           {/* FSFTM icon rail (OE-DELIVERY 2026-11-02-fsftm-dock): one vertical strip at the left edge
               for every panel; stays when the panel is closed. */}
+          {chromeSlot('rail')}
+          {chrome('rail', (
           <div
-            className="flex w-[52px] shrink-0 flex-col items-center gap-1 rounded-lg border border-border bg-surface-secondary/70 py-1.5"
+            className={clsx('flex w-[52px] shrink-0 flex-col items-center gap-1 rounded-lg border border-border bg-surface-secondary/70 py-1.5')}
             role="tablist"
             aria-orientation="vertical"
             data-testid="fsftm-rail"
@@ -19144,11 +20855,14 @@ export default function TakeoffViewerModule({
               );
             })}
           </div>
+          ))}
 
           {/* Page thumbnails strip - only for multi-page sets and when toggled
               on. Click a thumbnail to jump; the current page is ringed; a badge
               shows that page's measurement count. */}
-          {totalPages >= 1 && (
+          {chromeSlot('thumbs')}
+          {chrome('thumbs', (
+          totalPages >= 1 && (
             showThumbnails && leftTab !== 'side' ? (
             <>
             <div
@@ -19158,7 +20872,13 @@ export default function TakeoffViewerModule({
             >
               <div className="flex min-h-0 min-w-0 flex-1 flex-col">
               {leftTab === 'thumbs' && (
-            <div className="flex min-h-0 flex-1 flex-col bg-neutral-100 dark:bg-[#2a2a2a]">
+            <div className="relative flex min-h-0 flex-1 flex-col bg-neutral-100 dark:bg-[#2a2a2a]">
+            {pageEditBusy && (
+              <div className="pointer-events-none absolute bottom-9 right-2 z-20 flex items-center gap-1.5 rounded-full bg-black/70 px-2 py-0.5 text-[10px] text-white shadow" data-testid="page-edit-busy">
+                <Loader2 size={10} className="animate-spin" />
+                Saving…
+              </div>
+            )}
             {/* FSFTM snap-style thumbnails (OE-DELIVERY 2026-11-25-fsftm-pdf): a grid
                 sized by the slider at the bottom; label + scale under each page. */}
             <div
@@ -19200,9 +20920,53 @@ export default function TakeoffViewerModule({
                   data-page={n}
                   data-current={n === currentPage}
                   aria-current={n === currentPage ? 'page' : undefined}
-                  className="group flex min-w-0 flex-col items-center gap-1 rounded p-0.5 text-center focus:outline-none"
+                  className={clsx(
+                    'group relative flex min-w-0 flex-col items-center gap-1 rounded p-0.5 text-center focus:outline-none',
+                    thumbDrag && thumbDrag.includes(n) && 'opacity-40',
+                  )}
                   title={sheetCaption(sheetFor(n)) || `Page ${n}`}
+                  // FSFTM: drag thumbnails to reorder pages (OE-DELIVERY 2026-11-26-fsftm-pdf).
+                  draggable={!editingThumb}
+                  onDragStart={(ev) => {
+                    const moving = thumbSel.has(n) && thumbSel.size > 1 ? [...thumbSel].sort((a, b) => a - b) : [n];
+                    setThumbDrag(moving);
+                    ev.dataTransfer.effectAllowed = 'move';
+                    ev.dataTransfer.setData('text/plain', String(n));
+                  }}
+                  onDragOver={(ev) => {
+                    if (!thumbDrag) return;
+                    ev.preventDefault();
+                    ev.dataTransfer.dropEffect = 'move';
+                    const r = ev.currentTarget.getBoundingClientRect();
+                    const side = ev.clientX < r.left + r.width / 2 ? 'before' : 'after';
+                    if (!thumbDrop || thumbDrop.page !== n || thumbDrop.side !== side) setThumbDrop({ page: n, side });
+                  }}
+                  onDragLeave={(ev) => {
+                    if (!ev.currentTarget.contains(ev.relatedTarget as Node | null)) setThumbDrop((d) => (d && d.page === n ? null : d));
+                  }}
+                  onDrop={(ev) => {
+                    ev.preventDefault();
+                    const moving = thumbDrag;
+                    const side = thumbDrop?.side ?? 'before';
+                    setThumbDrag(null);
+                    setThumbDrop(null);
+                    if (!moving || moving.includes(n)) return;
+                    const rest = Array.from({ length: totalPages }, (_, i) => i + 1).filter((p) => !moving.includes(p));
+                    const at = rest.indexOf(n) + (side === 'after' ? 1 : 0);
+                    const order = [...rest.slice(0, at), ...moving, ...rest.slice(at)];
+                    if (order.every((p, i) => p === i + 1)) return;
+                    setThumbSel(new Set());
+                    void runPageEdit({ kind: 'reorder', order }, `${moving.length === 1 ? 'page' : `${moving.length} pages`} moved`, undefined, at + 1);
+                  }}
+                  onDragEnd={() => { setThumbDrag(null); setThumbDrop(null); }}
                 >
+                  {thumbDrop && thumbDrop.page === n && thumbDrag && !thumbDrag.includes(n) && (
+                    <span
+                      aria-hidden
+                      className={clsx('pointer-events-none absolute bottom-6 top-0 z-10 w-1 rounded bg-[#1f6fd1]', thumbDrop.side === 'before' ? '-left-1.5' : '-right-1.5')}
+                      data-testid="thumb-drop-marker"
+                    />
+                  )}
                   <span
                     className={clsx(
                       'block w-full overflow-hidden bg-white transition-shadow',
@@ -19750,9 +21514,12 @@ export default function TakeoffViewerModule({
               onKeyDown={onCollapsedTabKeyDown('left')}
             />
             )
-          )}
+          )
+          ))}
           {/* Left: PDF + Toolbar */}
           {/* FSFTM vertical tool strip (OE-DELIVERY 2026-11-02-fsftm-tool-strip). */}
+          {chromeSlot('strip')}
+          {chrome('strip', (
           <div className="flex shrink-0 min-h-0" style={{ order: 4 }}>
             <FSFTMToolStrip
               tools={stripTools}
@@ -19765,6 +21532,14 @@ export default function TakeoffViewerModule({
                 setToolLock((l) => !l);
               }}
               onSelect={(tool) => {
+                // A split pane's drawing was clicked last: the tool goes there.
+                if (!compact) {
+                  const f = getShared<string | null>('ws.focus');
+                  if (f && f !== focusKey && document.querySelector(`[data-viewer-host="${CSS.escape(f)}"][data-testid="viewer-pane"]`)) {
+                    setShared('ws.toolReq', { key: f, tool, n: Date.now() });
+                    return;
+                  }
+                }
                 if (tool === 'area' && activeTool === 'area') {
                   setAreaPopupDismissed((d) => !d);
                   return;
@@ -19774,13 +21549,25 @@ export default function TakeoffViewerModule({
               }}
             />
           </div>
-          <div className="flex flex-1 min-w-0 min-h-0 flex-col space-y-1" style={{ order: 3 }}>
+          ))}
+          <div
+            className="flex flex-1 min-w-0 min-h-0 flex-col space-y-1"
+            style={{ order: 3 }}
+            onPointerDownCapture={(e) => {
+              // The drawing last clicked in gets the keyboard and the tools
+              // picked from the main tool strip (OE-DELIVERY 2026-11-26-fsftm-pdf).
+              if (fromNestedEditor(e)) return; // a split pane's own editor
+              if (focusKey && getShared('ws.focus') !== focusKey) setShared('ws.focus', focusKey);
+            }}
+          >
             {/* Toolbar - two grouped rows so every control stays visible
                 without a horizontal scrollbar. Row 1 = navigate + view +
                 document actions; row 2 = scale + drawing tools. Related
                 controls sit in soft "segmented" tracks instead of being
                 separated by hairline dividers. */}
-            <div className="takeoff-toolbar flex shrink-0 flex-col gap-1.5 rounded-lg border border-border bg-surface-primary p-1.5 shadow-xs">
+            {chromeSlot('toolbar')}
+            {chrome('toolbar', (
+            <div className={clsx('takeoff-toolbar flex shrink-0 flex-col gap-1.5 rounded-lg border border-border bg-surface-primary p-1.5 shadow-xs')}>
               <div className="flex items-center gap-1 flex-wrap">
               {/* Page nav - prev / jump / next in one segmented track. */}
               <div className={TB_GROUP}>
@@ -20324,6 +22111,7 @@ export default function TakeoffViewerModule({
 
               </div>
             </div>
+            ))}
 
             {/* FSFTM Properties toolbar (OE-DELIVERY 2026-11-02-fsftm-properties-bar):
                 only while markups are selected. */}
@@ -20419,6 +22207,16 @@ export default function TakeoffViewerModule({
                 defaults={propsBar.defaults}
                 onAddToChest={() => addSelectionToChest(chestSets.find((x) => !x.recent)?.id ?? 'my-tools')}
                 onLayoutFraming={() => setShowFraming(true)}
+                onCutout={(shape) => {
+                  selectTool(shape === 'ellipse' ? 'ellipseCutout' : 'polygonCutout');
+                  addToast({
+                    type: 'info',
+                    title: 'Cut out a hole',
+                    message: shape === 'ellipse'
+                      ? 'Click the centre of the round opening inside the area, then its edge.'
+                      : 'Click the corners of the opening (stairs, shaft...) inside the area, double-click to finish.',
+                  });
+                }}
               />
             </div>
             )}
@@ -20623,17 +22421,44 @@ export default function TakeoffViewerModule({
                 panes (same PDF) when split is on. */}
             <div
               ref={splitAreaRef}
-              className={clsx(
-                'flex min-h-0 flex-1',
-                splitMode === 'off' && 'gap-2',
-                splitMode === 'vertical' && 'flex-row',
-                splitMode === 'horizontal' && 'flex-col',
-              )}
+              className={clsx('min-h-0 flex-1', splitMode === 'off' || !splitTree ? 'flex gap-2' : 'relative')}
             >
               <div
-                className={clsx('flex min-h-0 min-w-0 flex-col', splitMode === 'off' && 'flex-1')}
-                style={splitMode !== 'off' ? { flex: `${splitRatio} 1 0%` } : undefined}
+                className={clsx('relative flex min-h-0 min-w-0 flex-col', (splitMode === 'off' || !splitTree) && 'flex-1')}
+                style={splitMode !== 'off' && splitTree ? paneBox('main') : undefined}
+                onDragOver={(e) => {
+                  if (onTabDrop && hasTabDrag(e)) {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    if (!mainTabDropOver) setMainTabDropOver(true);
+                    return;
+                  }
+                  if (splitMode === 'off' || !hasTabDrag(e)) return;
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'move';
+                  if (!mainTabDropOver) setMainTabDropOver(true);
+                }}
+                onDragLeave={(e) => {
+                  if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node | null)) setMainTabDropOver(false);
+                }}
+                onDrop={(e) => {
+                  setMainTabDropOver(false);
+                  const t = readTabDrag(e);
+                  if (t && onTabDrop) {
+                    e.preventDefault();
+                    onTabDrop(t);
+                    return;
+                  }
+                  if (!t || t.from !== 'split') return;
+                  e.preventDefault();
+                  moveTabToMain(t);
+                }}
               >
+                {mainTabDropOver && (
+                  <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center border-2 border-dashed border-oe-blue bg-oe-blue/10 text-sm font-semibold text-oe-blue">
+                    Drop to open in this pane
+                  </div>
+                )}
               {/* Snap-style document tab strip above the drawing
                   (OE-DELIVERY 2026-11-25-fsftm-pdf). Same height as the split
                   pane's strip, so both panes keep identical viewing areas. */}
@@ -20641,12 +22466,13 @@ export default function TakeoffViewerModule({
                 className={clsx(
                   'flex h-7 shrink-0 items-stretch bg-[#cfcfcf] dark:bg-[#252526]',
                   splitMode !== 'off' && !splitActive && 'shadow-[inset_0_-2px_0_0_rgb(var(--oe-blue-ch))]',
+                  compact && '!hidden',
                 )}
                 data-testid="doc-tab-strip"
               >
             {/* FSFTM multi-file tabs (OE-DELIVERY 2026-11-25-fsftm-pdf): every open
                 drawing, x to close, + to open more or compare one side by side. */}
-            <div className="flex min-w-0 flex-1 items-stretch overflow-x-auto" role="tablist" aria-label="Open drawings" data-testid="doc-tabs">
+            <div className={clsx('flex min-w-0 flex-1 items-stretch overflow-x-auto transition-opacity', splitMode !== 'off' && splitActive && 'opacity-55')} role="tablist" aria-label="Open drawings" data-testid="doc-tabs">
               {(openDocuments && openDocuments.length > 0
                 ? openDocuments
                 : pdfDoc ? [{ id: documentId ?? '__local', name: fileName || 'Drawing' }] : []
@@ -20662,8 +22488,13 @@ export default function TakeoffViewerModule({
                       'group flex max-w-[280px] shrink-0 items-center gap-1 border-r border-black/20 pl-3 pr-1 text-[12px] dark:border-white/10',
                       isActive ? 'bg-[#d9d9d9] text-content-primary dark:bg-[#3a3a3a] dark:text-white' : 'text-content-secondary hover:bg-black/5 dark:text-neutral-400 dark:hover:bg-white/5',
                     )}
-                    title={isCompared ? `${d.name} (shown in the split pane)` : d.name}
+                    title={isCompared ? `${d.name} (shown in the split pane)` : splitMode !== 'off' ? `${d.name} - drag to the split pane to open it there` : d.name}
                     data-testid="doc-tab"
+                    draggable={splitMode !== 'off' && d.id !== '__local'}
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData(TAB_DND_MIME, JSON.stringify({ from: 'main', id: d.id, name: d.name } satisfies TabDragPayload));
+                      e.dataTransfer.effectAllowed = 'move';
+                    }}
                   >
                     <button
                       type="button"
@@ -20745,8 +22576,14 @@ export default function TakeoffViewerModule({
                               <button
                                 type="button"
                                 className="min-w-0 flex-1 truncate text-left"
-                                title={`Open ${d.filename} in a new tab`}
-                                onClick={() => { setOpenMenu(false); if (onSwitchDocument) onSwitchDocument(d.id); else onOpenRecentDocument?.(d.id); }}
+                                title={splitMode !== 'off' && splitActive ? `Open ${d.filename} in the split pane` : `Open ${d.filename} in a new tab`}
+                                onClick={() => {
+                                  setOpenMenu(false);
+                                  // The active split pane receives the document (opens in that pane).
+                                  if (splitMode !== 'off' && splitActive) { void loadCompareDoc(d.id, d.filename); return; }
+                                  if (onSwitchDocument) onSwitchDocument(d.id);
+                                  else onOpenRecentDocument?.(d.id);
+                                }}
                                 data-testid="doc-open-project"
                               >
                                 {d.filename}
@@ -20782,6 +22619,7 @@ export default function TakeoffViewerModule({
                   const files = Array.from(e.target.files ?? []).filter((f) => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
                   e.target.value = '';
                   if (!files.length) return;
+                  if (splitMode !== 'off' && splitActive) { void loadCompareFile(files[0]!); return; }
                   if (onUploadFiles) onUploadFiles(files);
                   else void handleFileUpload({ target: { files: [files[0]!] } } as unknown as React.ChangeEvent<HTMLInputElement>);
                 }}
@@ -20878,7 +22716,7 @@ export default function TakeoffViewerModule({
                       : spaceHeld || panLock
                         ? 'grab'
                         : activeTool === 'select'
-                          ? (dragPreview ? 'grabbing' : 'default')
+                          ? (dragPreview || labelDragId ? 'grabbing' : selectHoverCursor ?? 'default')
                           : 'crosshair',
                   }}
                   onClick={handleCanvasClick}
@@ -21518,72 +23356,96 @@ export default function TakeoffViewerModule({
                 </div>
               </div>
               </div>
-              {splitMode !== 'off' && pdfDoc && (
-                <div
-                  role="separator"
-                  aria-orientation={splitMode === 'vertical' ? 'vertical' : 'horizontal'}
-                  title="Drag to resize the panes (double-click: equal size)"
-                  className={clsx(
-                    'group relative z-10 flex shrink-0 items-center justify-center',
-                    splitMode === 'vertical' ? 'w-1.5 cursor-col-resize bg-border/70 hover:bg-oe-blue/60' : 'h-1.5 cursor-row-resize bg-border/70 hover:bg-oe-blue/60',
-                  )}
-                  onDoubleClick={() => setSplitRatio(0.5)}
-                  onPointerDown={(e) => {
-                    const area = splitAreaRef.current;
-                    if (!area) return;
-                    e.preventDefault();
-                    const el = e.currentTarget;
-                    el.setPointerCapture(e.pointerId);
-                    const r = area.getBoundingClientRect();
-                    const move = (ev: PointerEvent) => {
-                      const f = splitMode === 'vertical' ? (ev.clientX - r.left) / r.width : (ev.clientY - r.top) / r.height;
-                      setSplitRatio(Math.min(0.85, Math.max(0.15, f)));
-                    };
-                    const up = () => {
-                      el.removeEventListener('pointermove', move);
-                      el.removeEventListener('pointerup', up);
-                      el.removeEventListener('pointercancel', up);
-                    };
-                    el.addEventListener('pointermove', move);
-                    el.addEventListener('pointerup', up);
-                    el.addEventListener('pointercancel', up);
-                  }}
-                  data-testid="split-divider"
-                >
-                  <span className={clsx('rounded-full bg-border transition-colors group-hover:bg-oe-blue', splitMode === 'vertical' ? 'h-10 w-1' : 'h-1 w-10')} />
-                </div>
-              )}
-              {splitMode !== 'off' && pdfDoc && (
+              {splitMode !== 'off' && splitTree && pdfDoc && !hidden && !compact && layoutRects(splitTree).dividers.map((dv) => {
+                const vert = dv.dir === 'row';
+                return (
+                  <div
+                    key={`${dv.path.join('.')}:${dv.index}`}
+                    role="separator"
+                    aria-orientation={vert ? 'vertical' : 'horizontal'}
+                    title="Drag to resize the panes"
+                    className={clsx(
+                      'group absolute z-20 flex items-center justify-center',
+                      vert ? 'w-1.5 -translate-x-1/2 cursor-col-resize hover:bg-oe-blue/60' : 'h-1.5 -translate-y-1/2 cursor-row-resize hover:bg-oe-blue/60',
+                    )}
+                    style={{
+                      left: `${dv.rect.x * 100}%`,
+                      top: `${dv.rect.y * 100}%`,
+                      width: vert ? undefined : `${dv.rect.w * 100}%`,
+                      height: vert ? `${dv.rect.h * 100}%` : undefined,
+                    }}
+                    onPointerDown={(e) => {
+                      const area = splitAreaRef.current;
+                      const tree = splitTreeRef.current;
+                      if (!area || !tree) return;
+                      e.preventDefault();
+                      const el = e.currentTarget;
+                      el.setPointerCapture(e.pointerId);
+                      // The split this divider belongs to, on screen.
+                      const node = nodeAt(tree, dv.path);
+                      const all = layoutRects(tree).panes;
+                      const ls = node ? leaves(node) : [];
+                      const box = ls.reduce((acc, k) => {
+                        const r = all[k]!;
+                        return { x0: Math.min(acc.x0, r.x), y0: Math.min(acc.y0, r.y), x1: Math.max(acc.x1, r.x + r.w), y1: Math.max(acc.y1, r.y + r.h) };
+                      }, { x0: 1, y0: 1, x1: 0, y1: 0 });
+                      const ar = area.getBoundingClientRect();
+                      const move = (ev: PointerEvent) => {
+                        const f = vert
+                          ? ((ev.clientX - ar.left) / ar.width - box.x0) / Math.max(1e-6, box.x1 - box.x0)
+                          : ((ev.clientY - ar.top) / ar.height - box.y0) / Math.max(1e-6, box.y1 - box.y0);
+                        const t = splitTreeRef.current;
+                        if (t) setSplitTree(resizeAt(t, dv.path, dv.index, f));
+                      };
+                      const up = () => {
+                        el.removeEventListener('pointermove', move);
+                        el.removeEventListener('pointerup', up);
+                        el.removeEventListener('pointercancel', up);
+                      };
+                      el.addEventListener('pointermove', move);
+                      el.addEventListener('pointerup', up);
+                      el.addEventListener('pointercancel', up);
+                    }}
+                    data-testid="split-divider"
+                  >
+                    <span className={clsx('rounded-full bg-border transition-colors group-hover:bg-oe-blue', vert ? 'h-10 w-1' : 'h-1 w-10')} />
+                  </div>
+                );
+              })}
+              {splitMode !== 'off' && pdfDoc && !hidden && !compact && inLayout.has('p2') && (
                 <div
                   className="flex min-h-0 min-w-0"
-                  style={{ flex: `${1 - splitRatio} 1 0%` }}
+                  style={paneBox('p2')}
                   onPointerEnter={() => { syncLeaderRef.current = 'split'; }}
                   onMouseDownCapture={() => { syncLeaderRef.current = 'split'; }}
                   onWheelCapture={() => { syncLeaderRef.current = 'split'; }}
                 >
                 <SplitPane
+                  slot={!!compareDoc && hostingNow.some((h) => h.pane === 'p2')}
+                  measurementsKey={compareDoc && !compareDoc.id.startsWith('file:') ? `doc.m.${compareDoc.id}` : undefined}
                   docValue={compareDoc ? compareDoc.id : 'self'}
-                  docOptions={[
-                    ...(compareDoc && compareDoc.id.startsWith('file:') ? [{ id: compareDoc.id, name: compareDoc.name }] : []),
-                    ...(recentDocuments ?? []).filter((d) => d.id !== documentId).map((d) => ({ id: d.id, name: d.filename })),
-                  ]}
+                  docOptions={(recentDocuments ?? []).filter((d) => d.id !== documentId).map((d) => ({ id: d.id, name: d.filename }))}
+                  tabs={splitTabs.map((x) => ({ id: x.id, name: x.name }))}
+                  onCloseTab={closeSplitTab}
                   docLoading={compareLoading}
                   selfName={fileName ?? undefined}
                   onPickDoc={(id) => {
-                    if (id === 'self') { replaceCompareDoc(null); return; }
+                    if (id === 'self') { activateSplitTab('self', Math.max(1, totalPages)); return; }
                     if (id === '__file') { compareFileRef.current?.click(); return; }
                     if (compareDoc?.id === id) return;
+                    {
+                      const open = splitTabs.find((x) => x.id === id);
+                      if (open) { activateSplitTab(id, open.doc.numPages); return; }
+                    }
                     const d = (recentDocuments ?? []).find((x) => x.id === id);
                     if (d) void loadCompareDoc(d.id, d.filename);
                   }}
                   active={splitActive}
-                  onActivate={() => setSplitActive(true)}
-                  onSwap={() => {
-                    const mainPage = currentPage;
-                    goToPage(splitPage);
-                    setSplitPage(mainPage);
-                    setSplitActive(false);
-                  }}
+                  onActivate={() => { setSplitActive(true); focusPane('p2'); }}
+                  onSwap={swapSplitPanes}
+                  onDropTab={(tp) => { void dropTabOnPane(tp, 'p2'); }}
+                  paneKey="p2"
+                  onAddPane={addPane}
                   pdfDoc={compareDoc?.doc ?? pdfDoc}
                   page={splitPage}
                   zoom={splitZoom}
@@ -21601,10 +23463,48 @@ export default function TakeoffViewerModule({
                       zoomTo(z);
                     }
                   }}
-                  onClose={() => { setSplitMode('off'); setSyncViews(false); setSplitActive(false); }}
+                  onClose={() => dropFromLayout('p2')}
                 />
                 </div>
               )}
+              {/* Panes 3 and 4 (OE-DELIVERY 2026-11-26-fsftm-pdf): each shows its
+                  own drawings as tabs; tabs drag between any panes. */}
+              {splitMode !== 'off' && pdfDoc && !hidden && !compact && extraPanes.filter((xp) => inLayout.has(xp.key)).map((xp) => {
+                const shown = xp.tabs.find((x) => x.id === xp.activeId) ?? null;
+                return (
+                  <div
+                    key={xp.key}
+                    className="flex min-h-0 min-w-0"
+                    style={paneBox(xp.key)}
+                    onPointerDown={() => { setActiveExtraPane(xp.key); setSplitActive(false); focusPane(xp.key); }}
+                  >
+                    <SplitPane
+                      paneKey={xp.key}
+                      slot={!!shown && hostingNow.some((h) => h.pane === xp.key)}
+                      chooser={!!xp.choosing && xp.tabs.length === 0}
+                      measurementsKey={shown && !shown.id.startsWith('file:') ? `doc.m.${shown.id}` : undefined}
+                      docValue={shown ? shown.id : 'self'}
+                      docOptions={(recentDocuments ?? []).filter((d) => d.id !== documentId).map((d) => ({ id: d.id, name: d.filename }))}
+                      tabs={xp.tabs.map((x) => ({ id: x.id, name: x.name }))}
+                      onCloseTab={(id) => closeExtraTab(xp.key, id)}
+                      selfName={fileName ?? undefined}
+                      onPickDoc={(id) => { void pickInExtraPane(xp.key, id); }}
+                      onDropTab={(tp) => { void dropTabOnPane(tp, xp.key); }}
+                      onAddPane={addPane}
+                      active={activeExtraPane === xp.key}
+                      pdfDoc={shown?.doc ?? pdfDoc}
+                      page={xp.page}
+                      zoom={xp.zoom}
+                      totalPages={shown ? shown.doc.numPages : totalPages}
+                      measurements={shown ? NO_MEASUREMENTS : orderedMeasurements.filter((m) => m.page === xp.page)}
+                      groupColorMap={groupColorMap}
+                      onPageChange={(pg) => setExtraPanes((prev) => prev.map((x) => (x.key === xp.key ? { ...x, page: pg } : x)))}
+                      onZoomChange={(z) => setExtraPanes((prev) => prev.map((x) => (x.key === xp.key ? { ...x, zoom: z } : x)))}
+                      onClose={() => closeExtraPane(xp.key)}
+                    />
+                  </div>
+                );
+              })}
             </div>
 
               {/* Live drawing readout HUD - cursor coordinate + running
@@ -21922,7 +23822,9 @@ export default function TakeoffViewerModule({
             {/* Bottom page navigation: view-mode toggle on the left, pager
                 centered. The page input jumps on Enter/blur (clamped).
                 Wraps gracefully on narrow screens. */}
-            {!bottomBarCollapsed && (
+            {chromeSlot('bottom')}
+            {chrome('bottom', (
+            !bottomBarCollapsed && (
             <div className="relative flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-border bg-surface-primary px-2.5 py-1.5">
               <div
                 className="flex shrink-0 items-center rounded-md border border-border-light p-0.5"
@@ -21965,12 +23867,12 @@ export default function TakeoffViewerModule({
                 <button
                   type="button"
                   onClick={() => toggleSplit('vertical')}
-                  aria-pressed={splitMode === 'vertical'}
+                  aria-pressed={sharedSplitMode === 'vertical'}
                   data-testid="viewmode-split-vertical"
                   title={t('takeoff_viewer.view_split_vertical_hint', { defaultValue: 'Split vertical — same PDF side by side, independent pages' })}
                   className={clsx(
                     'inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors',
-                    splitMode === 'vertical'
+                    sharedSplitMode === 'vertical'
                       ? 'bg-oe-blue text-white shadow-xs'
                       : 'text-content-secondary hover:bg-surface-secondary hover:text-content-primary',
                   )}
@@ -21981,12 +23883,12 @@ export default function TakeoffViewerModule({
                 <button
                   type="button"
                   onClick={() => toggleSplit('horizontal')}
-                  aria-pressed={splitMode === 'horizontal'}
+                  aria-pressed={sharedSplitMode === 'horizontal'}
                   data-testid="viewmode-split-horizontal"
                   title={t('takeoff_viewer.view_split_horizontal_hint', { defaultValue: 'Split horizontal — same PDF stacked, independent pages' })}
                   className={clsx(
                     'inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors',
-                    splitMode === 'horizontal'
+                    sharedSplitMode === 'horizontal'
                       ? 'bg-oe-blue text-white shadow-xs'
                       : 'text-content-secondary hover:bg-surface-secondary hover:text-content-primary',
                   )}
@@ -21998,10 +23900,10 @@ export default function TakeoffViewerModule({
               {/* Select / Pan / Text Select (FSFTM bottom bar, update 21). */}
               <div className="flex items-center gap-0.5 rounded-md border border-border bg-surface-primary p-0.5" data-testid="bottom-tools">
                 {([
-                  ['select', 'Select (V)', MousePointer2, activeTool === 'select' && !panLock && !textSelArmed],
-                  ['pan', 'Pan - drag to move the sheet', Hand, panLock],
-                  ['text', 'Text Select - drag over text to select and copy it', TextCursor, textSelArmed],
-                ] as [string, string, typeof Hand, boolean][]).map(([k, tip, Icon, on]) => (
+                  ['select', 'Select (V)', MousePointer2, activeTool === 'select' && !panLock && !textSelArmed, 'Select'],
+                  ['pan', 'Pan - drag to move the sheet', Hand, panLock, 'Pan'],
+                  ['text', 'Text Select - drag over text to select and copy it', TextCursor, textSelArmed, 'Text'],
+                ] as [string, string, typeof Hand, boolean, string][]).map(([k, tip, Icon, on, name]) => (
                   <button
                     key={k}
                     type="button"
@@ -22012,10 +23914,11 @@ export default function TakeoffViewerModule({
                       else if (k === 'pan') { setTextSelArmed(false); setPanLock((v) => !v); }
                       else { setPanLock(false); setTextSelArmed((v) => !v); setTextSel(null); if (activeTool !== 'select') selectTool('select' as MeasureTool); }
                     }}
-                    className={clsx('flex h-7 w-8 items-center justify-center rounded', on ? 'bg-oe-blue text-white' : 'text-content-secondary hover:bg-surface-secondary')}
+                    className={clsx('flex h-9 w-11 flex-col items-center justify-center gap-0.5 rounded', on ? 'bg-oe-blue text-white' : 'text-content-secondary hover:bg-surface-secondary')}
                     data-testid={`bottom-tool-${k}`}
                   >
-                    <Icon size={15} />
+                    <Icon size={14} />
+                    <span className="text-[9px] font-medium leading-none">{name}</span>
                   </button>
                 ))}
               </div>
@@ -22208,12 +24111,15 @@ export default function TakeoffViewerModule({
               </div>
 
             </div>
-            )}
+            )
+            ))}
             {/* Bottom ledger bar: the measurements ledger under the page
                 bar, vertically resizable exactly like the side panels -
                 drag the thick handle up/down, drag to the bottom edge to
                 collapse it to a slim strip, double-click to reset. */}
-            {showLedger ? (
+            {chromeSlot('ledger')}
+            {chrome('ledger', (
+            showLedger ? (
               <div
                 className="flex shrink-0 flex-col overflow-hidden rounded-lg border border-border bg-surface-primary"
                 style={{ height: ledgerHeight }}
@@ -22332,7 +24238,8 @@ export default function TakeoffViewerModule({
                 onKeyDown={onLedgerCollapsedKeyDown}
                 reopenLabel={t('takeoff_viewer.reopen_ledger', { defaultValue: 'Ledger is hidden · click or drag up to show it again' })}
               />
-            )}
+            )
+            ))}
           </div>
 
           {/* Measurements panel. Collapsible for a larger drawing viewport;
@@ -22341,7 +24248,9 @@ export default function TakeoffViewerModule({
               viewer row (#341), so it scrolls internally with `overflow-y-auto`
               + `min-h-0` rather than clipping a long measurement list.
               Resizable via the drag grip on its inner edge. */}
-          {sideVisible ? (
+          {chromeSlot('side')}
+          {chrome('side', (
+          sideVisible ? (
             <>
             <div className="flex shrink-0" style={{ order: panelSide === 'left' ? 2 : 5 }}>
             <TakeoffResizeHandle
@@ -24251,10 +26160,28 @@ export default function TakeoffViewerModule({
               onPointerDown={beginCollapsedDrag('right')}
               onKeyDown={onCollapsedTabKeyDown('right')}
             />
-          )}
+          )
+          ))}
         </div>
       )}
 
+      {splitError && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40" onClick={() => setSplitError(null)} data-testid="split-error">
+          <div className="w-[420px] max-w-[92vw] rounded-md border border-border bg-[#2b2b2b] text-white shadow-2xl" onClick={(e) => e.stopPropagation()} role="alertdialog" aria-label="Error">
+            <div className="flex items-center justify-between border-b border-white/10 px-3 py-2 text-sm">
+              <span>Error</span>
+              <button type="button" onClick={() => setSplitError(null)} aria-label="Close" className="rounded p-0.5 hover:bg-white/10"><X size={14} /></button>
+            </div>
+            <div className="flex items-center gap-4 px-5 py-5 text-sm">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-[3px] border-red-600 text-2xl font-bold text-red-600">!</span>
+              <span>{splitError}</span>
+            </div>
+            <div className="flex justify-end px-4 pb-3">
+              <button type="button" autoFocus onClick={() => setSplitError(null)} className="rounded bg-[#1f6fd1] px-5 py-1.5 text-sm font-semibold text-white hover:bg-[#2a7de0]" data-testid="split-error-ok">OK</button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Calibration dialog (two-click with multi-unit picker) */}
       <SetScaleDialog
         open={setScaleDlg !== null}
@@ -25013,6 +26940,106 @@ export default function TakeoffViewerModule({
                 </button>
               );
             })()}
+            {(() => {
+              // FSFTM: cut an opening (stairs, shafts ...) out of an area
+              // (OE-DELIVERY 2026-11-26-fsftm-pdf). Draw it inside the area; the
+              // cutout is subtracted from the area's quantity and shown as a hole.
+              const am = measurements.find((x) => x.id === contextMenu.measurementId);
+              if (!am || am.locked || (am.type !== 'area' && am.type !== 'volume')) return null;
+              const start = (tool: MeasureTool, how: string) => {
+                setContextMenu(null);
+                selectTool(tool);
+                addToast({ type: 'info', title: 'Cut out a hole', message: `${how} inside "${am.annotation || 'the area'}". It is subtracted from the area and shown as a hole.` });
+              };
+              return (
+                <>
+                  <button type="button" onClick={() => start('polygonCutout', 'Click the corners of the opening (stairs, shaft...), double-click to finish,')} className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-content-primary hover:bg-surface-secondary transition-colors" role="menuitem" data-testid="context-cutout-polygon">
+                    <Scissors size={13} />
+                    <span className="flex-1">Cut out a hole (stairs, shafts...)</span>
+                  </button>
+                  <button type="button" onClick={() => start('ellipseCutout', 'Click the centre of the round opening, then its edge,')} className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-content-primary hover:bg-surface-secondary transition-colors" role="menuitem" data-testid="context-cutout-ellipse">
+                    <Circle size={13} />
+                    <span className="flex-1">Cut out a round hole</span>
+                  </button>
+                </>
+              );
+            })()}
+            {(() => {
+              const lm = measurements.find((x) => x.id === contextMenu.measurementId);
+              if (!lm || !lm.labelOffset) return null;
+              return (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setContextMenu(null);
+                    pushUndo({ kind: 'edit_geometry', measurementId: lm.id, previousMeasurement: { ...lm, points: [...lm.points] }, nextMeasurement: { ...lm, labelOffset: undefined, points: [...lm.points] } });
+                    setMeasurements((prev) => prev.map((x) => (x.id === lm.id ? { ...x, labelOffset: undefined } : x)));
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-content-primary hover:bg-surface-secondary transition-colors"
+                  role="menuitem"
+                  data-testid="context-reset-label"
+                >
+                  <RotateCcw size={13} />
+                  <span className="flex-1">Reset label position</span>
+                </button>
+              );
+            })()}
+            {(() => {
+              // FSFTM "Split at points" (OE-DELIVERY 2026-11-26-fsftm-pdf): every
+              // segment of a polyline / multi-point line becomes its own markup
+              // with the same properties.
+              const sm = measurements.find((x) => x.id === contextMenu.measurementId);
+              if (!sm || sm.locked || sm.points.length < 3 || (sm.type !== 'polyline' && sm.type !== 'line')) return null;
+              return (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setContextMenu(null);
+                    const sc = scaleForMeasurement(pageScales, sm.page, sm.points);
+                    const stamp = Date.now();
+                    const last = sm.points.length - 2;
+                    const pieces: Measurement[] = [];
+                    for (let i = 0; i <= last; i++) {
+                      const a = sm.points[i]!;
+                      const b = sm.points[i + 1]!;
+                      let piece: Measurement = {
+                        ...sm,
+                        id: `m_${stamp}_s${i}`,
+                        type: sm.type === 'polyline' ? 'distance' : 'line',
+                        points: [{ ...a }, { ...b }],
+                        serverId: undefined,
+                        linkedPositionId: undefined,
+                        linkedPositionOrdinal: undefined,
+                        linkedBoqId: undefined,
+                        linkedPositionLabel: undefined,
+                        annotation: sm.annotation ? `${sm.annotation} ${i + 1}` : sm.annotation,
+                        lineStart: i === 0 ? sm.lineStart : undefined,
+                        lineEnd: i === last ? sm.lineEnd : undefined,
+                        createdAt: new Date().toISOString(),
+                      };
+                      if (sm.type === 'polyline') {
+                        const real = toRealDistance(pixelDistance(a.x, a.y, b.x, b.y), sc);
+                        piece = { ...piece, value: real, unit: sc.unitLabel, label: formatMeasurement(real, sc.unitLabel) };
+                      }
+                      pieces.push(piece);
+                    }
+                    pushUndo({ kind: 'delete_measurement', measurement: { ...sm, points: [...sm.points] } });
+                    pushUndo({ kind: 'bulk_add', measurements: pieces });
+                    if (sm.serverId) registerDeletion(sm.serverId);
+                    setMeasurements((prev) => [...prev.filter((x) => x.id !== sm.id), ...pieces]);
+                    setSelectedLedgerIds(new Set(pieces.map((x) => x.id)));
+                    setSelectedMeasurementId(null);
+                    addToast({ type: 'success', title: `Split into ${pieces.length} markups`, message: 'Each segment is now its own markup with the same properties. Ctrl+Z twice puts it back together.' });
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-content-primary hover:bg-surface-secondary transition-colors"
+                  role="menuitem"
+                  data-testid="context-split-points"
+                >
+                  <Scissors size={13} />
+                  <span className="flex-1">Split at points ({sm.points.length - 1} markups)</span>
+                </button>
+              );
+            })()}
             <button
               type="button"
               onClick={() => {
@@ -25368,7 +27395,20 @@ export default function TakeoffViewerModule({
               {t('takeoff_viewer.multiply_title', { defaultValue: 'Multiply' })}
             </h3>
             <div className="mt-4 space-y-3">
-              <div>
+              <label className="flex items-start gap-2 rounded-md border border-oe-blue/30 bg-oe-blue/5 px-2 py-1.5 text-xs text-content-primary">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={multiplyTrack}
+                  onChange={(e) => { setMultiplyTrack(e.target.checked); trackPlanRef.current = null; setMultiplyGhosts(null); }}
+                  data-testid="multiply-track"
+                />
+                <span>
+                  <span className="font-semibold">Track with mouse</span>
+                  <span className="block text-[11px] text-content-tertiary">Set the spacing below (e.g. 2'-0&quot; o.c.), then move the mouse over the sheet: copies follow live in any direction. Click on the sheet to place them, Esc to cancel.</span>
+                </span>
+              </label>
+              <div className={multiplyTrack ? 'pointer-events-none opacity-40' : undefined}>
                 <label className="text-[11px] font-semibold text-content-secondary">
                   {t('takeoff_viewer.multiply_direction', { defaultValue: 'Direction:' })}
                 </label>

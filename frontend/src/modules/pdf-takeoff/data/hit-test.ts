@@ -81,6 +81,49 @@ export interface EditableMeasurement {
   /** Stored box size for text annotations (PDF units). */
   width?: number;
   height?: number;
+  /** Cut-out holes of an area / volume (PDF units). The fill leaves them
+   *  open and the value excludes them (OE-DELIVERY 2026-11-26-fsftm-pdf). */
+  holes?: Point[][];
+}
+
+/** Total pixel area of the valid holes (3+ points). */
+export function holesAreaPixels(holes: Point[][] | undefined): number {
+  let total = 0;
+  for (const h of holes ?? []) if (h.length >= 3) total += polygonAreaPixels(h);
+  return total;
+}
+
+/** Holes that follow a shape edit: a pure move (every point shifted by the
+ *  same amount) carries the holes along; any reshape keeps them in place. */
+export function carryHoles(m: { points: Point[]; holes?: Point[][] }, next: Point[]): Point[][] | undefined {
+  const holes = m.holes;
+  if (!holes || holes.length === 0) return holes;
+  const prev = m.points;
+  if (prev.length === 0 || prev.length !== next.length) return holes;
+  const dx = next[0]!.x - prev[0]!.x;
+  const dy = next[0]!.y - prev[0]!.y;
+  if (dx === 0 && dy === 0) return holes;
+  for (let i = 1; i < prev.length; i++) {
+    if (Math.abs(next[i]!.x - prev[i]!.x - dx) > 1e-6 || Math.abs(next[i]!.y - prev[i]!.y - dy) > 1e-6) return holes;
+  }
+  return holes.map((h) => h.map((p) => ({ x: p.x + dx, y: p.y + dy })));
+}
+
+/** A hole vertex under the pointer: [hole index, vertex index]. */
+export function hitHoleVertex(pt: Point, holes: Point[][] | undefined, zoom: number): [number, number] | null {
+  const tol = VERTEX_GRAB_PX / (zoom > 0 ? zoom : 1);
+  let best: [number, number] | null = null;
+  let bestD = Infinity;
+  (holes ?? []).forEach((h, hi) =>
+    h.forEach((p, vi) => {
+      const d = pixelDistance(pt.x, pt.y, p.x, p.y);
+      if (d < tol && d < bestD) {
+        bestD = d;
+        best = [hi, vi];
+      }
+    }),
+  );
+  return best;
 }
 
 /* ── Tolerances (screen pixels; divide by zoom for PDF-unit space) ───── */
@@ -142,7 +185,15 @@ const OPEN_LINE_TYPES: ReadonlySet<EditableMeasurementType> = new Set([
 
 /** Whether a measurement type supports adding / removing vertices. */
 export function supportsVariableVertices(type: EditableMeasurementType): boolean {
-  return type === 'polyline' || type === 'area' || type === 'volume' || type === 'cloud' || type === 'polygon';
+  return (
+    type === 'polyline' ||
+    type === 'area' ||
+    type === 'volume' ||
+    type === 'cloud' ||
+    type === 'polygon' ||
+    type === 'perimeter' ||
+    type === 'polygonCutout'
+  );
 }
 
 /** Minimum vertex count a type must keep to stay valid. Dropping below
@@ -289,12 +340,101 @@ export function hitTest(
     if (bestEdge >= 0) return { kind: 'body', index: bestEdge };
   }
 
-  // 4) Interior - closed polygon fill.
-  if (CLOSED_TYPES.has(m.type) && n >= 3 && pointInPolygon(pt, pts)) {
+  // 3b) Edges of cut-out holes belong to the area too.
+  for (const h of m.holes ?? []) {
+    for (let i = 0; i < h.length; i++) {
+      if (pointToSegmentDistance(pt, h[i]!, h[(i + 1) % h.length]!) < edgeTol) return { kind: 'body', index: 0 };
+    }
+  }
+
+  // 4) Interior - closed polygon fill (a cut-out hole is open, not part of it).
+  if (
+    CLOSED_TYPES.has(m.type) &&
+    n >= 3 &&
+    pointInPolygon(pt, pts) &&
+    !(m.holes ?? []).some((h) => h.length >= 3 && pointInPolygon(pt, h))
+  ) {
     return { kind: 'body', index: 0 };
   }
 
   return null;
+}
+
+/** Whether segment a-b crosses the axis-aligned box. */
+function segmentTouchesBox(a: Point, b: Point, x0: number, y0: number, x1: number, y1: number): boolean {
+  const inside = (p: Point) => p.x >= x0 && p.x <= x1 && p.y >= y0 && p.y <= y1;
+  if (inside(a) || inside(b)) return true;
+  // Liang-Barsky clip: does any part of the segment fall inside the box?
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  let t0 = 0;
+  let t1 = 1;
+  const edges: [number, number][] = [
+    [-dx, a.x - x0],
+    [dx, x1 - a.x],
+    [-dy, a.y - y0],
+    [dy, y1 - a.y],
+  ];
+  for (const [pp, q] of edges) {
+    if (pp === 0) {
+      if (q < 0) return false;
+      continue;
+    }
+    const r = q / pp;
+    if (pp < 0) {
+      if (r > t1) return false;
+      if (r > t0) t0 = r;
+    } else {
+      if (r < t0) return false;
+      if (r < t1) t1 = r;
+    }
+  }
+  return t0 <= t1;
+}
+
+/**
+ * Whether a markup is touched by a selection box (PDF units, any corner
+ * order). Lines and polygons are tested on their real geometry, so a long
+ * diagonal line or an L-shaped area is only picked when the box actually
+ * touches it, not when the box merely overlaps its bounding box. A box
+ * drawn entirely inside an area also selects that area. Other markup kinds
+ * (text, stamps, ellipses, legends, ...) use their bounding box.
+ */
+export function measurementTouchesBox(
+  m: EditableMeasurement,
+  box: { x0: number; y0: number; x1: number; y1: number },
+  tol = 0,
+): boolean {
+  const x0 = Math.min(box.x0, box.x1) - tol;
+  const x1 = Math.max(box.x0, box.x1) + tol;
+  const y0 = Math.min(box.y0, box.y1) - tol;
+  const y1 = Math.max(box.y0, box.y1) + tol;
+  const pts = m.points;
+  const n = pts.length;
+  if (n === 0) return false;
+  if (OPEN_LINE_TYPES.has(m.type) || CLOSED_TYPES.has(m.type) || m.type === 'count') {
+    if (n === 1 || m.type === 'count') return pts.some((p) => p.x >= x0 && p.x <= x1 && p.y >= y0 && p.y <= y1);
+    const edges = edgeCount(m.type, n);
+    for (let i = 0; i < edges; i++) {
+      if (segmentTouchesBox(pts[i]!, pts[(i + 1) % n]!, x0, y0, x1, y1)) return true;
+    }
+    return CLOSED_TYPES.has(m.type) && n >= 3 && pointInPolygon({ x: (x0 + x1) / 2, y: (y0 + y1) / 2 }, pts);
+  }
+  let bx0 = Infinity;
+  let by0 = Infinity;
+  let bx1 = -Infinity;
+  let by1 = -Infinity;
+  for (const p of pts) {
+    if (p.x < bx0) bx0 = p.x;
+    if (p.y < by0) by0 = p.y;
+    if (p.x > bx1) bx1 = p.x;
+    if (p.y > by1) by1 = p.y;
+  }
+  if (m.type === 'text' && m.width && m.width > 0) {
+    bx1 = Math.max(bx1, pts[0]!.x + m.width);
+    by1 = Math.max(by1, pts[0]!.y + (m.height && m.height > 0 ? m.height : TEXT_LINE_HEIGHT_PX + TEXT_PAD_Y * 2));
+  }
+  return bx0 <= x1 && bx1 >= x0 && by0 <= y1 && by1 >= y0;
 }
 
 /* ── Vertex add / delete ─────────────────────────────────────────────── */
@@ -386,7 +526,7 @@ export function recomputeMeasurement(
     }
 
     case 'area': {
-      const value = toRealArea(polygonAreaPixels(points), scale);
+      const value = toRealArea(Math.max(0, polygonAreaPixels(points) - holesAreaPixels(m.holes)), scale);
       const perim = toRealDistance(polygonPerimeterPixels(points), scale);
       const label = `${formatMeasurement(value, unitLabel + SUP2)} (P: ${formatMeasurement(perim, unitLabel)})`;
       return {
@@ -398,7 +538,7 @@ export function recomputeMeasurement(
     }
 
     case 'volume': {
-      const area = toRealArea(polygonAreaPixels(points), scale);
+      const area = toRealArea(Math.max(0, polygonAreaPixels(points) - holesAreaPixels(m.holes)), scale);
       const depth = m.depth ?? 0;
       const value = area * depth;
       const label =
