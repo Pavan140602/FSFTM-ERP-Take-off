@@ -15,3 +15,8 @@
 *.ttf binary
 *.otf binary
 *.zip binary
+
+# Windows batch files must keep CRLF line endings, or cmd.exe can mis-handle
+# labels and goto (start-fast.bat / build-frontend.bat).
+*.bat text eol=crlf
+*.cmd text eol=crlf
