@@ -104,6 +104,41 @@ view, close PDF tabs you no longer need, and turn split view off when you are
 not comparing. If you regularly work with 70+ page sets, 32 GB of RAM is the
 upgrade that helps most.
 
+## Sharing with the team on the office network
+
+One PC runs the app; everyone else on the same network uses it in their
+browser and installs nothing. All projects, drawings and markups live on that
+one PC, so everyone sees the same data.
+
+On the **server PC** (the one with the code):
+
+1. Make Windows treat the office network as **Private** (only your trusted
+   office network): Settings > Network & internet > Ethernet (or Wi-Fi) >
+   Network profile type > **Private**.
+2. The first time, right-click **`start-team.bat`** > **Run as administrator**
+   (it opens port 8000 in Windows Firewall for private networks). After that a
+   normal double-click is enough.
+3. The window shows the address to share, for example
+   `http://192.168.1.189:8000 (Ethernet)`. Use the Ethernet / Wi-Fi address,
+   not a VPN one.
+4. Keep that PC switched on (and not sleeping) and the window open while the
+   team works. Use `start-team.bat` *instead of* `start-fast.bat`, not both.
+
+On **each teammate's PC**: open that address in Chrome or Edge, sign in (or
+register; an admin then activates the new account in the user settings).
+
+Notes:
+
+- `start-team.bat` uses a random login secret stored on the server PC in
+  `%USERPROFILE%\.openestimate\team-jwt-secret.txt` (not in git). Do not share
+  that file. Deleting it signs everyone out and makes a new one.
+- If the server PC's address changes after a restart, ask IT for a fixed
+  address (DHCP reservation) so the link stays the same.
+- PDF rendering happens in each person's browser, so the server PC mostly
+  serves files and saves markups; 16 GB is enough for a small team.
+- Never forward port 8000 on the router to the internet. For access from
+  outside the office use a VPN.
+
 ## Default settings
 
 A fresh browser opens in **English (US)**, **imperial units**, **US dollars**
