@@ -26,9 +26,9 @@ function colorDist(
   i2: number,
 ): number {
   return (
-    Math.abs(data[i1] - data[i2]) +
-    Math.abs(data[i1 + 1] - data[i2 + 1]) +
-    Math.abs(data[i1 + 2] - data[i2 + 2])
+    Math.abs(data[i1]! - data[i2]!) +
+    Math.abs(data[i1 + 1]! - data[i2 + 1]!) +
+    Math.abs(data[i1 + 2]! - data[i2 + 2]!)
   );
 }
 
@@ -57,7 +57,6 @@ export function floodFill(
 
     const x = idx % width;
     const y = Math.floor(idx / width);
-    const cur = idx * 4;
 
     // 4-neighbors
     const neighbors: number[] = [];
@@ -106,7 +105,7 @@ export function traceBoundary(mask: Uint8Array, width: number, height: number): 
 
   // Moore neighbor tracing (clockwise)
   const boundary: Point[] = [];
-  const dirs = [
+  const dirs: ReadonlyArray<readonly [number, number]> = [
     [1, 0], [1, 1], [0, 1], [-1, 1],
     [-1, 0], [-1, -1], [0, -1], [1, -1],
   ];

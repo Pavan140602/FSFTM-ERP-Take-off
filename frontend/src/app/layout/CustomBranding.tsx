@@ -32,7 +32,7 @@ import clsx from 'clsx';
 import { Pencil, Upload, Trash2, X, Building2, FileText } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import { BRAND_GREY, BRAND_MAROON, COMPANY_LOGO_URL, COMPANY_NAME } from '@/shared/ui/Logo';
+import { COMPANY_LOGO_URL, COMPANY_NAME, CompanyName } from '@/shared/ui/Logo';
 import { useToastStore } from '@/stores/useToastStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import {
@@ -180,11 +180,7 @@ export function CustomBranding({ iconified }: CustomBrandingProps) {
                   letterSpacing: '0.03em',
                 }}
               >
-                by{' '}
-                <span className="font-semibold tracking-tight">
-                  Open<span className="text-oe-blue/60">Construction</span>
-                  <span className="text-content-quaternary">ERP</span>
-                </span>
+                <CompanyName by className="tracking-tight" />
               </span>
             </button>
           ) : (
@@ -204,9 +200,7 @@ export function CustomBranding({ iconified }: CustomBrandingProps) {
                 className="mt-1.5 block text-[10px] font-semibold leading-tight"
                 style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}
               >
-                <span style={{ color: BRAND_GREY }}>by </span>
-                <span style={{ color: BRAND_MAROON }}>Florida Steel</span>{' '}
-                <span style={{ color: BRAND_GREY }}>Frame &amp; Truss Manufacturing LLC</span>
+                <CompanyName by />
               </span>
             </div>
           )}

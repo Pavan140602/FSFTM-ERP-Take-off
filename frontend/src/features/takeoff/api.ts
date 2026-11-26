@@ -182,6 +182,22 @@ export interface SimilarSymbolsResult {
   measurement_id?: string | null;
 }
 
+/** Hits on one page of an all-pages similar-symbol search. */
+export interface SimilarSymbolsPage {
+  page: number;
+  hits: SimilarSymbolHit[];
+  measurement_id?: string | null;
+}
+
+/** Result of `similarSymbolsAllPages`: the seed is picked on the clicked
+ *  page and matched on every page. Nothing is stored server-side. */
+export interface SimilarSymbolsAllPagesResult {
+  seed_found: boolean;
+  note: string | null;
+  total_hits: number;
+  pages: SimilarSymbolsPage[];
+}
+
 /** A review decision on one proposed measurement.
  *
  *  `points` is optional and only meaningful with `accept`: it corrects the
@@ -484,6 +500,15 @@ export const takeoffApi = {
   similarSymbols: (docId: string, page: number, seedX: number, seedY: number) =>
     apiPost<SimilarSymbolsResult>(
       `/v1/takeoff/documents/${encodeURIComponent(docId)}/similar-symbols/?page=${page}&seed_x=${seedX}&seed_y=${seedY}`,
+      {},
+    ),
+
+  /** Same as `similarSymbols`, but matches the clicked symbol on every page
+   *  of the document. Read-only: the hits come back per page and the viewer
+   *  adds them as suggestions. */
+  similarSymbolsAllPages: (docId: string, page: number, seedX: number, seedY: number) =>
+    apiPost<SimilarSymbolsAllPagesResult>(
+      `/v1/takeoff/documents/${encodeURIComponent(docId)}/similar-symbols/all-pages/?page=${page}&seed_x=${seedX}&seed_y=${seedY}`,
       {},
     ),
 

@@ -49,8 +49,8 @@ function applyTheme(resolved: 'light' | 'dark'): void {
 }
 
 export const useThemeStore = create<ThemeState>((set, get) => ({
-  theme: 'system',
-  resolved: 'light',
+  theme: 'dark',
+  resolved: 'dark',
 
   setTheme: (theme) => {
     const resolved = resolveTheme(theme);
@@ -67,7 +67,7 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
 
   init: () => {
     const stored = localStorage.getItem(STORAGE_KEY) as ThemeMode | null;
-    const theme: ThemeMode = stored && ['light', 'dark', 'system'].includes(stored) ? stored : 'system';
+    const theme: ThemeMode = stored && ['light', 'dark', 'system'].includes(stored) ? stored : 'dark'; // FSFTM: dark by default
     const resolved = resolveTheme(theme);
 
     // Apply immediately (no transition on initial load)

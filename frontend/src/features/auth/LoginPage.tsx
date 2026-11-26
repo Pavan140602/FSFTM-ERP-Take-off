@@ -13,6 +13,7 @@ import {
   Sun, Moon, Monitor,
 } from 'lucide-react';
 import { Button, Input, Logo, LogoWithText, CountryFlag } from '@/shared/ui';
+import { CompanyName } from '@/shared/ui/Logo';
 import { readRememberChoice, saveRememberChoice, useAuthStore } from '@/stores/useAuthStore';
 import { useBrandingStore } from '@/stores/useBrandingStore';
 import { BrandingEditorModal } from '@/app/layout/CustomBranding';
@@ -392,7 +393,7 @@ export function LoginPage() {
   }
 
   return (
-    <div className="relative grid h-screen grid-cols-1 lg:grid-cols-2 bg-surface-secondary overflow-hidden">
+    <div className="fsftm-login relative grid h-screen grid-cols-1 lg:grid-cols-2 bg-surface-secondary overflow-hidden">
       <AuthBackground />
 
       {/* Local style block - premium glass variant + drifting orb keyframes
@@ -405,7 +406,7 @@ export function LoginPage() {
           -webkit-backdrop-filter: blur(28px) saturate(180%);
           border: 1px solid rgba(255, 255, 255, 0.85);
           box-shadow:
-            0 36px 80px -28px rgba(14, 165, 233, 0.30),
+            0 36px 80px -28px rgba(153, 0, 51, 0.30),
             0 14px 36px -12px rgba(15, 23, 42, 0.12),
             0 2px 6px -1px rgba(15, 23, 42, 0.06),
             inset 0 1px 0 rgba(255, 255, 255, 0.95),
@@ -416,7 +417,7 @@ export function LoginPage() {
             linear-gradient(135deg, rgba(22, 26, 36, 0.78) 0%, rgba(15, 17, 23, 0.66) 100%);
           border-color: transparent;
           box-shadow:
-            0 30px 80px -24px rgba(14, 165, 233, 0.35),
+            0 30px 80px -24px rgba(153, 0, 51, 0.35),
             0 12px 40px -12px rgba(0, 0, 0, 0.55),
             0 2px 6px -2px rgba(0, 0, 0, 0.4);
         }
@@ -427,13 +428,13 @@ export function LoginPage() {
           border-radius: inherit;
           pointer-events: none;
           background:
-            radial-gradient(120% 80% at 0% 0%, rgba(14, 165, 233, 0.05), transparent 65%);
+            radial-gradient(120% 80% at 0% 0%, rgba(153, 0, 51, 0.05), transparent 65%);
           mix-blend-mode: soft-light;
         }
         .dark .login-glass-pro::after {
           background:
-            radial-gradient(120% 80% at 0% 0%, rgba(14, 165, 233, 0.18), transparent 60%),
-            radial-gradient(120% 80% at 100% 100%, rgba(139, 92, 246, 0.16), transparent 60%);
+            radial-gradient(120% 80% at 0% 0%, rgba(153, 0, 51, 0.18), transparent 60%),
+            radial-gradient(120% 80% at 100% 100%, rgba(97, 99, 100, 0.16), transparent 60%);
           mix-blend-mode: screen;
         }
         @keyframes login-orb-drift-a {
@@ -461,13 +462,13 @@ export function LoginPage() {
           column so the headline / stats sit on a near-white field.
           Dark mode keeps the original richer blob set for depth. */}
       <div className="absolute inset-y-0 start-0 end-1/2 z-0 pointer-events-none overflow-hidden hidden lg:block">
-        <div className="absolute top-[-12%] left-[-6%] w-[520px] h-[520px] rounded-full bg-sky-300/10 dark:bg-oe-blue/35 blur-[120px] animate-blob-slow-1 mix-blend-screen" />
-        <div className="absolute bottom-[-18%] right-[2%] w-[400px] h-[400px] rounded-full bg-cyan-200/10 dark:bg-violet-500/35 blur-[110px] animate-blob-slow-4 mix-blend-screen hidden dark:block" />
+        <div className="absolute top-[-12%] left-[-6%] w-[520px] h-[520px] rounded-full bg-[#990033]/10 dark:bg-oe-blue/35 blur-[120px] animate-blob-slow-1 mix-blend-screen" />
+        <div className="absolute bottom-[-18%] right-[2%] w-[400px] h-[400px] rounded-full bg-[#616364]/10 dark:bg-[#616364]/30 blur-[110px] animate-blob-slow-4 mix-blend-screen hidden dark:block" />
       </div>
 
       {/* Mobile-only ambient blobs (single column layout) */}
       <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden lg:hidden">
-        <div className="absolute top-[-12%] left-[-6%] w-[520px] h-[520px] rounded-full bg-sky-300/10 dark:bg-oe-blue/35 blur-[110px] animate-blob-slow-1 mix-blend-screen" />
+        <div className="absolute top-[-12%] left-[-6%] w-[520px] h-[520px] rounded-full bg-[#990033]/10 dark:bg-oe-blue/35 blur-[110px] animate-blob-slow-1 mix-blend-screen" />
       </div>
 
       {/* Theme + Language - top right (enlarged for /login so discoverable). */}
@@ -522,21 +523,21 @@ export function LoginPage() {
             className="absolute inset-0"
             style={{
               background:
-                'radial-gradient(ellipse 90% 70% at 70% 25%, rgba(14,165,233,0.16), transparent 65%),' +
-                'radial-gradient(ellipse 80% 60% at 25% 85%, rgba(56,189,248,0.12), transparent 65%),' +
-                'radial-gradient(ellipse 60% 50% at 90% 75%, rgba(125,211,252,0.10), transparent 65%)',
+                'radial-gradient(ellipse 90% 70% at 70% 25%, rgba(153,0,51,0.16), transparent 65%),' +
+                'radial-gradient(ellipse 80% 60% at 25% 85%, rgba(184,26,77,0.12), transparent 65%),' +
+                'radial-gradient(ellipse 60% 50% at 90% 75%, rgba(97,99,100,0.10), transparent 65%)',
             }}
           />
           <div
             className="absolute inset-0 hidden dark:block"
             style={{
               background:
-                'radial-gradient(ellipse 80% 60% at 70% 20%, rgba(14,165,233,0.22), transparent 60%),' +
-                'radial-gradient(ellipse 70% 60% at 30% 90%, rgba(139,92,246,0.18), transparent 60%)',
+                'radial-gradient(ellipse 80% 60% at 70% 20%, rgba(153,0,51,0.22), transparent 60%),' +
+                'radial-gradient(ellipse 70% 60% at 30% 90%, rgba(97,99,100,0.18), transparent 60%)',
             }}
           />
-          <div className="absolute top-[8%] right-[8%] w-[420px] h-[420px] rounded-full bg-sky-300/45 dark:bg-sky-500/35 blur-[100px] login-orb-a" />
-          <div className="absolute bottom-[6%] left-[10%] w-[360px] h-[360px] rounded-full bg-cyan-200/40 dark:bg-violet-500/30 blur-[100px] login-orb-b" />
+          <div className="absolute top-[8%] right-[8%] w-[420px] h-[420px] rounded-full bg-[#990033]/20 dark:bg-[#990033]/35 blur-[100px] login-orb-a" />
+          <div className="absolute bottom-[6%] left-[10%] w-[360px] h-[360px] rounded-full bg-[#616364]/20 dark:bg-[#616364]/25 blur-[100px] login-orb-b" />
           <div className="absolute top-[42%] right-[34%] w-[280px] h-[280px] rounded-full bg-white/55 dark:bg-white/0 blur-[80px] login-orb-c" />
           <div
             className="absolute inset-0 opacity-[0.04] dark:opacity-[0.07] mix-blend-overlay"
@@ -562,10 +563,10 @@ export function LoginPage() {
             authoritative h1 (visually hidden, always present in DOM). */}
         <h2 className="text-[32px] xl:text-[36px] font-semibold text-content-primary leading-[1.08] tracking-[-0.025em] animate-stagger-in" style={{ animationDelay: '60ms' }}>
           {t('login.hero_h_a', { defaultValue: 'The' })}{' '}
-          <span className="bg-gradient-to-r from-oe-blue to-sky-500 bg-clip-text text-transparent">#1</span>{' '}
+          <span className="bg-gradient-to-r from-oe-blue to-[#d6336c] bg-clip-text text-transparent">#1</span>{' '}
           {t('login.hero_h_b', { defaultValue: 'open-source workspace for' })}
           <br />
-          <span className="bg-gradient-to-r from-oe-blue to-sky-500 bg-clip-text text-transparent">
+          <span className="bg-gradient-to-r from-oe-blue to-[#d6336c] bg-clip-text text-transparent">
             {t('login.hero_h_c', { defaultValue: 'construction project management' })}
           </span>
         </h2>
@@ -656,11 +657,11 @@ export function LoginPage() {
                     aspectRatio: HEX_PORTRAIT_ASPECT,
                     clipPath: HEX_PORTRAIT_CLIP,
                     background: isAccent
-                      ? 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 65%, #0369a1 100%)'
-                      : 'linear-gradient(180deg, rgba(255,255,255,0.97), rgba(244,250,255,0.82))',
+                      ? 'linear-gradient(135deg, #b81a4d 0%, #990033 65%, #6b0024 100%)'
+                      : 'linear-gradient(180deg, rgba(255,255,255,0.97), rgba(252,243,246,0.82))',
                     boxShadow: isAccent
-                      ? '0 18px 32px -12px rgba(14,165,233,0.55), inset 0 1px 0 rgba(255,255,255,0.35)'
-                      : '0 8px 18px -8px rgba(15,23,42,0.10), inset 0 1px 0 rgba(255,255,255,0.9), inset 0 0 0 1px rgba(14,165,233,0.06)',
+                      ? '0 18px 32px -12px rgba(153,0,51,0.55), inset 0 1px 0 rgba(255,255,255,0.35)'
+                      : '0 8px 18px -8px rgba(15,23,42,0.10), inset 0 1px 0 rgba(255,255,255,0.9), inset 0 0 0 1px rgba(153,0,51,0.06)',
                   }}
                 >
                   <Icon
@@ -693,7 +694,7 @@ export function LoginPage() {
             const Icon = feat.icon;
             return (
               <div key={feat.title} className="relative pl-4 max-w-[210px]">
-                <span aria-hidden className="absolute left-0 top-1 h-[14px] w-[2px] rounded-full bg-gradient-to-b from-oe-blue to-sky-500/60" />
+                <span aria-hidden className="absolute left-0 top-1 h-[14px] w-[2px] rounded-full bg-gradient-to-b from-oe-blue to-[#616364]/60" />
                 <div className="flex items-center gap-1.5">
                   <Icon size={13} strokeWidth={1.8} className="text-oe-blue/85" />
                   <span className="text-[12.5px] font-semibold tracking-[-0.01em] text-content-primary leading-tight">
@@ -714,7 +715,7 @@ export function LoginPage() {
             <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" className="opacity-40"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
             <a href="/api/source" target="_blank" rel="noopener noreferrer" className="hover:text-content-tertiary transition-colors">AGPL-3.0</a>
             <span className="opacity-30">&middot;</span>
-            <a href="https://OpenConstructionERP.com" target="_blank" rel="noopener noreferrer" className="hover:text-content-tertiary transition-colors">OpenConstructionERP.com</a>
+            <a href="/api/source" target="_blank" rel="noopener noreferrer" className="hover:text-content-tertiary transition-colors">{t('login.github_sub', { defaultValue: 'Source code' })}</a>
           </div>
         </div>
       </div>
@@ -734,13 +735,13 @@ export function LoginPage() {
           <div className="absolute inset-0 bg-gradient-to-l from-white/0 via-white/60 to-white dark:from-[#070912]/0 dark:via-[#070912]/60 dark:to-[#070912]" />
           {/* Tiny far-corner sky tint just to soften the edge - the glass
               still has something to lift off, but the field reads white. */}
-          <div className="absolute -top-24 -left-24 w-[420px] h-[420px] rounded-full bg-sky-100/55 dark:bg-sky-500/10 blur-[110px]" />
+          <div className="absolute -top-24 -left-24 w-[420px] h-[420px] rounded-full bg-[#990033]/10 dark:bg-[#990033]/15 blur-[110px]" />
         </div>
         <div className="w-full max-w-[380px] relative z-10">
           {/* Logo - tenant white-label (logo / company name) when set via
               the in-app sidebar editor; otherwise the default brand. The
-              small "by Florida Steel Frame & Truss Manufacturing LLC" attribution stays visible in
-              customised modes (AGPL-3.0 requirement). */}
+              small "by <company>" line stays visible in customised modes. The
+              AGPL-3.0 legal notice is the licence + source link in the footer. */}
           <div className="relative mb-5 flex flex-col items-center animate-stagger-in" style={{ animationDelay: '0ms' }}>
             {/* Brand + edit-pencil row - grouped together and visually
                 centered in the form column (previously the pencil was
@@ -771,21 +772,17 @@ export function LoginPage() {
                     className="mt-2 block text-[11px] leading-none text-content-tertiary"
                     style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif", letterSpacing: '0.02em' }}
                   >
-                    by{' '}
-                    <span className="font-semibold tracking-tight">
-                      Open<span className="text-oe-blue/80">Construction</span>
-                      <span className="text-content-quaternary">ERP</span>
-                    </span>
+                    <CompanyName by className="tracking-tight" />
                   </span>
                 </div>
               ) : (
-                <div className="flex items-center gap-2.5">
-                  <Logo size="md" animate />
+                <div className="flex flex-col items-center gap-2">
+                  <Logo size="lg" animate />
                   <span
-                    className="text-2xl font-medium text-content-primary whitespace-nowrap"
-                    style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif", letterSpacing: '-0.02em' }}
+                    className="text-center text-base font-semibold text-content-primary"
+                    style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif", letterSpacing: '-0.01em' }}
                   >
-                    Open<span className="text-oe-blue">Construction</span><span className="text-content-quaternary">ERP</span>
+                    <CompanyName />
                   </span>
                 </div>
               )}
@@ -809,7 +806,7 @@ export function LoginPage() {
 
           {/* Open-source banner (mobile) */}
           <div className="lg:hidden mb-4 animate-stagger-in" style={{ animationDelay: '100ms' }}>
-            <div className="rounded-xl bg-gradient-to-r from-oe-blue/10 via-violet-500/10 to-emerald-500/10 border border-oe-blue/20 px-4 py-3 text-center">
+            <div className="rounded-xl bg-gradient-to-r from-oe-blue/10 via-[#616364]/10 to-emerald-500/10 border border-oe-blue/20 px-4 py-3 text-center">
               <div className="flex items-center justify-center gap-1.5 mb-1">
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
@@ -817,7 +814,7 @@ export function LoginPage() {
                 </span>
                 <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">Open Source</span>
               </div>
-              <p className="text-sm font-bold bg-gradient-to-r from-oe-blue via-violet-600 to-emerald-600 bg-clip-text text-transparent">
+              <p className="text-sm font-bold bg-gradient-to-r from-oe-blue via-[#616364] to-emerald-600 bg-clip-text text-transparent">
                 {t('login.open_source_badge', { defaultValue: 'The #1 Open-Source Construction ERP' })}
               </p>
             </div>
@@ -1069,7 +1066,7 @@ export function LoginPage() {
           </div>
           <div className="lg:hidden mt-2 text-center text-2xs text-content-quaternary">
             <div className="flex items-center justify-center gap-3">
-              <a href="https://OpenConstructionERP.com" target="_blank" rel="noopener noreferrer" className="hover:text-content-secondary transition-colors">OpenConstructionERP.com</a>
+              <CompanyName />
               <span>·</span>
               <a href="https://github.com/datadrivenconstruction/OpenConstructionERP" target="_blank" rel="noopener noreferrer" className="hover:text-content-secondary transition-colors">GitHub</a>
             </div>

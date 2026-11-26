@@ -544,3 +544,10 @@ __pycache__/
 .env
 .env.*
 !.env.example
+# Frontend production build (build-frontend.bat / npm run build): generated,
+# never committed. Only the placeholder stays tracked.
+frontend/dist/*
+!frontend/dist/.placeholder
+frontend/stats.html
+# build-frontend.bat builds here first and swaps it into dist/ only on success.
+frontend/dist-new/

@@ -64,7 +64,7 @@ import { LegendPropertiesPanel } from './components/LegendPropertiesPanel';
 import { SetScaleDialog } from './components/SetScaleDialog';
 import { CombineDialog, NewPdfDialog, type CombineItem } from './components/PdfCreateDialogs';
 import { wordsFromItems, wordsInRect, lineBoxes, textOf, type Word, type RawItem } from './data/text-words';
-import { ExtractPagesDialog, DeletePagesDialog, type ExtractOptions } from './components/PageToolsDialogs';
+import { ExtractPagesDialog, DeletePagesDialog, RotatePagesDialog, ExportPagesDialog, type ExtractOptions } from './components/PageToolsDialogs';
 import { thumbCacheGet, thumbCachePut } from './data/thumb-cache';
 import * as pdfPages from './data/pdf-pages';
 import { parseLengthInches, formatFtIn } from './data/length-input';
@@ -141,7 +141,6 @@ import {
   Redo2,
   Pencil,
   Save,
-  HardDriveDownload,
   Route,
   Box,
   Eye,
@@ -151,7 +150,6 @@ import {
   ClipboardList,
   ChevronDown,
   ChevronUp,
-  Type,
   Square,
   RectangleHorizontal,
   Loader2,
@@ -163,27 +161,20 @@ import {
   FileText,
   Sparkles,
   Layers,
-  List,
-  PanelRight,
   X,
   Check,
   AlertTriangle,
   Search,
-  Boxes,
-  ArrowUpToLine,
-  ArrowDownToLine,
   GripVertical,
   Maximize2,
   Minimize2,
   ChevronsRight,
   ChevronsLeft,
   ChevronsUp,
-  ChevronsDown,
   ChevronsUpDown,
   Columns2,
   Rows2,
   Circle,
-  CircleDot,
   DraftingCompass,
   Waypoints,
   Hexagon,
@@ -195,10 +186,10 @@ import {
   MapPin,
   BookOpen,
   Plus,
+  ClipboardPaste,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useToastStore } from '../../stores/useToastStore';
-import { Toast } from '@/shared/ui/Toast';
 import { useProjectContextStore } from '../../stores/useProjectContextStore';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { usePreferencesStore } from '../../stores/usePreferencesStore';
@@ -211,12 +202,10 @@ import {
   type MeasureDimension,
 } from '../../features/takeoff/lib/units';
 import {
-  confidenceBand,
   countConfidenceBands,
-  type ConfidenceBand,
   type ConfidenceThresholds,
 } from '../../features/takeoff/lib/confidenceBand';
-import { apiGet, apiPost, apiPut, getAuthToken } from '../../shared/lib/api';
+import { apiGet, apiPut, getAuthToken } from '../../shared/lib/api';
 import AiAssistantPanel from './AiAssistantPanel';
 // Detect tab removed at the user's request; Auto Takeoff replaces it (OE-DELIVERY 2026-11-02-remove-detect).
 // Auto Takeoff (OE-DELIVERY 2026-11-02-auto-takeoff).
@@ -346,7 +335,6 @@ import {
 import {
   filterMarkups,
   totalsByType,
-  evaluateFormula,
   type MarkupFilter,
 } from './data/markups-list';
 import {
@@ -460,13 +448,9 @@ import {
   sortByPaintOrder,
   groupBands,
   groupBandCommit,
-  groupOf,
-  reorderGroups,
-  freezeGroupBands,
   hydrateGroupBands,
   stampGroupBands,
   orderKeyForEdge,
-  planMeasurementDrop,
 } from '../../features/takeoff/lib/takeoff-order';
 import { seedAnnotationCounters } from '../../features/takeoff/lib/takeoff-labels';
 import { displayGroupName } from '../../features/takeoff/lib/group-labels';
@@ -483,14 +467,32 @@ import {
 } from '../../features/takeoff/lib/takeoff-quantity';
 import type { WallOpening, Measurement as BaseMeasurement } from '../../features/takeoff/lib/takeoff-types';
 import { WallAreaPanel } from '../../features/takeoff/components/WallAreaPanel';
-import {
-  defaultSectionId,
-  positionQuantityFor,
-  positionUnitFor,
-  sectionOptions,
-} from '../../features/takeoff/lib/takeoff-create-position';
 import { linkedQuantityDrift } from '../../features/takeoff/lib/takeoff-linked-drift';
 import { replicateMeasurementsToPages } from '../../features/takeoff/lib/takeoff-replicate';
+import { findStackedMarkups, stackHaloColor } from './data/overlap-stacks';
+import { drawMarkupEndings, type LineEnding } from './data/line-endings';
+
+/** Split-pane view API used by the exact view sync. */
+interface SplitSyncApi {
+  centerFrac: () => { fx: number; fy: number; w: number; h: number } | null;
+  centerOn: (fx: number, fy: number) => void;
+}
+
+/** FSFTM keeps the drawing area clear: the "pages have no text layer / need
+ *  OCR" strip and the "Detected scale" strip are hidden (user request,
+ *  OE-DELIVERY 2026-11-26-fsftm-pdf). Scale is set from Document > Set Scale.
+ *  Flip to true to bring both back. */
+const SHOW_PAGE_INFO_BANNERS = false as boolean;
+
+/** Stable empty list: a compared revision shows no markups of this drawing. */
+const NO_MEASUREMENTS: never[] = [];
+
+/** FSFTM thumbnail grid: smallest / largest cell width (px). */
+const THUMB_SIZE_MIN = 70;
+const THUMB_SIZE_MAX = 320;
+
+/** Types whose halo is drawn as a closed outline. */
+const STACK_CLOSED_TYPES = new Set(['area', 'volume', 'rectangle', 'rectarea', 'polygon', 'cloud', 'cloudPlus', 'ellipse']);
 import { ScaleAutoDetect } from '../../features/takeoff/components/ScaleAutoDetect';
 import { MeasurementLedger, COLUMNS as LEDGER_COLUMNS, shortPageLabel } from '../../features/takeoff/components/MeasurementLedger';
 import { ManageColumnsDialog } from './ManageColumnsDialog';
@@ -528,7 +530,7 @@ import { parseDecimalInput } from '@/shared/lib/parseDecimal';
 // Type-only: the scale-source vocabulary is a closed set owned by the backend
 // contract, so the viewer reuses it instead of restating it as a bare string.
 import type { ScaleSource } from '@/features/takeoff/api';
-import { fmtCurrency, fmtList, fmtPercent, getIntlLocale } from '@/shared/lib/formatters';
+import { fmtList, fmtPercent } from '@/shared/lib/formatters';
 
 // The BOQ editor's cost-database picker, reused (not rebuilt) to price a
 // position created from a measurement. Lazy so the viewer does not pull the
@@ -707,27 +709,7 @@ const DIMENSION_LABELS: Readonly<Record<MeasureDimension, { key: string; fallbac
   time: { key: 'takeoff.dim_time', fallback: 'time' },
 };
 
-/** Badge colours per confidence band.
- *
- *  Green / amber / red is the platform's agreed reading for an AI result, so
- *  the band is legible before the number is read. ``unknown`` keeps the violet
- *  "this came from a detector" tone rather than borrowing red: the offline
- *  Recognize path proposes geometry without scoring it, and painting that as
- *  low confidence would invent a judgement nothing made. */
-const CONFIDENCE_BAND_CLASSES: Record<ConfidenceBand, string> = {
-  high: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
-  medium: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
-  low: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300',
-  unknown: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300',
-};
 
-/** Plain wording for each band, used in the badge tooltip and the review bar. */
-const CONFIDENCE_BAND_TEXT: Record<ConfidenceBand, { key: string; fallback: string }> = {
-  high: { key: 'takeoff_viewer.confidence_high', fallback: 'High confidence' },
-  medium: { key: 'takeoff_viewer.confidence_medium', fallback: 'Medium confidence' },
-  low: { key: 'takeoff_viewer.confidence_low', fallback: 'Low confidence' },
-  unknown: { key: 'takeoff_viewer.confidence_unknown', fallback: 'Not scored' },
-};
 
 /** How each stored scale provenance reads to an estimator. A value absent from
  *  this map (including a source added server-side ahead of this client) falls
@@ -814,6 +796,9 @@ interface Measurement {
    *  line pattern, a fill colour independent of the line colour, and which
    *  label parts show on the drawing. Undefined = previous behaviour. */
   lineStyle?: 'solid' | 'dashed' | 'dotted' | 'dashdot';
+  /** FSFTM Start / End line endings (OE-DELIVERY 2026-11-25-fsftm-pdf). */
+  lineStart?: LineEnding;
+  lineEnd?: LineEnding;
   fillColor?: string;
   labelMode?: 'all' | 'value' | 'name' | 'none';
   /** FSFTM Properties toolbar (OE-DELIVERY 2026-11-02-fsftm-properties-bar):
@@ -1071,10 +1056,6 @@ const TOOL_LABELS: Record<MeasureTool, string> = {
   arc: 'Arc',
 };
 
-/** FSFTM-style legend (placed on the PDF) geometry, in PDF user units.
- *  The box height grows with the row count; the viewer hit-tests and paints
- *  from these same constants so the two can never disagree. */
-const LEGEND_WIDTH = 230;
 const LEGEND_HEADER_H = 30;
 const LEGEND_COLHEADER_H = 16;
 const LEGEND_ROW_H = 24;
@@ -1491,15 +1472,6 @@ function drawMultiplyGhost(
   ctx.restore();
 }
 
-/** Map a display-unit label to a CalibrationUnit for toMeters(). Falls back
- *  to feet (the user's working unit) for unrecognized labels. */
-function toCalibrationUnit(label: string): 'm' | 'mm' | 'ft' | 'in' {
-  const s = (label || '').trim().toLowerCase();
-  if (s === 'mm' || s.startsWith('millim')) return 'mm';
-  if (s === 'm' || s.startsWith('meter') || s.startsWith('metre')) return 'm';
-  if (s === 'in' || s === '"' || s === '″' || s.startsWith('inch')) return 'in';
-  return 'ft';
-}
 
 /** Parse a FSFTM-style distance string into metres.
  *  Accepts `1'-6"`, `1'6"`, `18"`, `1.5'` as well as plain decimals
@@ -1669,6 +1641,12 @@ interface TakeoffViewerModuleProps {
   onCloseDocument?: () => void;
   /** Open a document the viewer just uploaded (page tools, update 15). */
   onOpenUploadedDocument?: (doc: { id: string; filename: string }) => void;
+  /** FSFTM multi-file tabs (OE-DELIVERY 2026-11-25-fsftm-pdf): the open drawings,
+   *  switching / closing one, and adding PDFs from this computer. */
+  openDocuments?: { id: string; name: string }[];
+  onSwitchDocument?: (docId: string) => void;
+  onCloseDocumentTab?: (docId: string) => void;
+  onUploadFiles?: (files: File[]) => void;
 }
 
 /** localStorage key for the dragged legend position (#358). A workspace
@@ -1776,6 +1754,15 @@ function SplitPane({
   onClose,
   syncTo,
   onViewChange,
+  active = false,
+  onActivate,
+  onSwap,
+  docValue = 'self',
+  docOptions,
+  onPickDoc,
+  docLoading = false,
+  selfName,
+  syncApiRef,
 }: {
   pdfDoc: PDFDocumentProxy;
   page: number;
@@ -1790,6 +1777,22 @@ function SplitPane({
   syncTo?: { fx: number; fy: number; seq: number } | null;
   /** FSFTM Sync, the other way: this pane's centre as a fraction of the sheet. */
   onViewChange?: (fx: number, fy: number) => void;
+  /** This pane has keyboard focus (OE-DELIVERY 2026-11-25-fsftm-pdf). */
+  active?: boolean;
+  onActivate?: () => void;
+  /** Swap the two panes' pages, so this page moves into the drawing pane. */
+  onSwap?: () => void;
+  /** Revision compare (OE-DELIVERY 2026-11-25-fsftm-pdf): which document this
+   *  pane shows ('self' = the open drawing), the choices, and the picker. */
+  docValue?: string;
+  docOptions?: { id: string; name: string }[];
+  onPickDoc?: (id: string) => void;
+  docLoading?: boolean;
+  /** Name of the open drawing, for the "same drawing" choice. */
+  selfName?: string;
+  /** Exact view sync (OE-DELIVERY 2026-11-25-fsftm-pdf): read / set the point of
+   *  the sheet at the centre of this pane, as fractions of the sheet. */
+  syncApiRef?: React.MutableRefObject<SplitSyncApi | null>;
 }) {
   /* FSFTM-style split pane (OE-DELIVERY 2026-11-02-fsftm-zoom-anchor):
    * the wheel zooms at the cursor, the point under the cursor stays put
@@ -1806,6 +1809,11 @@ function SplitPane({
   const [pageSize, setPageSize] = useState<{ page: number; w: number; h: number } | null>(null);
   /** Zoom the bitmaps were last rendered at (capped by the canvas limits). */
   const [bitmapZoom, setBitmapZoom] = useState(0);
+  /** Page whose bitmap the canvas holds. On a page change the old page stays
+   *  on screen, untouched, until the new one is fully rendered off-screen;
+   *  then size, bitmap and markups swap in one frame - no stretch or flash
+   *  (OE-DELIVERY 2026-11-25-fsftm-pdf). */
+  const renderedPageRef = useRef(0);
   const [shift, setShift] = useState({ x: 0, y: 0 });
   const shiftRef = useRef(shift);
   shiftRef.current = shift;
@@ -1933,6 +1941,8 @@ function SplitPane({
   /* Instant CSS size + anchor, before paint, on every zoom step. */
   useLayoutEffect(() => {
     if (!pageSize || pageSize.page !== page) return;
+    // A new page's size is applied together with its bitmap (render effect).
+    if (renderedPageRef.current !== 0 && renderedPageRef.current !== page) return;
     const w = `${pageSize.w * zoom}px`;
     const h = `${pageSize.h * zoom}px`;
     for (const cv of [canvasRef.current, overlayRef.current]) {
@@ -2018,12 +2028,22 @@ function SplitPane({
           overlay.width = off.width;
           overlay.height = off.height;
         }
+        // Size + bitmap + markups land together (page change without a jump).
+        const cssW = `${pageSize.w * zoomRef.current}px`;
+        const cssH = `${pageSize.h * zoomRef.current}px`;
+        for (const cv of [canvas, overlay]) {
+          if (cv) {
+            cv.style.width = cssW;
+            cv.style.height = cssH;
+          }
+        }
+        renderedPageRef.current = page;
         setBitmapZoom(bz);
         drawOverlay(bz);
       } catch {
         /* superseded render - ignore */
       }
-    }, bitmapZoom === 0 ? 0 : 100);
+    }, bitmapZoom === 0 || renderedPageRef.current !== page ? 0 : 100);
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
@@ -2033,10 +2053,11 @@ function SplitPane({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pdfDoc, page, zoom, pageSize]);
 
-  /* Repaint the overlay when the measurements change. */
+  /* Repaint the overlay when the measurements change (not while the canvas
+   * still shows the previous page). */
   useEffect(() => {
-    if (bitmapZoom > 0) drawOverlay(bitmapZoom);
-  }, [drawOverlay, bitmapZoom]);
+    if (bitmapZoom > 0 && renderedPageRef.current === page) drawOverlay(bitmapZoom);
+  }, [drawOverlay, bitmapZoom, page]);
 
   /** Fit the page width to this pane. */
   const fitWidth = useCallback(() => {
@@ -2058,34 +2079,102 @@ function SplitPane({
     zoomAt(zoomRef.current * (dir > 0 ? 1.25 : 1 / 1.25), r.left + r.width / 2, r.top + r.height / 2);
   };
 
+  // Sync API: centre fraction of the sheet, and centre the pane on one.
+  useEffect(() => {
+    if (!syncApiRef) return;
+    const api: SplitSyncApi = {
+      centerFrac: () => {
+        const sc = scrollRef.current;
+        const sh = canvasRef.current;
+        if (!sc || !sh) return null;
+        const sr = sh.getBoundingClientRect();
+        const vr = sc.getBoundingClientRect();
+        if (sr.width <= 0 || sr.height <= 0) return null;
+        return { fx: (vr.left + vr.width / 2 - sr.left) / sr.width, fy: (vr.top + vr.height / 2 - sr.top) / sr.height, w: sr.width, h: sr.height };
+      },
+      centerOn: (fx, fy) => {
+        const sc = scrollRef.current;
+        const sh = canvasRef.current;
+        if (!sc || !sh) return;
+        const sr = sh.getBoundingClientRect();
+        const vr = sc.getBoundingClientRect();
+        if (sr.width <= 0 || sr.height <= 0) return;
+        const dx = sr.left + fx * sr.width - (vr.left + vr.width / 2);
+        const dy = sr.top + fy * sr.height - (vr.top + vr.height / 2);
+        if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) nudge(dx, dy);
+      },
+    };
+    syncApiRef.current = api;
+    return () => { if (syncApiRef.current === api) syncApiRef.current = null; };
+  }, [syncApiRef, nudge]);
+
+  /* Keyboard navigation, the same keys as the main view (OE-DELIVERY
+   * 2026-11-25-fsftm-pdf): PgDn / Up = next page, PgUp / Down = previous,
+   * Home / End, + / - zoom, 0 fit width. Handled here and stopped, so the
+   * main view does not also flip its page. */
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const tgt = e.target as HTMLElement;
+    if (tgt.tagName === 'INPUT' || tgt.tagName === 'SELECT' || tgt.tagName === 'TEXTAREA') return;
+    let handled = true;
+    if (e.key === 'PageDown' || e.key === 'ArrowUp') onPageChange(Math.min(totalPages, page + 1));
+    else if (e.key === 'PageUp' || e.key === 'ArrowDown') onPageChange(Math.max(1, page - 1));
+    else if (e.key === 'Home') onPageChange(1);
+    else if (e.key === 'End') onPageChange(totalPages);
+    else if (e.key === '+' || e.key === '=') stepZoom(1);
+    else if (e.key === '-' || e.key === '_') stepZoom(-1);
+    else if (e.key === '0') fitWidth();
+    else if (e.key === 'ArrowLeft') nudge(-60, 0);
+    else if (e.key === 'ArrowRight') nudge(60, 0);
+    else handled = false;
+    if (handled) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  };
+
   return (
-    <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-gray-100 dark:bg-gray-900">
-      {/* Pane header: own pager + zoom + close. */}
-      <div className="flex shrink-0 items-center gap-1 border-b border-border bg-surface-primary px-2 py-1">
-        <span className="mr-1 text-[10px] font-bold uppercase tracking-widest text-content-tertiary">
-          Split
-        </span>
-        <button
-          type="button"
-          onClick={() => onPageChange(Math.max(1, page - 1))}
-          disabled={page <= 1}
-          className="rounded p-1 text-content-secondary hover:bg-surface-secondary disabled:opacity-40"
-          aria-label="Previous page"
-        >
-          <ChevronLeft size={14} />
-        </button>
-        <span className="text-[11px] tabular-nums text-content-secondary">
-          {page} / {totalPages}
-        </span>
-        <button
-          type="button"
-          onClick={() => onPageChange(Math.min(totalPages, page + 1))}
-          disabled={page >= totalPages}
-          className="rounded p-1 text-content-secondary hover:bg-surface-secondary disabled:opacity-40"
-          aria-label="Next page"
-        >
-          <ChevronRight size={14} />
-        </button>
+    <div
+      className={clsx(
+        'relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#e9e9e9] outline-none dark:bg-[#1e1e1e]',
+        active ? 'shadow-[inset_0_2px_0_0_rgb(var(--oe-blue-ch))]' : '',
+      )}
+      tabIndex={0}
+      onKeyDown={onKeyDown}
+      onMouseDown={(e) => {
+        onActivate?.();
+        const tgt = e.target as HTMLElement;
+        if (tgt.tagName !== 'INPUT' && tgt.tagName !== 'BUTTON') (e.currentTarget as HTMLElement).focus({ preventScroll: true });
+      }}
+      data-testid="split-pane"
+      data-active={active ? 'true' : undefined}
+    >
+      {/* Pane toolbar: floats over the sheet (top-right) so this pane's
+          viewing area matches the main pane exactly (no strip pushing the
+          sheet down; sync stays exact). OE-DELIVERY 2026-11-25-fsftm-pdf. */}
+      <div
+        className={clsx('flex h-7 shrink-0 items-center gap-1 bg-[#cfcfcf] pr-1 dark:bg-[#252526]', active && 'shadow-[inset_0_-2px_0_0_rgb(var(--oe-blue-ch))]')}
+        data-testid="split-toolbar"
+      >
+        {onPickDoc && (
+          <select
+            value={docValue}
+            onChange={(e) => onPickDoc(e.target.value)}
+            onKeyDown={(e) => e.stopPropagation()}
+            className="h-full max-w-[300px] min-w-0 cursor-pointer truncate border-0 border-r border-black/20 bg-[#d9d9d9] pl-3 pr-6 text-[12px] text-content-primary focus:outline-none dark:border-white/10 dark:bg-[#3a3a3a] dark:text-white"
+            title="Document shown in this pane - pick another drawing (e.g. the old revision) to compare"
+            data-testid="split-doc-select"
+          >
+            <option value="self">{selfName ?? 'This drawing'}</option>
+            {(docOptions ?? []).map((d) => (
+              <option key={d.id} value={d.id}>{d.name}</option>
+            ))}
+            <option value="__file">Open a PDF from this computer…</option>
+          </select>
+        )}
+        {docLoading && <Loader2 size={12} className="animate-spin text-content-tertiary" />}
+        <span className="ml-1 text-[10px] tabular-nums text-content-tertiary" title="Page shown in this pane - use the page bar below while this pane is active">p.{page}</span>
+        <span className="flex-1" />
         <span className="mx-1 h-4 w-px bg-border" />
         <button
           type="button"
@@ -2115,6 +2204,18 @@ function SplitPane({
         >
           <Maximize2 size={14} />
         </button>
+        {onSwap && (
+          <button
+            type="button"
+            onClick={onSwap}
+            className="ml-1 flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-semibold text-oe-blue hover:bg-oe-blue/10"
+            title="Swap panes: bring this page into the main pane to draw and edit markups on it"
+            data-testid="split-swap"
+          >
+            <ArrowLeftRight size={12} />
+            Swap
+          </button>
+        )}
         <button
           type="button"
           onClick={onClose}
@@ -2154,74 +2255,6 @@ function SplitPane({
           <canvas ref={canvasRef} className="block rounded-[2px] shadow-sm" />
           <canvas ref={overlayRef} className="pointer-events-none absolute inset-0" />
         </div>
-      </div>
-    </div>
-  );
-}
-/** Thick horizontal drag handle below the bottom page-navigation bar
- *  (VS Code terminal style): a visible line with an up/down chevron pill.
- *  Drag down (or click) to collapse the bottom bar into this slim strip;
- *  drag up (or click) to expand it back. */
-function BottomCollapseHandle({
-  collapsed,
-  onToggle,
-}: {
-  collapsed: boolean;
-  onToggle: () => void;
-}) {
-  const dragRef = useRef<{ startY: number; pointerId: number; moved: boolean } | null>(null);
-  const Icon = collapsed ? ChevronsUp : ChevronsDown;
-  return (
-    <div
-      role="separator"
-      aria-orientation="horizontal"
-      aria-label={collapsed ? 'Expand the page navigation bar' : 'Collapse the page navigation bar'}
-      title={collapsed ? 'Drag up or click to expand the page bar' : 'Drag down or click to collapse the page bar'}
-      tabIndex={0}
-      data-testid="takeoff-bottom-collapse-handle"
-      onPointerDown={(e) => {
-        e.preventDefault();
-        e.currentTarget.setPointerCapture?.(e.pointerId);
-        dragRef.current = { startY: e.clientY, pointerId: e.pointerId, moved: false };
-      }}
-      onPointerMove={(e) => {
-        const d = dragRef.current;
-        if (!d || e.pointerId !== d.pointerId) return;
-        const dy = e.clientY - d.startY;
-        if (Math.abs(dy) > 4) d.moved = true;
-        if (!collapsed && dy > 24) {
-          onToggle();
-          dragRef.current = null;
-        } else if (collapsed && dy < -24) {
-          onToggle();
-          dragRef.current = null;
-        }
-      }}
-      onPointerUp={() => {
-        const d = dragRef.current;
-        dragRef.current = null;
-        // A no-drag press is a click: toggle.
-        if (d && !d.moved) onToggle();
-      }}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-          e.preventDefault();
-          onToggle();
-        }
-      }}
-      className="group relative h-3.5 shrink-0 cursor-row-resize touch-none select-none"
-    >
-      {/* Thick line */}
-      <div
-        aria-hidden="true"
-        className="absolute inset-x-6 top-1/2 h-[3px] -translate-y-1/2 rounded-full bg-border transition-colors group-hover:bg-oe-blue/70"
-      />
-      {/* Up/down indication pill */}
-      <div
-        aria-hidden="true"
-        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-border bg-surface-elevated px-2 py-0.5 shadow-xs transition-all group-hover:border-oe-blue"
-      >
-        <Icon size={12} className="text-content-tertiary transition-colors group-hover:text-oe-blue" />
       </div>
     </div>
   );
@@ -2397,6 +2430,8 @@ function correctDocumentName(raw: string): string {
   const words = withoutExt
     .split(' ')
     .map((word) => {
+      // Strip characters Windows forbids in file names, control characters included.
+      // eslint-disable-next-line no-control-regex
       const cleaned = word.replace(/[/\\:*?"<>|\x00-\x1f]/g, '');
       if (!cleaned) return '';
       const lower = cleaned.toLowerCase();
@@ -2418,6 +2453,10 @@ export default function TakeoffViewerModule({
   onOpenRecentDocument,
   onCloseDocument,
   onOpenUploadedDocument,
+  openDocuments,
+  onSwitchDocument,
+  onCloseDocumentTab,
+  onUploadFiles,
 }: TakeoffViewerModuleProps = {}) {
   const { t, i18n } = useTranslation();
 
@@ -2972,6 +3011,22 @@ export default function TakeoffViewerModule({
    * showing the same PDF. 'vertical' = panes side by side, 'horizontal' =
    * panes stacked. The second pane has its own page + zoom. */
   const [splitMode, setSplitMode] = useState<'off' | 'horizontal' | 'vertical'>('off');
+  /** Share of the split area the MAIN pane takes (0.15-0.85), dragged on the
+   *  divider and remembered (OE-DELIVERY 2026-11-25-fsftm-pdf). */
+  const [splitRatio, setSplitRatio] = useState<number>(() => {
+    try {
+      const v = Number(localStorage.getItem('takeoff.splitRatio'));
+      return v >= 0.15 && v <= 0.85 ? v : 0.5;
+    } catch { return 0.5; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('takeoff.splitRatio', String(splitRatio)); } catch { /* ignore */ }
+  }, [splitRatio]);
+  const splitAreaRef = useRef<HTMLDivElement>(null);
+  /** Which pane the keyboard drives while split is on. */
+  const [splitActive, setSplitActive] = useState(false);
+  const splitActiveRef = useRef(false);
+  splitActiveRef.current = splitActive && splitMode !== 'off';
   const [splitPage, setSplitPage] = useState(1);
   const [splitZoom, setSplitZoom] = useState(1);
 
@@ -3010,37 +3065,33 @@ export default function TakeoffViewerModule({
 
   /** Bottom pager input text, mirrored from currentPage. */
   const [pageInput, setPageInput] = useState('1');
+  /** The page of the ACTIVE pane: the split pane's while it is active,
+   *  else the main view's. The page bar shows and drives this one
+   *  (OE-DELIVERY 2026-11-25-fsftm-pdf). */
+  const navPage = splitMode !== 'off' && splitActive ? splitPage : currentPage;
   useEffect(() => {
-    setPageInput(String(currentPage));
-  }, [currentPage]);
+    setPageInput(String(navPage));
+  }, [navPage]);
   /** Zoom slider popover open state. */
   const [zoomMenuOpen, setZoomMenuOpen] = useState(false);
   /** Independently hide the on-canvas measurement name badges and the dimension
    *  values, so a dense sheet can be decluttered without hiding geometry; the
    *  numbers stay in the Ledger and hover tooltip either way (#314). Persisted. */
-  const [showLabels, setShowLabels] = useState<boolean>(() => {
+  const [showLabels, setShowLabels] = useState<boolean>(
     // Default ON every session (user rule, update 24): a markup shows its label and
     // dimension unless its own Caption says otherwise; this switch only hides them
     // for the session.
-    try {
-      return true;
-    } catch {
-      return true;
-    }
-  });
+    true,
+  );
   useEffect(() => {
     try { localStorage.setItem('takeoff.showLabels', String(showLabels)); } catch { /* ignore */ }
   }, [showLabels]);
-  const [showDimensions, setShowDimensions] = useState<boolean>(() => {
+  const [showDimensions, setShowDimensions] = useState<boolean>(
     // Default ON every session (user rule, update 24): a markup shows its label and
     // dimension unless its own Caption says otherwise; this switch only hides them
     // for the session.
-    try {
-      return true;
-    } catch {
-      return true;
-    }
-  });
+    true,
+  );
   useEffect(() => {
     try { localStorage.setItem('takeoff.showDimensions', String(showDimensions)); } catch { /* ignore */ }
   }, [showDimensions]);
@@ -3048,7 +3099,7 @@ export default function TakeoffViewerModule({
    * The centered three-line label stack (name + material + dimension)
    * drawn above distance/polyline markups. Size, colours and per-field
    * visibility are workspace prefs. */
-  const [labelTextSize, setLabelTextSize] = useState<number>(() => {
+  const [labelTextSize] = useState<number>(() => {
     try {
       const v = Number(localStorage.getItem('takeoff.labelTextSize'));
       return Number.isFinite(v) && v >= 8 && v <= 32 ? v : 13;
@@ -3058,7 +3109,7 @@ export default function TakeoffViewerModule({
     try { localStorage.setItem('takeoff.labelTextSize', String(labelTextSize)); } catch { /* ignore */ }
   }, [labelTextSize]);
   /** Material-line size (defaults to 88% of the name size, FSFTM-like). */
-  const [labelMaterialSize, setLabelMaterialSize] = useState<number>(() => {
+  const [labelMaterialSize] = useState<number>(() => {
     try {
       const v = Number(localStorage.getItem('takeoff.labelMaterialSize'));
       return Number.isFinite(v) && v >= 8 && v <= 32 ? v : 11;
@@ -3068,7 +3119,7 @@ export default function TakeoffViewerModule({
     try { localStorage.setItem('takeoff.labelMaterialSize', String(labelMaterialSize)); } catch { /* ignore */ }
   }, [labelMaterialSize]);
   /** Dimension-line size. */
-  const [labelDimSize, setLabelDimSize] = useState<number>(() => {
+  const [labelDimSize] = useState<number>(() => {
     try {
       const v = Number(localStorage.getItem('takeoff.labelDimSize'));
       return Number.isFinite(v) && v >= 8 && v <= 32 ? v : 13;
@@ -3142,11 +3193,10 @@ export default function TakeoffViewerModule({
   /** Per-field label visibility: which lines of the floating stack render.
    *  The toolbar Names / Values toggles remain the master switches for
    *  their groups. */
-  const [labelShowName, setLabelShowName] = useState<boolean>(() => {
+  const [labelShowName, setLabelShowName] = useState<boolean>(
     // Default ON every session (update 24).
-    try { return true; }
-    catch { return true; }
-  });
+    true,
+  );
   useEffect(() => {
     try { localStorage.setItem('takeoff.labelShowName.v2', String(labelShowName)); } catch { /* ignore */ }
   }, [labelShowName]);
@@ -3157,17 +3207,26 @@ export default function TakeoffViewerModule({
   useEffect(() => {
     try { localStorage.setItem('takeoff.labelShowMaterial', String(labelShowMaterial)); } catch { /* ignore */ }
   }, [labelShowMaterial]);
-  const [labelShowDimension, setLabelShowDimension] = useState<boolean>(() => {
+  const [labelShowDimension, setLabelShowDimension] = useState<boolean>(
     // Default ON every session (update 24).
-    try { return true; }
-    catch { return true; }
-  });
+    true,
+  );
   useEffect(() => {
     try { localStorage.setItem('takeoff.labelShowDimension', String(labelShowDimension)); } catch { /* ignore */ }
   }, [labelShowDimension]);
   /** page number -> data-URL of a small rendered preview, lazily filled and
    *  LRU-capped (see capThumbCache) so a 300-page set never holds 300 bitmaps. */
   const [thumbs, setThumbs] = useState<Record<number, string>>({});
+  /** FSFTM thumbnail grid cell width in px (slider under the grid), persisted. */
+  const [thumbSize, setThumbSize] = useState<number>(() => {
+    try {
+      const v = Number(localStorage.getItem('takeoff.thumbSize'));
+      return v >= THUMB_SIZE_MIN && v <= THUMB_SIZE_MAX ? v : 120;
+    } catch { return 120; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('takeoff.thumbSize', String(thumbSize)); } catch { /* ignore */ }
+  }, [thumbSize]);
   /** Mirror of `thumbs` for the render loop to read which pages already have a
    *  bitmap without taking `thumbs` as an effect dependency (which would loop). */
   const thumbsRef = useRef(thumbs);
@@ -3268,9 +3327,10 @@ export default function TakeoffViewerModule({
   };
   const detectMarkHitsRect = (m: { rect: number[]; line: number[] | null }, rx0: number, ry0: number, rx1: number, ry1: number) => {
     if (m.line && m.line.length === 4) {
-      return detectSegHitsRect(m.line[0] * zoom, m.line[1] * zoom, m.line[2] * zoom, m.line[3] * zoom, rx0, ry0, rx1, ry1);
+      const [lx1 = 0, ly1 = 0, lx2 = 0, ly2 = 0] = m.line;
+      return detectSegHitsRect(lx1 * zoom, ly1 * zoom, lx2 * zoom, ly2 * zoom, rx0, ry0, rx1, ry1);
     }
-    const [bx, by, bx2, by2] = m.rect;
+    const [bx = 0, by = 0, bx2 = 0, by2 = 0] = m.rect;
     return !(bx2 * zoom < rx0 || bx * zoom > rx1 || by2 * zoom < ry0 || by * zoom > ry1);
   };
   const [activeMatchIdx, setActiveMatchIdx] = useState(-1);
@@ -3381,12 +3441,12 @@ export default function TakeoffViewerModule({
       ),
     );
   };
-  /** Convenience: re-apply current popup state to the selection. */
-  const applyAreaPopupToSelection = (): void => {
-    applyDepthSlopeToSelection(areaDepth, areaDepthUnit, areaSlopeType, areaSlopeValue, areaPitchRise, areaPitchRun);
-  };
 
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
+  /** FSFTM "Resume markup" (OE-DELIVERY 2026-11-25-fsftm-pdf): id of the line
+   *  being continued. While set, the polyline tool's finish updates that
+   *  markup instead of creating a new one, and the original is not drawn. */
+  const resumeTargetRef = useRef<string | null>(null);
   // Single ordered projection (issue #379): every paint-order consumer - the
   // canvas paint pass, the click hit-test, the sidebar list and the PDF export
   // - reads measurements through this so they always agree on which shape is on
@@ -3416,6 +3476,10 @@ export default function TakeoffViewerModule({
     [measurements, groupBandMap],
   );
   const [activePoints, setActivePoints] = useState<Point[]>([]);
+  // Esc, a tool change or a finished line ends a "Resume markup" session.
+  useEffect(() => {
+    if (activePoints.length === 0 || (activeTool !== 'polyline' && activeTool !== 'polylineMarkup')) resumeTargetRef.current = null;
+  }, [activePoints, activeTool]);
 
   /** This page's measurements for the split pane's read-only overlay.
    *  Declared here (after orderedMeasurements) so the dep array can't hit
@@ -3703,7 +3767,7 @@ export default function TakeoffViewerModule({
    * up/down chevrons below the pager (VS Code terminal style). Drag down
    * (or click) to collapse it to the slim handle strip for more canvas
    * space; drag up (or click) to bring it back. Persisted. */
-  const [bottomBarCollapsed, setBottomBarCollapsed] = useState<boolean>(() => {
+  const [bottomBarCollapsed] = useState<boolean>(() => {
     try { return localStorage.getItem('takeoff.bottomBarCollapsed') === '1'; } catch { return false; }
   });
   useEffect(() => {
@@ -3711,7 +3775,7 @@ export default function TakeoffViewerModule({
   }, [bottomBarCollapsed]);
 
   // Canvas refs
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   /** Set when the main PDF canvas mounts — the page-render effect waits for
    *  this, otherwise a fast (range-request) load can setPdfDoc before the
    *  canvas exists and the first paint is skipped forever (blank page until
@@ -4068,7 +4132,7 @@ export default function TakeoffViewerModule({
     ids?: string[];
   } | null>(null);
   /** Which sub-list of the markup menu is open (Status / Colour). */
-  const [contextSub, setContextSub] = useState<'status' | 'colour' | null>(null);
+  const [contextSub, setContextSub] = useState<'status' | 'colour' | 'chest' | null>(null);
   /** Multiply dialog: linear FSFTM-style copy. Null when closed; carries
    *  the source measurement id. Direction/Distance/Copies/Preview mirror
    *  FSFTM's Multiply dialog. */
@@ -4204,7 +4268,7 @@ export default function TakeoffViewerModule({
         setSelectedMeasurementId((cur) => {
           if (cur !== id) return cur;
           const remaining = [...next];
-          return remaining.length > 0 ? remaining[0] : null;
+          return remaining[0] ?? null;
         });
       }
       return next;
@@ -4226,7 +4290,7 @@ export default function TakeoffViewerModule({
       const allSelected = allIds.length > 0 && allIds.every((id) => prev.has(id));
       const next = allSelected ? new Set<string>() : new Set(allIds);
       // Sync primary selection for the Properties panel.
-      setSelectedMeasurementId(next.size > 0 ? [...next][0] : null);
+      setSelectedMeasurementId([...next][0] ?? null);
       return next;
     });
     setRightPanelWidth((w) => {
@@ -4244,7 +4308,7 @@ export default function TakeoffViewerModule({
   // restored. View concern only - it never affects CSV/XLSX/BOQ or totals.
   // Session-scoped, like hiddenGroups (not persisted).
   const [hiddenMeasurements, setHiddenMeasurements] = useState<Set<string>>(new Set());
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [, setCollapsedGroups] = useState<Set<string>>(new Set());
   // Custom per-group colours (issue #313). Merged over the built-in colours so a
   // user-defined group paints in its chosen colour on the canvas, in the legend
   // and in exports. Loaded/saved per document below.
@@ -4331,8 +4395,8 @@ export default function TakeoffViewerModule({
   const finishPenStrokeRef = useRef<() => void>(() => {});
 
   // Inline editing state for annotations in the measurement list
-  const [editingAnnotationId, setEditingAnnotationId] = useState<string | null>(null);
-  const [editingAnnotationValue, setEditingAnnotationValue] = useState('');
+  const [, setEditingAnnotationId] = useState<string | null>(null);
+  const [, setEditingAnnotationValue] = useState('');
 
   // Undo / Redo stacks.  Redo is cleared whenever a fresh user operation
   // is pushed onto undo (so the two stacks never fork).
@@ -4569,29 +4633,29 @@ export default function TakeoffViewerModule({
   // Link measurement to BOQ state.  The picker is self-contained: it can
   // discover project + BOQ on its own (no dependency on the Export dialog
   // being opened first) and supports creating a new position inline.
-  const [linkingMeasurementId, setLinkingMeasurementId] = useState<string | null>(null);
-  const [linkPickerProjectId, setLinkPickerProjectId] = useState('');
+  const [, setLinkingMeasurementId] = useState<string | null>(null);
+  const [, setLinkPickerProjectId] = useState('');
   const [linkPickerBoqId, setLinkPickerBoqId] = useState('');
-  const [linkPickerProjects, setLinkPickerProjects] = useState<{ id: string; name: string }[]>([]);
-  const [linkPickerBoqs, setLinkPickerBoqs] = useState<{ id: string; name: string }[]>([]);
-  const [linkBoqPositions, setLinkBoqPositions] = useState<Position[]>([]);
-  const [linkBoqsLoading, setLinkBoqsLoading] = useState(false);
-  const [linkPositionsLoading, setLinkPositionsLoading] = useState(false);
+  const [, setLinkPickerProjects] = useState<{ id: string; name: string }[]>([]);
+  const [, setLinkPickerBoqs] = useState<{ id: string; name: string }[]>([]);
+  const [, setLinkBoqPositions] = useState<Position[]>([]);
+  const [, setLinkBoqsLoading] = useState(false);
+  const [, setLinkPositionsLoading] = useState(false);
   const [linkingInProgress, setLinkingInProgress] = useState(false);
-  const [linkPickerSearch, setLinkPickerSearch] = useState('');
-  const [linkPickerMode, setLinkPickerMode] = useState<'pick' | 'create'>('pick');
+  const [, setLinkPickerSearch] = useState('');
+  const [, setLinkPickerMode] = useState<'pick' | 'create'>('pick');
   // "Create new position" form. null section / description = not touched yet,
   // so the defaults (last section, the measurement's name) apply.
-  const [linkCreateSectionId, setLinkCreateSectionId] = useState<string | null>(null);
-  const [linkCreateDescription, setLinkCreateDescription] = useState<string | null>(null);
-  const [linkCreateCost, setLinkCreateCost] = useState<
+  const [, setLinkCreateSectionId] = useState<string | null>(null);
+  const [, setLinkCreateDescription] = useState<string | null>(null);
+  const [, setLinkCreateCost] = useState<
     { id: string; code: string; description: string; unit: string; rate: number; currency?: string } | null
   >(null);
   const [linkCostPickerOpen, setLinkCostPickerOpen] = useState(false);
   // Bulk "Add all to BOQ" from the Ledger tab: the eligible (unlinked,
   // measurable, human-confirmed) measurements awaiting a target BOQ pick.
   // null = panel closed. Reuses the link-picker project/BOQ state above.
-  const [bulkAddMeasurements, setBulkAddMeasurements] = useState<Measurement[] | null>(null);
+  const [, setBulkAddMeasurements] = useState<Measurement[] | null>(null);
 
   // Cross-module linking (issue: takeoff -> Issue/RFI): the measurement the
   // "Create RFI" dialog is open for, or null when closed. A measurement must
@@ -4824,18 +4888,64 @@ export default function TakeoffViewerModule({
 
   /** Overlay Pages (FSFTM compare): another page drawn over this one in a
    *  colour, with opacity and an alignment nudge. */
-  const [overlayCfg, setOverlayCfg] = useState<{ page: number; color: 'red' | 'blue' | 'green'; opacity: number; dx: number; dy: number } | null>(null);
+  const [overlayCfg, setOverlayCfg] = useState<{ page: number; color: 'red' | 'blue' | 'green'; opacity: number; dx: number; dy: number; src?: 'self' | 'compare' } | null>(null);
+  /** Revision compare (OE-DELIVERY 2026-11-25-fsftm-pdf): another drawing (the
+   *  old or new revision) shown in the split pane and usable as overlay. */
+  const [compareDoc, setCompareDoc] = useState<{ id: string; name: string; doc: PDFDocumentProxy } | null>(null);
+  const [compareLoading, setCompareLoading] = useState(false);
+  const compareFileRef = useRef<HTMLInputElement>(null);
+  /** Top-bar "+" menu and its file input (multi-file tabs). */
+  const [openMenu, setOpenMenu] = useState(false);
+  const openFilesRef = useRef<HTMLInputElement>(null);
+  const compareDocRef = useRef(compareDoc);
+  compareDocRef.current = compareDoc;
+  const releasePdf = (d: PDFDocumentProxy | undefined) => {
+    try { void (d as unknown as { destroy?: () => Promise<void> } | undefined)?.destroy?.(); } catch { /* ignore */ }
+  };
+  useEffect(() => () => { releasePdf(compareDocRef.current?.doc); }, []);
+  const replaceCompareDoc = (next: { id: string; name: string; doc: PDFDocumentProxy } | null) => {
+    const prev = compareDocRef.current;
+    if (prev && prev.doc !== next?.doc) releasePdf(prev.doc);
+    setCompareDoc(next);
+    setSplitPage((sp) => Math.min(Math.max(1, sp), next ? next.doc.numPages : Math.max(1, totalPagesRef.current)));
+  };
+  const loadCompareDoc = async (id: string, name: string) => {
+    setCompareLoading(true);
+    try {
+      const token = useAuthStore.getState().accessToken;
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const doc = await openPdfUrl(`/api/v1/takeoff/documents/${encodeURIComponent(id)}/download/`, headers, { fastImages: true }).promise;
+      replaceCompareDoc({ id, name, doc });
+    } catch (err) {
+      addToast({ type: 'error', title: 'Could not open that drawing', message: err instanceof Error ? err.message : String(err) });
+    } finally {
+      setCompareLoading(false);
+    }
+  };
+  const loadCompareFile = async (file: File) => {
+    setCompareLoading(true);
+    try {
+      const doc = await openPdf(await file.arrayBuffer(), { fastImages: true }).promise;
+      replaceCompareDoc({ id: `file:${file.name}`, name: file.name, doc });
+    } catch (err) {
+      addToast({ type: 'error', title: 'Could not open that PDF', message: err instanceof Error ? err.message : String(err) });
+    } finally {
+      setCompareLoading(false);
+    }
+  };
   const [overlayPanelOpen, setOverlayPanelOpen] = useState(false);
   const [overlayImg, setOverlayImg] = useState<{ url: string; w: number; h: number } | null>(null);
   useEffect(() => {
-    if (!pdfDoc || !overlayCfg) {
+    const overlaySrc = overlayCfg?.src === 'compare' && compareDoc ? compareDoc.doc : pdfDoc;
+    if (!overlaySrc || !overlayCfg) {
       setOverlayImg(null);
       return;
     }
     let cancelled = false;
     (async () => {
       try {
-        const page = await pdfDoc.getPage(overlayCfg.page);
+        const page = await overlaySrc.getPage(Math.min(overlayCfg.page, overlaySrc.numPages));
         const vp1 = page.getViewport({ scale: 1 });
         const s = Math.min(3, 6000 / Math.max(vp1.width, vp1.height));
         const vp = page.getViewport({ scale: s });
@@ -4868,7 +4978,7 @@ export default function TakeoffViewerModule({
     };
     // Colour / page changes re-render; opacity and nudge are CSS only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pdfDoc, overlayCfg?.page, overlayCfg?.color]);
+  }, [pdfDoc, overlayCfg?.page, overlayCfg?.color, overlayCfg?.src, compareDoc]);
 
   /** Dimension display units for every label, the legend and the lists. */
   const [displayUnitPref, setDisplayUnitPref] = useState<DisplayUnitPref>(() => {
@@ -4907,12 +5017,6 @@ export default function TakeoffViewerModule({
    *  scroll position) for checking two sheets / revisions together. */
   const [syncViews, setSyncViews] = useState(false);
   const syncDeltaRef = useRef(0);
-  /** While the main view follows the split pane, its own scroll must not
-   *  echo back (OE-DELIVERY 2026-11-02-fsftm-dock). */
-  const mainSyncIgnoreUntilRef = useRef(0);
-  /** The split pane's last reported centre (sheet fractions). */
-  const lastSplitViewRef = useRef<{ fx: number; fy: number } | null>(null);
-  const [syncTo, setSyncTo] = useState<{ fx: number; fy: number; seq: number } | null>(null);
 
   const [customColumns, setCustomColumns] = useState<string[]>([]);
   /** Manage Columns dialog visibility. */
@@ -5057,7 +5161,7 @@ export default function TakeoffViewerModule({
   // PDF / Excel export in-flight flags (drive button spinner state).
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingXlsx, setIsExportingXlsx] = useState(false);
-  const { hasPersistedData, saveNow, clearPersisted, syncing, syncedToServer, registerDeletion, hasUnsavedChanges } = useMeasurementPersistence({
+  const { saveNow, clearPersisted, syncing, registerDeletion, hasUnsavedChanges, storageInfo } = useMeasurementPersistence({
     fileName,
     // Stable document UUID drives both the localStorage key and server sync
     // (issue #238); a null id (fresh local drop) keeps everything local.
@@ -5138,11 +5242,41 @@ export default function TakeoffViewerModule({
 
   /** Copied markups (Ctrl+C) and the paste routine (Ctrl+V), update 19. */
   const markupClipRef = useRef<Measurement[] | null>(null);
-  const pasteMarkupsRef = useRef<() => void>(() => {});
-  pasteMarkupsRef.current = () => {
+  const pasteMarkupsRef = useRef<(at?: Point | null) => void>(() => {});
+  /** Last pointer position over the sheet, in PDF units (paste-at-cursor). */
+  const lastPointerPdfRef = useRef<Point | null>(null);
+  /** Where the previous paste landed, so a repeat paste at the same spot
+   *  steps diagonally instead of stacking copies on top of each other. */
+  const lastPasteRef = useRef<{ x: number; y: number; n: number } | null>(null);
+  /** Markups on the current page that sit on top of another markup. */
+  const stackedOnPage = useMemo(
+    () => findStackedMarkups(measurements.filter((m) => m.page === currentPage && !m.suggested), 4),
+    [measurements, currentPage],
+  );
+  const stackedOnPageRef = useRef(stackedOnPage);
+  stackedOnPageRef.current = stackedOnPage;
+  pasteMarkupsRef.current = (at?: Point | null) => {
     const clip = markupClipRef.current;
     if (!clip || clip.length === 0) return;
     const page = currentPageRef.current;
+    // Paste position: the explicit point (right-click "Paste here"), else the
+    // mouse position over the sheet, else next to the originals. The copies
+    // keep their layout; their bounding-box centre lands on the target.
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const m of clip) for (const q of m.points) {
+      if (q.x < minX) minX = q.x; if (q.y < minY) minY = q.y;
+      if (q.x > maxX) maxX = q.x; if (q.y > maxY) maxY = q.y;
+    }
+    const cx = Number.isFinite(minX) ? (minX + maxX) / 2 : 0;
+    const cy = Number.isFinite(minY) ? (minY + maxY) / 2 : 0;
+    const step = 14 / Math.max(zoomRef.current || 1, 0.05);
+    const target = at ?? lastPointerPdfRef.current ?? { x: cx + step, y: cy + step };
+    const prevPaste = lastPasteRef.current;
+    const sameSpot = !!prevPaste && Math.hypot(prevPaste.x - target.x, prevPaste.y - target.y) < step / 2;
+    const n = sameSpot ? prevPaste.n + 1 : (at || lastPointerPdfRef.current ? 0 : 1);
+    lastPasteRef.current = { x: target.x, y: target.y, n };
+    const dx = target.x - cx + n * step;
+    const dy = target.y - cy + n * step;
     const sc = scaleForPage(pageScalesRef.current, page);
     const stamp = Date.now();
     const idMap = new Map<string, string>();
@@ -5160,7 +5294,7 @@ export default function TakeoffViewerModule({
         linkedPositionOrdinal: undefined,
         linkedBoqId: undefined,
         linkedPositionLabel: undefined,
-        points: m.points.map((q) => ({ ...q })),
+        points: m.points.map((q) => ({ ...q, x: q.x + dx, y: q.y + dy })),
         createdAt: new Date().toISOString(),
       };
       if (m.markupGroupId) {
@@ -5180,15 +5314,54 @@ export default function TakeoffViewerModule({
     pushUndo({ kind: 'bulk_add', measurements: clones });
     setMeasurements((prev) => [...prev, ...clones]);
     setSelectedLedgerIds(new Set(clones.map((c) => c.id)));
-    addToast({ type: 'success', title: `${clones.length} markup${clones.length === 1 ? '' : 's'} pasted`, message: `Page ${page}, same position.` });
+    addToast({ type: 'success', title: `${clones.length} markup${clones.length === 1 ? '' : 's'} pasted`, message: `Page ${page}, at the cursor.` });
   };
 
   /** Save the work now (button, File > Save, Ctrl+S - update 15). */
   const saveWorkRef = useRef<() => void>(() => {});
   saveWorkRef.current = () => {
     try { saveNow(); } catch { /* the debounced sync still runs */ }
-    addToast({ type: 'success', title: 'Saved', message: documentId ? 'Markups and scales saved to the project.' : 'Saved on this computer (local file).' });
+    addToast({
+      type: 'success',
+      title: 'Saved',
+      message: storageInfo.server
+        ? `Markups and scales saved to project "${activeProjectName || 'this project'}" on the server, with a backup in this browser. File > Where is my work saved? shows the details.`
+        : 'Saved in this browser only (this PDF is not in a project yet). File > Where is my work saved? shows the details.',
+    });
   };
+  /** FSFTM "Where is my work saved?" window (OE-DELIVERY 2026-11-25-fsftm-pdf). */
+  const [saveInfoOpen, setSaveInfoOpen] = useState(false);
+  /** Legend toggle (View > Legend; was a toolbar button). */
+  const toggleLegendRef = useRef<() => void>(() => {});
+  toggleLegendRef.current = () => {
+                      // Toggle on ACTUAL visibility: the flag alone can be true
+                      // while the sidebar is closed or on another tab, so a
+                      // plain !flag toggle hides on first click. If the
+                      // dashboard is not on screen, open it; else hide it.
+                      // Markups selected: Create New Legend from them, placed
+                      // with the next click on the PDF (FSFTM)
+                      // (OE-DELIVERY 2026-11-12-fsftm-ui).
+                      {
+                        const sel = new Set<string>(selectedLedgerIds);
+                        if (selectedMeasurementId) sel.add(selectedMeasurementId);
+                        if (sel.size > 0 && startLegendFromRef.current(sel)) return;
+                      }
+                      const isOpen =
+                        legendDashboardVisible && showSidebar && sidebarTab === 'properties';
+                      const next = !isOpen;
+                      setLegendDashboardVisible(next);
+                      if (next) {
+                        // Open the right-side Legend dashboard (first in Properties tab).
+                        setSidebarTab('properties');
+                        setLegendCollapsed(false);
+                        setRightPanelWidth((w) => {
+                          if (w !== 0) return w;
+                          const last = lastOpenRightWidthRef.current;
+                          return last > 0 ? last : RIGHT_PANEL_DEFAULT;
+                        });
+                        setShowSidebar(true);
+                      }
+                    };
   /** Close the PDF: save, then hand back to the document list. */
   const closePdf = () => {
     try { saveNow(); } catch { /* teardown flush saves too */ }
@@ -6105,7 +6278,7 @@ export default function TakeoffViewerModule({
   // holds the other pages up; more workers only fight for the CPU.
   const THUMB_LANES = (navigator.hardwareConcurrency || 4) >= 4 ? 2 : 1;
   /** Cache key per drawing + page (IndexedDB, thumbnail speed fix). */
-  const thumbKey = (n: number) => `${documentId ?? `${fileName ?? 'local'}#${totalPages}`}|${n}|${THUMB_MAX_WIDTH * 2}`;
+  const thumbKey = (n: number) => `${pdfDoc?.fingerprints?.[0] ?? documentId ?? `${fileName ?? 'local'}#${totalPages}`}|${n}|${THUMB_MAX_WIDTH * 2}`;
   const thumbKeyRef = useRef(thumbKey);
   thumbKeyRef.current = thumbKey;
   useEffect(() => {
@@ -6293,7 +6466,7 @@ export default function TakeoffViewerModule({
    * captures the page as soon as it is painted and the sidebar spinner clears.
    * Cheap (a single drawImage), so re-running it per render is fine. */
   useEffect(() => {
-    if (!showThumbnails || totalPages <= 1) return;
+    if (!showThumbnails || totalPages < 1) return;
     if (mainRenderedPageRef.current !== currentPage) return; // not painted yet
     if (thumbsRef.current[currentPage] !== undefined) return; // already captured
     const main = canvasRef.current;
@@ -6592,58 +6765,6 @@ export default function TakeoffViewerModule({
       ctx.restore(); // matches the save before rotation
     };
 
-    /** Anchor a value label off the line it measures (issue #355).
-     *
-     * A distance / polyline can carry a real-world width (strokeWidthReal) and
-     * paint as a band tens of device px wide, so a fixed straight-up offset lands
-     * the text inside the band, in the band's own colour. Offset along the
-     * segment's up-facing unit normal instead, by half the painted band plus the
-     * caller's gap, and derive the text alignment from that normal so the text
-     * runs away from the line rather than back across it. originX/Y is the point
-     * the label sits by (a segment midpoint, or the first vertex for a polyline
-     * total); segA/segB are that segment's endpoints; all are device coords.
-     */
-    const placeLabel = (
-      originX: number,
-      originY: number,
-      segAx: number,
-      segAy: number,
-      segBx: number,
-      segBy: number,
-      gapPx: number,
-      bandHalfPx: number,
-    ): { lx: number; ly: number; align: CanvasTextAlign; baseline: CanvasTextBaseline } => {
-      let nx = -(segBy - segAy);
-      let ny = segBx - segAx;
-      const len = Math.hypot(nx, ny);
-      if (len < 1e-6) {
-        // Zero-length segment (nothing dedupes coincident vertices): no
-        // direction, so fall back to straight up instead of dividing by zero.
-        nx = 0;
-        ny = -1;
-      } else {
-        nx /= len;
-        ny /= len;
-        // Pick whichever of the two normals points up on screen (smaller y) so
-        // labels sit above their lines as they did before. This flips the side
-        // as a segment crosses vertical; the invariant that holds is that the
-        // text ends up outside the band in every case.
-        if (ny > 0) {
-          nx = -nx;
-          ny = -ny;
-        }
-      }
-      const off = bandHalfPx + gapPx;
-      return {
-        lx: originX + nx * off,
-        ly: originY + ny * off,
-        // Canvas text runs rightward from its anchor on its baseline, so a label
-        // left of a near-vertical band still runs back across it unless aligned:
-        // align right when the normal points left, centre when it is vertical.
-        align: nx < -0.01 ? 'right' : nx > 0.01 ? 'left' : 'center',
-        baseline: ny < -0.01 ? 'bottom' : ny > 0.01 ? 'top' : 'middle',
-      };
-    };
 
     // The measurement being dragged, repointed to the live preview geometry so
     // its band, fills, value label, per-segment labels, vertex dots and
@@ -6671,7 +6792,7 @@ export default function TakeoffViewerModule({
     // Draw completed measurements on current page (respecting group visibility).
     // Iterate the ordered projection (issue #379) so an explicit z-order drives
     // which shape paints on top; un-ordered rows keep creation order (#375).
-    for (const rawM of orderedMeasurements.filter((m) => m.page === currentPage && !hiddenGroups.has(m.group) && !hiddenMeasurements.has(m.id) && !hiddenTypes.has(m.type) && !(isAnnotationType(m.type) && hiddenGroups.has('__annotations__')) && !(m.auto?.cat === 'columns' && !autoShowColumns) && !(autoRoleFilter && m.auto?.cat === 'walls' && !wallPassesFilter(m.auto, autoRoleFilter)))) {
+    for (const rawM of orderedMeasurements.filter((m) => m.page === currentPage && m.id !== resumeTargetRef.current && !hiddenGroups.has(m.group) && !hiddenMeasurements.has(m.id) && !hiddenTypes.has(m.type) && !(isAnnotationType(m.type) && hiddenGroups.has('__annotations__')) && !(m.auto?.cat === 'columns' && !autoShowColumns) && !(autoRoleFilter && m.auto?.cat === 'walls' && !wallPassesFilter(m.auto, autoRoleFilter)))) {
       // Repoint the dragged measurement to its live geometry (#357); the rest of
       // the loop then draws the band / labels / dots from the cursor position.
       const m = previewMeasurement && previewMeasurement.id === rawM.id ? previewMeasurement : rawM;
@@ -6699,12 +6820,60 @@ export default function TakeoffViewerModule({
           ? m.strokeWidthReal * ownPixelsPerUnit
           : (m.strokeWidth ?? 2);
       ctx.lineWidth = baseStrokeWidth * dpr * zoom;
-      // Half the painted band, in device px, used to push value labels clear of
-      // a wide real-world line so they are not drawn on top of it (issue #355).
-      const bandHalfPx = (baseStrokeWidth * dpr * zoom) / 2;
       // AI suggestions (#194) render translucent + dashed until the user
       // confirms them, so they read as proposals rather than committed work.
       ctx.globalAlpha = m.suggested ? 0.5 : 1.0;
+      // FSFTM stacked markups (OE-DELIVERY 2026-11-25-fsftm-pdf): a markup lying
+      // on top of another gets a contrasting dashed halo (one colour per copy)
+      // and the top copy a "xN" badge, so doubled-up takeoff is visible.
+      const stackInfo = stackedOnPageRef.current.get(m.id);
+      if (stackInfo && m.points.length > 0) {
+        ctx.save();
+        ctx.globalAlpha = 0.9;
+        ctx.strokeStyle = stackHaloColor(stackInfo.index);
+        ctx.lineWidth = (baseStrokeWidth * zoom + 7) * dpr;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.setLineDash([9 * dpr, 7 * dpr]);
+        ctx.lineDashOffset = stackInfo.index * 8 * dpr;
+        if (m.type === 'count') {
+          for (const q of m.points) {
+            ctx.beginPath();
+            ctx.arc(q.x * dpr * zoom, q.y * dpr * zoom, (9 + stackInfo.index * 4) * dpr, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+        } else {
+          ctx.beginPath();
+          m.points.forEach((q, qi) => {
+            const X = q.x * dpr * zoom;
+            const Y = q.y * dpr * zoom;
+            if (qi === 0) ctx.moveTo(X, Y);
+            else ctx.lineTo(X, Y);
+          });
+          if (STACK_CLOSED_TYPES.has(m.type)) ctx.closePath();
+          ctx.stroke();
+        }
+        if (stackInfo.index === stackInfo.size - 1) {
+          const a = m.points[0]!;
+          const label = `×${stackInfo.size}`;
+          ctx.setLineDash([]);
+          ctx.font = `bold ${11 * dpr}px system-ui, sans-serif`;
+          const w = ctx.measureText(label).width + 10 * dpr;
+          const h = 16 * dpr;
+          const bx = a.x * dpr * zoom - w / 2;
+          const by = a.y * dpr * zoom - h - 8 * dpr;
+          ctx.globalAlpha = 1;
+          ctx.fillStyle = '#990033';
+          ctx.beginPath();
+          ctx.roundRect(bx, by, w, h, 4 * dpr);
+          ctx.fill();
+          ctx.fillStyle = '#ffffff';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(label, bx + w / 2, by + h / 2 + 0.5);
+        }
+        ctx.restore();
+      }
       ctx.setLineDash(m.suggested ? [6 * dpr, 4 * dpr] : lineDashFor(m.lineStyle, baseStrokeWidth * dpr * zoom));
 
       if (m.type === 'distance' && m.points.length === 2) {
@@ -7448,8 +7617,50 @@ export default function TakeoffViewerModule({
       ctx.restore();
     }
 
+    // FSFTM Start / End line endings (OE-DELIVERY 2026-11-25-fsftm-pdf), drawn
+    // over their markups in the markup's own colour and width.
+    for (const em of measurements) {
+      if (em.page !== currentPage || (!em.lineStart && !em.lineEnd) || em.points.length < 2) continue;
+      if (hiddenGroups.has(em.group) || hiddenMeasurements.has(em.id) || hiddenTypes.has(em.type) || em.id === resumeTargetRef.current) continue;
+      const src = previewMeasurement && previewMeasurement.id === em.id ? previewMeasurement : em;
+      const ec = resolveMeasurementColor(src, groupColorMap);
+      const sw = (src.strokeWidth ?? 2) * dpr * zoom;
+      ctx.save();
+      ctx.strokeStyle = ec;
+      ctx.fillStyle = ec;
+      ctx.lineWidth = Math.max(1, sw);
+      ctx.globalAlpha = src.suggested ? 0.5 : 1;
+      drawMarkupEndings(ctx, src.points.map((q) => ({ x: q.x * dpr * zoom, y: q.y * dpr * zoom })), src.lineStart, src.lineEnd, Math.max(9 * dpr, sw * 4));
+      ctx.restore();
+    }
+
     // Draw active points (in-progress measurement)
     if (activePoints.length > 0) {
+      // A resumed markup shows every earlier vertex clearly, in its own colour
+      // (OE-DELIVERY 2026-11-25-fsftm-pdf).
+      const resumedM = resumeTargetRef.current ? measurements.find((x) => x.id === resumeTargetRef.current) : undefined;
+      if (resumedM) {
+        const rc = resolveMeasurementColor(resumedM, groupColorMap);
+        ctx.save();
+        ctx.strokeStyle = rc;
+        ctx.lineWidth = Math.max(2, (resumedM.strokeWidth ?? 2) * zoom) * dpr;
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        activePoints.forEach((q, qi) => {
+          if (qi === 0) ctx.moveTo(q.x * dpr * zoom, q.y * dpr * zoom);
+          else ctx.lineTo(q.x * dpr * zoom, q.y * dpr * zoom);
+        });
+        ctx.stroke();
+        for (const q of activePoints) {
+          ctx.beginPath();
+          ctx.arc(q.x * dpr * zoom, q.y * dpr * zoom, 5 * dpr, 0, Math.PI * 2);
+          ctx.fillStyle = '#ffffff';
+          ctx.fill();
+          ctx.lineWidth = 2 * dpr;
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
       ctx.strokeStyle = '#ef4444';
       ctx.fillStyle = '#ef4444';
       // A live pen stroke is hundreds of samples; it draws as a line only.
@@ -8363,8 +8574,6 @@ export default function TakeoffViewerModule({
       return prev.map((m) => {
         if (m.id !== parentId) return m;
         const updated = { ...m, value: net, _grossArea: gross } as Measurement & { _grossArea: number };
-        // Update label to show net
-        const unitLabel = m.unit.replace('²', '');
         updated.label = `${formatMeasurement(net, m.unit)} (net)`;
         return updated;
       });
@@ -8641,39 +8850,8 @@ export default function TakeoffViewerModule({
     setMeasurements((prev) => [...prev, newMeasurement]);
   };
 
-  /** Update the annotation of a measurement with undo support. */
-  const updateAnnotation = useCallback(
-    (id: string, newAnnotation: string) => {
-      setMeasurements((prev) =>
-        prev.map((m) => {
-          if (m.id !== id) return m;
-          pushUndo({ kind: 'change_annotation', measurementId: id, previousAnnotation: m.annotation });
-          return { ...m, annotation: newAnnotation };
-        }),
-      );
-    },
-    [pushUndo],
-  );
 
-  /** Start inline editing of an annotation. */
-  const startEditAnnotation = useCallback((m: Measurement) => {
-    setEditingAnnotationId(m.id);
-    setEditingAnnotationValue(m.annotation);
-  }, []);
 
-  /** Commit the inline annotation edit. */
-  const commitEditAnnotation = useCallback(() => {
-    if (editingAnnotationId) {
-      const trimmed = editingAnnotationValue.trim();
-      // Only commit if actually changed
-      const existing = measurements.find((m) => m.id === editingAnnotationId);
-      if (existing && trimmed && trimmed !== existing.annotation) {
-        updateAnnotation(editingAnnotationId, trimmed);
-      }
-    }
-    setEditingAnnotationId(null);
-    setEditingAnnotationValue('');
-  }, [editingAnnotationId, editingAnnotationValue, measurements, updateAnnotation]);
 
   /* ── Touch handlers: pinch-to-zoom + tap for measurements ─────────── */
 
@@ -9787,6 +9965,24 @@ export default function TakeoffViewerModule({
         totalPx += pixelDistance(pa.x, pa.y, pb.x, pb.y);
       }
       const totalReal = toRealDistance(totalPx, scale);
+      const resumeId = resumeTargetRef.current;
+      const resumed = resumeId ? measurementsRef.current.find((x) => x.id === resumeId) : undefined;
+      resumeTargetRef.current = null;
+      if (resumed) {
+        const next: Measurement = {
+          ...resumed,
+          type: 'polyline',
+          points: [...pts],
+          value: totalReal,
+          unit: scale.unitLabel,
+          label: formatMeasurement(totalReal, scale.unitLabel),
+        };
+        pushUndo({ kind: 'edit_geometry', measurementId: resumed.id, previousMeasurement: { ...resumed, points: [...resumed.points] }, nextMeasurement: { ...next, points: [...next.points] } });
+        setMeasurements((prev) => prev.map((x) => (x.id === resumed.id ? next : x)));
+        setActivePoints([]);
+        setSelectedMeasurementId(resumed.id);
+        return;
+      }
       const newMeasurement: Measurement = {
         id: `m_${Date.now()}`,
         type: 'polyline',
@@ -9915,6 +10111,17 @@ export default function TakeoffViewerModule({
     if (activeTool === 'polylineMarkup' && pts.length >= 2) {
       // The double-click's own clicks may repeat the last point.
       const clean = pts.filter((q, i) => i === 0 || Math.hypot(q.x - pts[i - 1]!.x, q.y - pts[i - 1]!.y) > 0.5);
+      const resumeId = resumeTargetRef.current;
+      const resumed = resumeId ? measurementsRef.current.find((x) => x.id === resumeId) : undefined;
+      resumeTargetRef.current = null;
+      if (resumed && clean.length >= 2) {
+        const next: Measurement = { ...resumed, points: clean };
+        pushUndo({ kind: 'edit_geometry', measurementId: resumed.id, previousMeasurement: { ...resumed, points: [...resumed.points] }, nextMeasurement: { ...next, points: [...next.points] } });
+        setMeasurements((prev) => prev.map((x) => (x.id === resumed.id ? next : x)));
+        setActivePoints([]);
+        setSelectedMeasurementId(resumed.id);
+        return;
+      }
       if (clean.length >= 2) {
         const newMeasurement: Measurement = {
           id: `m_${Date.now()}`,
@@ -10017,6 +10224,10 @@ export default function TakeoffViewerModule({
    *  click precedes the right-click), or, with the select tool, open the
    *  measurement context menu for the shape under the cursor (issue #302). */
   const pointerToPdfRef = useRef<((e: { clientX: number; clientY: number }) => Point | null) | null>(null);
+  /** Right-click "Paste here" menu on empty sheet space, and the PDF point a
+   *  markup context menu was opened at (its own "Paste here" item). */
+  const [pasteMenu, setPasteMenu] = useState<{ x: number; y: number; pt: Point } | null>(null);
+  const pasteAnchorRef = useRef<Point | null>(null);
   const handleCanvasContextMenu = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       // FSFTM Zoom tool: right-click zooms out around the cursor (OE-DELIVERY 2026-11-02-fsftm-zoom).
@@ -10067,8 +10278,15 @@ export default function TakeoffViewerModule({
           setContextSub(null);
           setLegendSub(null);
           setContextMenu({ x: e.clientX, y: e.clientY, measurementId: targetId, ids: menuIds });
+          pasteAnchorRef.current = pointerToPdfRef.current?.(e) ?? null;
         } else {
           setContextMenu(null);
+          // Empty sheet: offer "Paste here" when markups are on the clipboard.
+          const pt = pointerToPdfRef.current?.(e) ?? null;
+          if (pt && markupClipRef.current?.length) {
+            e.preventDefault();
+            setPasteMenu({ x: e.clientX, y: e.clientY, pt });
+          }
         }
       } else {
         // Prevent the native context menu while using the other measurement tools.
@@ -11093,6 +11311,7 @@ export default function TakeoffViewerModule({
   const handleCanvasMouseMove = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       modsRef.current = { ctrl: e.ctrlKey || e.metaKey, shift: e.shiftKey };
+      lastPointerPdfRef.current = pointerToPdfRef.current?.(e) ?? null;
       if (textSelArmedRef.current && textSelStartRef.current && (e.buttons & 1)) {
         const tp = pointerToPdf(e);
         const st = textSelStartRef.current;
@@ -11520,14 +11739,13 @@ export default function TakeoffViewerModule({
         toggleMarqueeSelection(pending.measurementId);
       }
       if (panRef.current) {
-        const pan = panRef.current;
         panRef.current = null;
         setPanning(false);
         // Sync the direct-DOM transform into state so re-renders keep it.
         const wrap = panWrapRef.current;
         if (wrap) {
           const m = /translate\((-?[\d.]+)px,\s*(-?[\d.]+)px\)/.exec(wrap.style.transform || '');
-          if (m) setPanOffset({ x: parseFloat(m[1]), y: parseFloat(m[2]) });
+          if (m) setPanOffset({ x: parseFloat(m[1] ?? '0'), y: parseFloat(m[2] ?? '0') });
         }
         return;
       }
@@ -12362,7 +12580,18 @@ export default function TakeoffViewerModule({
     setSearchQuery('');
   }, []);
 
+  /** Go to a page in the ACTIVE pane (main view or split pane). */
+  const navTo = useCallback((p: number) => {
+    const tp = totalPagesRef.current;
+    if (splitActiveRef.current) {
+      const st = compareDocRef.current ? compareDocRef.current.doc.numPages : tp;
+      setSplitPage(Math.min(Math.max(1, p), Math.max(1, st)));
+      return;
+    }
+    goToPage(p);
+  }, [goToPage]);
   const prevPage = useCallback(() => {
+    if (splitActiveRef.current) { setSplitPage((sp) => Math.max(1, sp - 1)); return; }
     goToPage(Math.max(1, currentPageRef.current - 1));
   }, [goToPage]);
   // BUG-fix: totalPages MUST be a dependency.  With `[]` the callback was
@@ -12372,6 +12601,11 @@ export default function TakeoffViewerModule({
   const nextPage = useCallback(
     () => {
       const tp = totalPagesRef.current;
+      if (splitActiveRef.current) {
+        const st = compareDocRef.current ? compareDocRef.current.doc.numPages : tp;
+        setSplitPage((sp) => (st > 0 ? Math.min(sp + 1, st) : sp));
+        return;
+      }
       goToPage(tp > 0 ? Math.min(currentPageRef.current + 1, tp) : currentPageRef.current);
     },
     [goToPage],
@@ -12380,9 +12614,9 @@ export default function TakeoffViewerModule({
   /** Commit the bottom pager input: jump to the typed page (clamped). */
   const commitPageInput = useCallback(() => {
     const n = parseInt(pageInput, 10);
-    if (Number.isFinite(n)) goToPage(n);
-    else setPageInput(String(currentPageRef.current));
-  }, [pageInput, goToPage]);
+    if (Number.isFinite(n)) navTo(n);
+    else setPageInput(String(splitActiveRef.current ? splitPage : currentPageRef.current));
+  }, [pageInput, navTo, splitPage]);
 
   /* ── Measurement summary ─────────────────────────────────────────── */
 
@@ -12498,18 +12732,6 @@ export default function TakeoffViewerModule({
     [legendColumnDefs, legendHiddenColumns, legendStyle],
   );
 
-  /** Smart grouping key: type + material + label + value + unit. The
-   *  name component is the Ledger Label (customFields.Subject), falling
-   *  back to the annotation — so measurements whose Ledger Labels differ
-   *  never share a legend row. Different materials, labels, or lengths
-   *  get separate rows. */
-  const legendGroupKey = (m: Measurement): string => {
-    const mat = (m.customFields?.Material?.trim() || '').toLowerCase();
-    const ann = (m.customFields?.Subject?.trim() || m.annotation?.trim() || '').toLowerCase();
-    const val = m.type === 'count' ? '' : (m.value || 0).toFixed(2);
-    const unit = (m.unit || '').toLowerCase();
-    return `${m.type}||${mat}||${ann}||${val}||${unit}`;
-  };
 
   /** Merge key: like legendGroupKey but WITHOUT the value, so near-identical
    *  lengths can be evaluated for merging. */
@@ -12765,7 +12987,6 @@ export default function TakeoffViewerModule({
         return groups
           .map(({ key, ms, mergedMax, mergedValues }) => {
             const first = ms[0]!;
-            const type = first.type;
             const material = first.customFields?.Material?.trim() || '';
             const cells: Record<string, string> = {};
             let mergeTitle: string | undefined;
@@ -12895,26 +13116,6 @@ export default function TakeoffViewerModule({
     [measurements],
   );
 
-  /** Group page measurements by their group name.
-   *
-   *  A Map, not a plain object, because the iteration order IS the group order
-   *  the sidebar renders (issue #394): bucketing the band-major projection in
-   *  order puts each group where its band says it belongs. An object would not
-   *  preserve that. Integer-like string keys are enumerated numerically ahead of
-   *  every other key, so groups named for levels or zones ("1", "2", "10") would
-   *  sort themselves to the top in numeric order regardless of their band, which
-   *  is exactly the naming a construction takeoff uses. A Map keeps insertion
-   *  order for every key shape. */
-  const groupedPageMeasurements = useMemo(() => {
-    const groups = new Map<string, Measurement[]>();
-    for (const m of pageMeasurements) {
-      const g = m.group || 'General';
-      const list = groups.get(g);
-      if (list) list.push(m);
-      else groups.set(g, [m]);
-    }
-    return groups;
-  }, [pageMeasurements]);
 
   /** Summaries for the color-coded legend overlay (bottom-left of canvas). */
   const legendSummaries = useMemo(
@@ -13293,25 +13494,6 @@ export default function TakeoffViewerModule({
     });
   }, []);
 
-  /** Toggle visibility of a single measurement (issue #359). View-only, like
-   *  the group eye: it never touches quantities or exports to CSV/XLSX/BOQ. */
-  const toggleMeasurementVisibility = useCallback((id: string) => {
-    // Read the pre-toggle state before flipping it, so we know whether this is
-    // a hide (was visible) or a show (was hidden).
-    const wasHidden = hiddenMeasurementsRef.current.has(id);
-    setHiddenMeasurements((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-    // Hiding the selected measurement clears the selection, so the select-tool
-    // edit overlay stops drawing handles over a now-hidden shape.
-    if (!wasHidden) setSelectedMeasurementId((cur) => (cur === id ? null : cur));
-  }, []);
 
   /** Bring a measurement to the front / send it to the back of the paint stack
    *  (issue #379). Sets only the moved row's `order` key (max+1 for front,
@@ -13342,168 +13524,10 @@ export default function TakeoffViewerModule({
     );
   }, [pushUndo]);
 
-  // Drag-to-reorder state for the sidebar Measurements list (issue #379). Holds
-  // the id of the row currently being dragged (via its grip handle) and the row
-  // it is hovering over, so the list can show a drop indicator. Kept in state
-  // (not a ref) because the drop indicator is a visual affordance that must
-  // re-render; cleared on drop / drag-end.
-  const [draggingMeasurementId, setDraggingMeasurementId] = useState<string | null>(null);
-  // Hovered row AND which of its two halves the pointer is in (issue #392).
-  // Held as one object so moving across the midpoint is a single render and the
-  // indicator cannot be drawn for a row with a stale half.
-  const [dragOverTarget, setDragOverTarget] = useState<
-    { id: string; place: 'before' | 'after' } | null
-  >(null);
 
-  /** Drop a dragged measurement next to another row in the sidebar list,
-   *  reordering the paint (z) stack accordingly (issue #379). Computes a single
-   *  fractional ``order`` key that lands the dragged row next to the target in
-   *  the shared paint-order projection, so canvas paint, hit-test, sidebar list
-   *  and PDF export stay in agreement. One-row edit, undoable, and persisted via
-   *  metadata like bring-to-front / send-to-back.
-   *
-   *  A drop onto a row of another group moves the measurement into that group
-   *  (issue #393). Before, the list drew a drop indicator over the foreign row
-   *  and then wrote only an order key, which the banded projection confines to
-   *  the dragged row's own group, so the gesture looked accepted and did
-   *  nothing. Regrouping by dragging is also the obvious way to ask for it. */
-  const reorderMeasurementByDrag = useCallback((
-    draggedId: string,
-    targetId: string,
-    place: 'before' | 'after',
-  ) => {
-    const all = measurementsRef.current;
-    const dragged = all.find((m) => m.id === draggedId);
-    const target = all.find((m) => m.id === targetId);
-    if (!dragged || !target) return;
-    // The sidebar lists rows in ascending paint order, so "before" puts the
-    // dragged shape just beneath the hovered row and "after" just above it.
-    // Which one is decided by the half of the row the pointer was in when it
-    // was released (issue #392), not fixed: with "before" as the only option
-    // the slot after the last row of a group had no gesture that reached it.
-    // Usually one fractional key. When the gap between the two neighbours has
-    // been halved until float64 has nothing left between them, the plan comes
-    // back as a renumber of the whole group instead (issue #405), because a
-    // midpoint that rounds onto its own bound puts the row on the wrong side of
-    // the row it was dropped against, and every export reads that same wrong
-    // projection.
-    const plan = planMeasurementDrop(all, draggedId, targetId, place);
-    if (plan === null) return;
-    // Compare through the same normalisation the projection buckets with, so a
-    // row whose group is the empty string is not "moved" into General, which
-    // is where it already renders. Recorded only when it really changes.
-    const previousGroup = dragged.group;
-    const changesGroup = groupOf(dragged) !== groupOf(target);
-    const nextGroup = changesGroup ? target.group : undefined;
-    // Pin every group where it is on screen BEFORE the move. Bands otherwise
-    // default to first appearance in the array, so moving the first-appearing
-    // member of a group out of it re-derives that group from its next member,
-    // and two group blocks trade places because the user dragged one row. Only
-    // a regrouping drop needs this; a restack cannot change any group's first
-    // appearance, and pinning on every drag would make the derived default dead
-    // code in every document.
-    if (changesGroup) {
-      setExplicitGroupBands((prev) => freezeGroupBands(all, prev));
-    }
-    const regroup = changesGroup ? { regrouped: true, previousGroup, nextGroup } : {};
-    if (plan.kind === 'single') {
-      pushUndo({
-        kind: 'reorder_measurement',
-        measurementId: draggedId,
-        previousOrder: dragged.order,
-        nextOrder: plan.order,
-        ...regroup,
-      });
-      setMeasurements((prev) =>
-        prev.map((m) =>
-          m.id === draggedId
-            ? { ...m, order: plan.order, ...(changesGroup ? { group: target.group } : {}) }
-            : m,
-        ),
-      );
-      return;
-    }
-    // Renumbered group. The keys are read off the array the plan was computed
-    // from, so the frame records what each row held before this drop rather than
-    // what it holds by the time the state update runs.
-    const rows = [...plan.orders].map(([id, nextOrder]) => ({
-      id,
-      previousOrder: all.find((m) => m.id === id)?.order,
-      nextOrder,
-    }));
-    pushUndo({
-      kind: 'renumber_measurement_order',
-      rows,
-      measurementId: draggedId,
-      ...regroup,
-    });
-    setMeasurements((prev) =>
-      prev.map((m) => {
-        const next = plan.orders.get(m.id);
-        if (next === undefined) return m;
-        return {
-          ...m,
-          order: next,
-          ...(changesGroup && m.id === draggedId ? { group: target.group } : {}),
-        };
-      }),
-    );
-  }, [pushUndo]);
 
-  // Group-block drag state (issue #400), the group-level twin of the row drag
-  // above. Separate from it so a half-finished row drag can never be read as a
-  // group drag: the two gestures start on different handles and drop on
-  // different targets, and sharing one slot would let a stray dragOver on a
-  // group header pick up a row id.
-  const [draggingGroup, setDraggingGroup] = useState<string | null>(null);
-  const [dragOverGroup, setDragOverGroup] = useState<
-    { name: string; place: 'before' | 'after' } | null
-  >(null);
 
-  /** Move a whole group block to a new slot in the sidebar (issue #400).
-   *
-   *  Until now a group had no gesture of its own: the only way to get one block
-   *  above another was to move its measurements one at a time, and after #394
-   *  that stopped working entirely, correctly, since a measurement can no longer
-   *  drag its group anywhere.
-   *
-   *  Renumbers every group in the document rather than handing the dragged one a
-   *  fractional band. Bands with no explicit entry are derived AFTER the highest
-   *  explicit one, so pinning the dragged group alone would push every untouched
-   *  group above it and land the drop nowhere near where it was made. */
-  const reorderGroupByDrag = useCallback((
-    draggedGroup: string,
-    targetGroup: string,
-    place: 'before' | 'after',
-  ) => {
-    const all = measurementsRef.current;
-    // EVERY group in the document in its current on-screen order, not the groups
-    // on this page. The band map is per document, so renumbering only the
-    // visible subset would drop the band of every group living on another sheet
-    // and reshuffle pages the user was not even looking at.
-    const currentBands = groupBands(all, explicitGroupBandsRef.current);
-    const displayed: string[] = [...new Set(all.map((m) => groupOf(m as never)))].sort(
-      (a, b) => (currentBands[a] ?? 0) - (currentBands[b] ?? 0),
-    );
-    const nextBands = reorderGroups(displayed, draggedGroup, targetGroup, place);
-    if (nextBands === null) return;
-    const previousBands = explicitGroupBandsRef.current;
-    pushUndo({ kind: 'reorder_groups', previousBands, nextBands });
-    setExplicitGroupBands(nextBands);
-  }, [pushUndo]);
 
-  /** Toggle collapse of a measurement group in sidebar */
-  const toggleGroupCollapse = useCallback((groupName: string) => {
-    setCollapsedGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(groupName)) {
-        next.delete(groupName);
-      } else {
-        next.add(groupName);
-      }
-      return next;
-    });
-  }, []);
 
   /** Export measurements to CSV */
   const handleExportCSV = useCallback(() => {
@@ -13818,7 +13842,7 @@ export default function TakeoffViewerModule({
   };
 
   /** FSFTM Extract / Delete Pages windows (update 19). */
-  const [pageDlg, setPageDlg] = useState<{ kind: 'extract' | 'delete'; pages: number[] } | null>(null);
+  const [pageDlg, setPageDlg] = useState<{ kind: 'extract' | 'delete' | 'rotate' | 'export'; pages: number[] } | null>(null);
   /** Upload a PDF to the project's drawings; null when there is no project. */
   const uploadPdf = async (bytes: Uint8Array, name: string): Promise<{ id: string; filename: string } | null> => {
     const projectId = selectedProjectId || activeProjectId || '';
@@ -13879,38 +13903,105 @@ export default function TakeoffViewerModule({
       addToast({ type: 'error', title: 'Extract failed', message: err instanceof Error ? err.message : String(err) });
     }
   };
-  /** Upload edited bytes as a new drawing and open it (or download). */
-  const saveEditedPdf = async (bytes: Uint8Array, suffix: string) => {
-    const name = `${baseName} (${suffix}).pdf`;
-    const projectId = selectedProjectId || activeProjectId || '';
-    if (!onOpenUploadedDocument || !projectId) {
-      download(bytes, name);
-      addToast({ type: 'success', title: 'Edited PDF downloaded', message: name });
-      return;
-    }
-    const fd = new FormData();
-    fd.append('file', new Blob([bytes as BlobPart], { type: 'application/pdf' }), name);
-    const headers: Record<string, string> = { 'X-DDC-Client': 'OE/1.0' };
-    const token = getAuthToken();
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    const res = await fetch(`/api/v1/takeoff/documents/upload/?project_id=${encodeURIComponent(projectId)}`, { method: 'POST', headers, body: fd });
-    if (!res.ok) throw new Error(`Upload failed (${res.status})`);
-    const doc = (await res.json()) as { id: string; filename: string };
-    try { saveNow(); } catch { /* ignore */ }
-    addToast({ type: 'success', title: 'Pages updated', message: `Saved as ${doc.filename} - opening it with your markups.` });
-    onOpenUploadedDocument({ id: doc.id, filename: doc.filename });
-  };
-  /** Run a page edit on the real file, carry the markups, save as a new drawing. */
-  const runPageEdit = async (edit: pdfPages.PageEdit, suffix: string, rotate?: { pages: Set<number>; deg: 90 | 180 | 270 }) => {
-    if (!pdfDoc) return;
+  /** Run a page edit on the open drawing IN PLACE (OE-DELIVERY 2026-11-25-fsftm-pdf):
+   *  the edited PDF replaces this document's file on the server (same id), the
+   *  viewer reloads it straight away, and the markups, page scales, viewports
+   *  and sheet labels move with their pages (rotated pages turn their markups).
+   *  Nothing is saved as a copy, so there is no re-open pause. */
+  const pageEditBusyRef = useRef(false);
+  const runPageEdit = async (
+    edit: pdfPages.PageEdit,
+    suffix: string,
+    rotate?: { pages: Set<number>; deg: 90 | 180 | 270 },
+    goTo?: number,
+  ) => {
+    if (!pdfDoc || pageEditBusyRef.current) return;
+    pageEditBusyRef.current = true;
     try {
       const orig = await pdfDoc.getData();
+      // Page sizes before the edit (rotation turns points inside them).
+      const before = new Map<number, { w: number; h: number }>();
+      if (rotate) for (const pg of rotate.pages) { const vp = await viewportOf(pg); before.set(pg, { w: vp.width, h: vp.height }); }
       const r = await pdfPages.editPages(orig, edit);
-      const snap = await snapshotFor(r.pageMap, rotate);
-      const bytes = await pdfPages.withSnapshot(r.bytes, snap);
-      await saveEditedPdf(bytes, suffix);
+      const map = r.pageMap;
+      const projectId = selectedProjectId || activeProjectId || '';
+      if (documentId && projectId) {
+        const fd = new FormData();
+        fd.append('file', new Blob([r.bytes as BlobPart], { type: 'application/pdf' }), fileName || 'drawing.pdf');
+        const headers: Record<string, string> = { 'X-DDC-Client': 'OE/1.0' };
+        const token = getAuthToken();
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const res = await fetch(`/api/v1/takeoff/documents/${encodeURIComponent(documentId)}/file/`, { method: 'PUT', headers, body: fd });
+        if (!res.ok) throw new Error(`Saving the edited drawing failed (${res.status})`);
+      }
+      const newDoc = await openPdf(r.bytes.slice().buffer as ArrayBuffer, { fastImages: true }).promise;
+
+      // Markups: move to the new page numbers, turn on rotated pages, drop deleted pages.
+      const nextMs: Measurement[] = [];
+      for (const m of measurementsRef.current) {
+        const np = map[m.page];
+        if (np === undefined) {
+          if (m.serverId) registerDeletion(m.serverId);
+          continue;
+        }
+        const size = rotate && rotate.pages.has(m.page) ? before.get(m.page) : undefined;
+        const points = size ? m.points.map((q) => pdfPages.rotatePoint(q, rotate!.deg, size.w, size.h)) : m.points;
+        nextMs.push(np === m.page && points === m.points ? m : { ...m, page: np, points });
+      }
+      // Page-keyed settings follow their pages.
+      const remapKeys = <T,>(rec: Record<number, T> | undefined): Record<number, T> => {
+        const out: Record<number, T> = {};
+        for (const [k, v] of Object.entries(rec ?? {})) {
+          const np = map[Number(k)];
+          if (np !== undefined) out[np] = v;
+        }
+        return out;
+      };
+      setPageScales((ps) => {
+        const viewports = remapKeys(ps.viewports);
+        if (rotate) {
+          // A rotated page's viewport rectangles turn with it.
+          for (const pg of rotate.pages) {
+            const np = map[pg];
+            const size = before.get(pg);
+            if (np === undefined || !size || !viewports[np]) continue;
+            viewports[np] = viewports[np]!.map((v) => {
+              const a = pdfPages.rotatePoint({ x: v.rect.x, y: v.rect.y }, rotate.deg, size.w, size.h);
+              const b = pdfPages.rotatePoint({ x: v.rect.x + v.rect.w, y: v.rect.y + v.rect.h }, rotate.deg, size.w, size.h);
+              return { ...v, rect: { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(b.x - a.x), h: Math.abs(b.y - a.y) } };
+            });
+          }
+        }
+        return { ...ps, byPage: remapKeys(ps.byPage), ...(ps.viewports ? { viewports } : {}) };
+      });
+      setSheetEdits((prev) => {
+        const next = remapKeys(prev);
+        try { localStorage.setItem(sheetKey, JSON.stringify(next)); } catch { /* ignore */ }
+        return next;
+      });
+      // The page structure changed: undo history no longer lines up.
+      undoStackRef.current = [];
+      redoStackRef.current = [];
+      setUndoCount(0);
+      setRedoCount(0);
+      setThumbs({});
+      setThumbSel(new Set());
+      pageWordsRef.current.clear();
+      setMeasurements(nextMs);
+      setPdfDoc(newDoc);
+      setTotalPages(newDoc.numPages);
+      refreshPageLabels(newDoc);
+      const target = Math.min(newDoc.numPages, Math.max(1, goTo ?? map[currentPage] ?? currentPage));
+      setCurrentPage(target);
+      addToast({
+        type: 'success',
+        title: `Drawing updated: ${suffix}`,
+        message: documentId && projectId ? `Saved to this drawing. Now on page ${target} of ${newDoc.numPages}.` : `Page ${target} of ${newDoc.numPages}. Use File > Download PDF to keep the edited file.`,
+      });
     } catch (err) {
       addToast({ type: 'error', title: 'Page tool failed', message: err instanceof Error ? err.message : String(err) });
+    } finally {
+      pageEditBusyRef.current = false;
     }
   };
   const extractToBytes = async (pages: number[]) => {
@@ -14154,7 +14245,7 @@ export default function TakeoffViewerModule({
           selectTool('stamp' as MeasureTool);
           break;
         case 'insertBlank':
-          await runPageEdit({ kind: 'insertBlank', after: last, count: 1 }, 'blank page inserted');
+          await runPageEdit({ kind: 'insertBlank', after: last, count: 1 }, 'blank page inserted', undefined, last + 1);
           break;
         case 'insertPages':
           pickPdf((other) => { void runPageEdit({ kind: 'insertPdf', after: last, other }, 'pages inserted'); });
@@ -14167,6 +14258,12 @@ export default function TakeoffViewerModule({
           break;
         case 'delete':
           setPageDlg({ kind: 'delete', pages });
+          break;
+        case 'rotateDlg':
+          setPageDlg({ kind: 'rotate', pages });
+          break;
+        case 'exportDlg':
+          setPageDlg({ kind: 'export', pages });
           break;
         case 'rotateCw':
         case 'rotateCcw':
@@ -14674,7 +14771,6 @@ export default function TakeoffViewerModule({
       }
       return null;
     }
-    const unit = displayUnitFor(src.unit || '', measurementSystem);
     // A bare number is interpreted in the unit pick list the user chose;
     // explicit marks/suffixes (', ", mm, m, ft) always win.
     const meters = parseDistanceToMeters(multiplyDistance, multiplyUnit);
@@ -14979,7 +15075,6 @@ export default function TakeoffViewerModule({
       });
       return;
     }
-    const unit = displayUnitFor(src.unit || '', measurementSystem);
     const distPdf = meters * pgScale.pixelsPerUnit;
 
     const closed = src.type === 'area' || src.type === 'rectangle';
@@ -15405,58 +15500,82 @@ export default function TakeoffViewerModule({
 
 
 
-  /** Sync from the split pane: centre the main view on the same spot. */
-  const applySplitView = useCallback((fx: number, fy: number) => {
+  /* Exact split sync (OE-DELIVERY 2026-11-25-fsftm-pdf). The pane under the
+   * pointer leads; every frame the other pane is centred on exactly the same
+   * point of the sheet (scroll first, then the sheet offset for what scrolling
+   * cannot reach), so pans, wheel-zooms and drags all follow with no lag or
+   * drift. Zoom and page number follow both ways. */
+  const splitSyncApiRef = useRef<SplitSyncApi | null>(null);
+  const syncLeaderRef = useRef<'main' | 'split'>('main');
+  const mainCenterFrac = useCallback(() => {
     const c = containerRef.current;
     const canvas = canvasRef.current;
-    if (!c || !canvas) return;
-    mainSyncIgnoreUntilRef.current = Math.max(mainSyncIgnoreUntilRef.current, Date.now() + 300);
+    if (!c || !canvas) return null;
     const cr = canvas.getBoundingClientRect();
     const vr = c.getBoundingClientRect();
-    c.scrollLeft += cr.left + fx * cr.width - (vr.left + vr.width / 2);
-    c.scrollTop += cr.top + fy * cr.height - (vr.top + vr.height / 2);
+    if (cr.width <= 0 || cr.height <= 0) return null;
+    return { fx: (vr.left + vr.width / 2 - cr.left) / cr.width, fy: (vr.top + vr.height / 2 - cr.top) / cr.height };
   }, []);
-  /* FSFTM Sync effects (OE-DELIVERY 2026-11-02-fsftm-left-panel). */
+  const panCommitTimerRef = useRef(0);
+  const mainCenterOn = useCallback((fx: number, fy: number) => {
+    const c = containerRef.current;
+    const canvas = canvasRef.current;
+    const wrap = panWrapRef.current;
+    if (!c || !canvas) return;
+    const cr = canvas.getBoundingClientRect();
+    const vr = c.getBoundingClientRect();
+    if (cr.width <= 0 || cr.height <= 0) return;
+    const dx = cr.left + fx * cr.width - (vr.left + vr.width / 2);
+    const dy = cr.top + fy * cr.height - (vr.top + vr.height / 2);
+    if (Math.abs(dx) <= 0.5 && Math.abs(dy) <= 0.5) return;
+    const l0 = c.scrollLeft;
+    const t0 = c.scrollTop;
+    c.scrollLeft = l0 + dx;
+    c.scrollTop = t0 + dy;
+    const rx = dx - (c.scrollLeft - l0);
+    const ry = dy - (c.scrollTop - t0);
+    if ((Math.abs(rx) > 0.5 || Math.abs(ry) > 0.5) && wrap) {
+      const next = { x: panOffsetRef.current.x - rx, y: panOffsetRef.current.y - ry };
+      panOffsetRef.current = next;
+      wrap.style.transform = `translate(${next.x}px, ${next.y}px)`;
+      // Commit to state once the motion settles (no re-render per frame).
+      window.clearTimeout(panCommitTimerRef.current);
+      panCommitTimerRef.current = window.setTimeout(() => setPanOffset(panOffsetRef.current), 120);
+    }
+  }, []);
   useEffect(() => {
     if (!syncViews || splitMode === 'off') return;
-    setSplitPage(Math.min(totalPages, Math.max(1, currentPage + syncDeltaRef.current)));
+    let raf = 0;
+    const tick = () => {
+      raf = requestAnimationFrame(tick);
+      const api = splitSyncApiRef.current;
+      if (!api) return;
+      if (syncLeaderRef.current === 'main') {
+        const f = mainCenterFrac();
+        if (f) api.centerOn(f.fx, f.fy);
+      } else {
+        const f = api.centerFrac();
+        if (f) mainCenterOn(f.fx, f.fy);
+      }
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [syncViews, splitMode, mainCenterFrac, mainCenterOn]);
+  /* Page number and zoom follow the leader. */
+  useEffect(() => {
+    if (!syncViews || splitMode === 'off' || syncLeaderRef.current !== 'main') return;
+    const st = compareDocRef.current ? compareDocRef.current.doc.numPages : totalPages;
+    setSplitPage(Math.min(st, Math.max(1, currentPage + syncDeltaRef.current)));
   }, [syncViews, splitMode, currentPage, totalPages]);
   useEffect(() => {
-    if (!syncViews || splitMode === 'off') return;
+    if (!syncViews || splitMode === 'off' || syncLeaderRef.current !== 'split') return;
+    const target = Math.min(totalPages, Math.max(1, splitPage - syncDeltaRef.current));
+    if (target !== currentPageRef.current) goToPage(target);
+  }, [syncViews, splitMode, splitPage, totalPages, goToPage]);
+  useEffect(() => {
+    if (!syncViews || splitMode === 'off' || syncLeaderRef.current !== 'main') return;
     setSplitZoom(zoom);
   }, [syncViews, splitMode, zoom]);
-  useEffect(() => {
-    if (!syncViews || splitMode === 'off') return;
-    const c = containerRef.current;
-    if (!c) return;
-    let timer = 0;
-    let seq = 0;
-    const emit = () => {
-      timer = 0;
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const cr = canvas.getBoundingClientRect();
-      const vr = c.getBoundingClientRect();
-      if (cr.width <= 0 || cr.height <= 0) return;
-      seq += 1;
-      setSyncTo({ fx: (vr.left + vr.width / 2 - cr.left) / cr.width, fy: (vr.top + vr.height / 2 - cr.top) / cr.height, seq });
-    };
-    const onScroll = () => {
-      if (Date.now() < mainSyncIgnoreUntilRef.current) return;
-      if (!timer) timer = window.setTimeout(emit, 60);
-    };
-    c.addEventListener('scroll', onScroll, { passive: true });
-    if (Date.now() >= mainSyncIgnoreUntilRef.current) emit();
-    // Once a zoom has settled (anchor + re-render), send the final position.
-    const late = window.setTimeout(() => {
-      if (Date.now() >= mainSyncIgnoreUntilRef.current) emit();
-    }, 450);
-    return () => {
-      c.removeEventListener('scroll', onScroll);
-      if (timer) window.clearTimeout(timer);
-      window.clearTimeout(late);
-    };
-  }, [syncViews, splitMode, zoom, currentPage]);
   const pendingAutoFocusRef = useRef<string | null>(null);
   /** Zoom to a spot (a tag Auto Takeoff could not take off), changing page
    *  first when needed (OE-DELIVERY 2026-11-05-detail-scan). */
@@ -16315,67 +16434,8 @@ export default function TakeoffViewerModule({
     [],
   );
 
-  /** Toast a failed decision. The row keeps its flag and stays on the canvas,
-   *  so the message only has to say the decision did not land. */
-  const reportReviewFailure = useCallback(
-    (err: unknown, action: 'accept' | 'reject') => {
-      addToast({
-        type: 'error',
-        title:
-          action === 'accept'
-            ? t('takeoff_viewer.review.accept_failed', { defaultValue: 'Could not accept the suggestion' })
-            : t('takeoff_viewer.review.reject_failed', { defaultValue: 'Could not reject the suggestion' }),
-        message:
-          err instanceof Error
-            ? err.message
-            : t('takeoff_viewer.review.retry', { defaultValue: 'Still pending, try again.' }),
-      });
-    },
-    [addToast, t],
-  );
 
-  /** Accept one suggestion: confirm it server-side, then adopt the stored row. */
-  const acceptSuggestion = useCallback(
-    async (id: string) => {
-      const target = measurementsRef.current.find((m) => m.id === id);
-      if (!target) return;
-      let row: MeasurementResponse | null = null;
-      if (target.serverId) {
-        try {
-          row = await submitReview(target.serverId, 'accept');
-        } catch (err) {
-          reportReviewFailure(err, 'accept');
-          return;
-        }
-      }
-      setMeasurements((prev) => prev.map((m) => (m.id === id ? applyAcceptedRow(m, row) : m)));
-    },
-    [submitReview, applyAcceptedRow, reportReviewFailure],
-  );
 
-  /** Reject one suggestion: record the decision, then take it off the canvas.
-   *  The row stays in the database as `rejected` - the record of what a human
-   *  turned down is the point of the queue, and it stops the same suggestion
-   *  coming back on the next run. */
-  const rejectSuggestion = useCallback(
-    async (id: string) => {
-      const target = measurementsRef.current.find((m) => m.id === id);
-      if (!target) return;
-      // A suggestion that was never persisted has no decision to record: taking
-      // it off the canvas IS the whole rejection.
-      if (target.serverId) {
-        try {
-          await submitReview(target.serverId, 'reject');
-        } catch (err) {
-          reportReviewFailure(err, 'reject');
-          return;
-        }
-      }
-      setMeasurements((prev) => prev.filter((m) => m.id !== id));
-      setSelectedMeasurementId((cur) => (cur === id ? null : cur));
-    },
-    [submitReview, reportReviewFailure],
-  );
 
   /** Accept every pending suggestion at once.
    *
@@ -16738,21 +16798,7 @@ export default function TakeoffViewerModule({
     }
   }, [selectedProjectId, selectedBoqId, activeProjectId, activeBoqIdFromStore, loadPickerBoqs, loadPickerPositions]);
 
-  /** Picker: user switched project.  Reset BOQ + positions, load BOQs for new project. */
-  const handlePickerProjectChange = useCallback(async (projectId: string) => {
-    setLinkPickerProjectId(projectId);
-    setLinkPickerBoqId('');
-    setLinkBoqPositions([]);
-    await loadPickerBoqs(projectId);
-  }, [loadPickerBoqs]);
 
-  /** Picker: user picked a BOQ.  Load its positions. */
-  const handlePickerBoqChange = useCallback(async (boqId: string) => {
-    setLinkPickerBoqId(boqId);
-    // A section belongs to one bill; a new bill starts from its own default.
-    setLinkCreateSectionId(null);
-    await loadPickerPositions(boqId);
-  }, [loadPickerPositions]);
 
   /** Link a measurement to a specific existing BOQ position, pushing the
    *  measurement's quantity/unit into the position and recording both
@@ -16927,218 +16973,9 @@ export default function TakeoffViewerModule({
     await handleLinkToPosition(selectedMeasurement.id, selectedLinkedDrift.position, false);
   }, [selectedMeasurement, selectedLinkedDrift, handleLinkToPosition]);
 
-  /** Default text for a position created from a measurement. */
-  const defaultPositionDescription = useCallback(
-    (m: Measurement) =>
-      m.annotation ||
-      t('takeoff.position_default_desc', {
-        defaultValue: 'Takeoff · {{type}} page {{page}}',
-        type: m.type,
-        page: m.page,
-      }),
-    [t],
-  );
 
-  /** Create a brand-new BOQ position from the measurement and link to it.
-   *
-   *  A synced measurement goes through the server route, which creates the
-   *  position through the BOQ service (lock check, ordinal in the editor's
-   *  gap-of-10 scheme under the chosen section, validation, audit) and links
-   *  it in ONE transaction, computing the quantity from the same fold the
-   *  ledger uses (wall area with openings, slope, wastage, multiplier). The
-   *  quantity-bearing metadata is written explicitly first, so a height or an
-   *  opening typed a moment ago (whose autosave PATCH is still debounced) is
-   *  what the server folds. A measurement that never synced (a local-only
-   *  drawing) has no server row to link, so it keeps the client-side create.
-   */
-  const handleCreateAndLink = useCallback(async (measurementId: string) => {
-    const measurement = measurements.find((m) => m.id === measurementId);
-    if (!measurement) return;
-    if (!linkPickerBoqId) {
-      addToast({
-        type: 'warning',
-        title: t('takeoff.link_need_boq', { defaultValue: 'Pick a BOQ first' }),
-      });
-      return;
-    }
-    if (measurement.isDeduction) {
-      addToast({
-        type: 'error',
-        title: t('takeoff_create.deduction_title', { defaultValue: 'An opening is not a bill position' }),
-        message: t('takeoff_create.deduction_msg', {
-          defaultValue: 'This measurement is an opening deducted from its group. Create the position from the wall or area it is cut from.',
-        }),
-      });
-      return;
-    }
-    const sectionId = linkCreateSectionId ?? defaultSectionId(linkBoqPositions);
-    const description =
-      (linkCreateDescription ?? '').trim() || defaultPositionDescription(measurement);
-    const positionUnit = positionUnitFor(measurement, measurementSystem);
-    setLinkingInProgress(true);
-    try {
-      let created: { id: string; ordinal: string; boq_id: string; description: string };
-      let quantity: number;
-      let unit: string;
-      if (measurement.serverId) {
-        // Flush the reported-quantity inputs so the server folds what is on
-        // screen. Explicit nulls clear a reset value (the server merges).
-        await takeoffApi.update(measurement.serverId, {
-          metadata: {
-            wall_height: measurement.wallHeight ?? null,
-            openings: measurement.openings ?? null,
-            slope_factor: measurement.slopeFactor ?? null,
-            wastage_pct: measurement.wastagePct ?? null,
-            multiplier: measurement.multiplier ?? null,
-          },
-        });
-        const result = await takeoffApi.createBoqPosition(measurement.serverId, {
-          boq_id: linkPickerBoqId,
-          parent_id: sectionId || null,
-          description,
-          unit: positionUnit,
-          cost_item_id: linkCreateCost?.id ?? null,
-          unit_rate: linkCreateCost?.rate ?? null,
-        });
-        created = {
-          id: result.position_id,
-          ordinal: result.ordinal,
-          boq_id: result.boq_id,
-          description: result.description,
-        };
-        quantity = result.quantity;
-        unit = result.unit;
-      } else {
-        // Local-only drawing: no server row to link, so create the position
-        // client-side with the same reported quantity, in the chosen section.
-        const takeoffOrdinals = linkBoqPositions
-          .map((p) => {
-            const match = /^TK\.(\d+)$/.exec(p.ordinal || '');
-            return match ? parseInt(match[1]!, 10) : 0;
-          })
-          .filter((n) => n > 0);
-        const nextNum = (takeoffOrdinals.length ? Math.max(...takeoffOrdinals) : 0) + 1;
-        quantity = boqQuantity(positionQuantityFor(measurement, measurementSystem));
-        unit = positionUnit;
-        const newPos = await boqApi.addPosition({
-          boq_id: linkPickerBoqId,
-          ordinal: `TK.${String(nextNum).padStart(3, '0')}`,
-          description,
-          unit,
-          quantity,
-          unit_rate: linkCreateCost?.rate ?? 0,
-          ...(sectionId ? { parent_id: sectionId } : {}),
-        });
-        created = {
-          id: newPos.id,
-          ordinal: newPos.ordinal,
-          boq_id: newPos.boq_id,
-          description: newPos.description,
-        };
-      }
 
-      setMeasurements((prev) => prev.map((m) =>
-        m.id === measurementId
-          ? {
-              ...m,
-              linkedPositionId: created.id,
-              linkedPositionOrdinal: created.ordinal,
-              linkedBoqId: created.boq_id,
-              linkedPositionLabel: created.description,
-            }
-          : m,
-      ));
-      // Reload the picker's positions so the next create numbers after this one.
-      void loadPickerPositions(created.boq_id);
 
-      // Refresh the react-query cached BOQ editor views.
-      queryClient.invalidateQueries({ queryKey: ['boq', created.boq_id] });
-      queryClient.invalidateQueries({ queryKey: ['all-boqs'] });
-      queryClient.invalidateQueries({ queryKey: ['takeoff-linked-boq'] });
-
-      addToast({
-        type: 'success',
-        title: t('takeoff.linked_created', { defaultValue: 'Position created & linked' }),
-        message: t('takeoff_create.created_msg', {
-          defaultValue: '{{posOrdinal}}: {{qty}} {{unit}}',
-          posOrdinal: created.ordinal,
-          qty: formatMaxDigits(quantity, 4),
-          unit,
-        }),
-      });
-      setLinkingMeasurementId(null);
-    } catch (err) {
-      addToast({
-        type: 'error',
-        title: t('takeoff.create_link_failed', { defaultValue: 'Create & link failed' }),
-        message: err instanceof Error ? err.message : '',
-      });
-    } finally {
-      setLinkingInProgress(false);
-    }
-  }, [
-    measurements,
-    linkPickerBoqId,
-    linkBoqPositions,
-    linkCreateSectionId,
-    linkCreateDescription,
-    linkCreateCost,
-    measurementSystem,
-    defaultPositionDescription,
-    loadPickerPositions,
-    addToast,
-    t,
-    queryClient,
-  ]);
-
-  /** Remove the link between a measurement and its BOQ position.
-   *  We intentionally leave the BOQ position alone — unlinking just
-   *  detaches the relationship, so the user doesn't accidentally wipe a
-   *  quantity they've reviewed.
-   */
-  const handleUnlinkMeasurement = useCallback(async (measurementId: string) => {
-    const measurement = measurements.find((m) => m.id === measurementId);
-    if (!measurement) return;
-    setLinkingInProgress(true);
-    try {
-      if (measurement.serverId) {
-        try {
-          await takeoffApi.update(measurement.serverId, { linked_boq_position_id: null });
-        } catch { /* non-critical */ }
-      }
-      setMeasurements((prev) => prev.map((m) =>
-        m.id === measurementId
-          ? {
-              ...m,
-              linkedPositionId: undefined,
-              linkedPositionOrdinal: undefined,
-              linkedBoqId: undefined,
-              linkedPositionLabel: undefined,
-            }
-          : m,
-      ));
-      addToast({
-        type: 'success',
-        title: t('takeoff.unlinked', { defaultValue: 'Unlinked from BOQ' }),
-      });
-      setLinkingMeasurementId(null);
-    } catch (err) {
-      addToast({
-        type: 'error',
-        title: t('takeoff.unlink_failed', { defaultValue: 'Unlink failed' }),
-        message: err instanceof Error ? err.message : '',
-      });
-    } finally {
-      setLinkingInProgress(false);
-    }
-  }, [measurements, addToast, t]);
-
-  /** Jump into the BOQ editor focused on the linked position. */
-  const handleOpenLinkedPosition = useCallback((m: Measurement) => {
-    if (!m.linkedBoqId || !m.linkedPositionId) return;
-    // Absolute navigation; takeoff is embedded under /takeoff route.
-    openLink(`/boq/${m.linkedBoqId}?highlight=${m.linkedPositionId}`);
-  }, []);
 
   /** Ledger row click → navigate to the measurement.  Switch to its page
    *  if it's on a different one, select it, and (if the Properties tab
@@ -17261,152 +17098,6 @@ export default function TakeoffViewerModule({
     }
   }, [addToast, t, selectedProjectId, selectedBoqId, activeProjectId, activeBoqIdFromStore, loadPickerBoqs]);
 
-  /** Confirm the bulk add: one bulk-create call into the picked BOQ (the
-   *  same ``positions/bulk/`` endpoint the Takeoff page uses, returning
-   *  the created positions in input order), then link each measurement to
-   *  its new position with ``pushQuantity`` so the server-side value
-   *  stays authoritative. */
-  const handleBulkAddConfirm = useCallback(async () => {
-    if (!bulkAddMeasurements || bulkAddMeasurements.length === 0 || !linkPickerBoqId) return;
-    setLinkingInProgress(true);
-    try {
-      const items = bulkAddMeasurements.map((m) => ({
-        description: m.annotation || t('takeoff.position_default_desc', {
-          defaultValue: 'Takeoff · {{type}} page {{page}}',
-          type: m.type,
-          page: m.page,
-        }),
-        // Reported quantity + unit (wall area, wastage, multiplier), the
-        // figure the ledger shows, not the raw drawn length.
-        quantity: boqQuantity(reportedMagnitude(m)),
-        unit: normalizeUnit(effectiveUnit(m)),
-        source: 'takeoff',
-        metadata: {
-          takeoff_raw_unit: m.unit,
-          pdf_measurement_source: `Takeoff: ${m.annotation || m.type} (page ${m.page})`,
-          pdf_measurement_id: m.serverId ?? m.id,
-          pdf_document_id: fileName ?? undefined,
-          pdf_page: m.page,
-        },
-      }));
-      const created = await apiPost<Position[]>(
-        `/v1/boq/boqs/${linkPickerBoqId}/positions/bulk/`,
-        { items },
-      );
-
-      // The bulk endpoint drops rows that fail validation and returns only
-      // the inserted positions, so when the response is shorter an index
-      // zip would link measurement i to a NEIGHBOR's position - silently
-      // wrong quantities. Match by the measurement id we stamped into each
-      // position's metadata instead; index matching stays only as the
-      // fallback for an equal-length response.
-      const sameLength = created.length === bulkAddMeasurements.length;
-      const createdByMeasurementId = new Map<string, Position>();
-      for (const pos of created) {
-        const meta = (pos.metadata ?? pos.metadata_) as Record<string, unknown> | undefined;
-        const mid = meta?.pdf_measurement_id;
-        if (typeof mid === 'string') createdByMeasurementId.set(mid, pos);
-      }
-
-      // Every row was dropped: nothing exists to link or to announce, and a
-      // success toast reading "0 positions created, starting at" hid that.
-      // The picker stays open so another bill can be chosen.
-      if (created.length === 0) {
-        addToast({
-          type: 'warning',
-          title: t('takeoff.bulk_add_rejected_title', { defaultValue: 'Nothing added to the BOQ' }),
-          message: t('takeoff.bulk_add_rejected_msg', {
-            defaultValue:
-              'The BOQ accepted none of the selected measurements, so no positions were created. Check that the bill is open for editing and that each measurement has a quantity, then try again.',
-          }),
-        });
-        return;
-      }
-
-      // Link measurements to their new positions (and push the quantity
-      // server-side). A per-item failure only degrades the back-link -
-      // the position already exists with the measured quantity.
-      let linkFailures = 0;
-      const createdByMeasurement = new Map<string, Position>();
-      for (let i = 0; i < bulkAddMeasurements.length; i += 1) {
-        const m = bulkAddMeasurements[i]!;
-        const pos = createdByMeasurementId.get(m.serverId ?? m.id) ?? (sameLength ? created[i] : undefined);
-        if (!pos) continue;
-        createdByMeasurement.set(m.id, pos);
-        if (m.serverId) {
-          try {
-            // The server push copies the RAW stored value, so it is only safe
-            // for a row with no adjustment; an adjusted row keeps the
-            // reported quantity written at create.
-            await takeoffApi.linkToBoq(m.serverId, pos.id, { pushQuantity: !hasQuantityFactor(m) });
-          } catch {
-            linkFailures += 1;
-          }
-        }
-      }
-
-      // Reflect the new links locally so the ledger badges flip at once.
-      setMeasurements((prev) => prev.map((m) => {
-        const pos = createdByMeasurement.get(m.id);
-        if (!pos) return m;
-        return {
-          ...m,
-          linkedPositionId: pos.id,
-          linkedPositionOrdinal: pos.ordinal,
-          linkedBoqId: pos.boq_id,
-          linkedPositionLabel: pos.description,
-        };
-      }));
-
-      queryClient.invalidateQueries({ queryKey: ['boq', linkPickerBoqId] });
-      queryClient.invalidateQueries({ queryKey: ['all-boqs'] });
-      queryClient.invalidateQueries({ queryKey: ['takeoff-linked-boq'] });
-
-      const first = created[0];
-      addToast({
-        type: 'success',
-        title: t('takeoff.bulk_add_success_title', { defaultValue: 'Added to BOQ' }),
-        message: t('takeoff.bulk_add_success_msg', {
-          defaultValue: '{{count}} positions created, starting at {{first}}',
-          count: created.length,
-          first: first ? `${first.ordinal} ${first.description?.slice(0, 30) ?? ''}`.trim() : '',
-        }),
-      });
-      const notAccepted = bulkAddMeasurements.length - created.length;
-      if (notAccepted > 0) {
-        addToast({
-          type: 'warning',
-          title: t('takeoff.bulk_add_skipped_title', { defaultValue: 'Some measurements were not added' }),
-          message: t('takeoff.bulk_add_skipped_msg', {
-            defaultValue:
-              'Not accepted by the BOQ: {{count}} of {{total}} measurements. No positions were created for them and they stay unlinked.',
-            count: notAccepted,
-            total: bulkAddMeasurements.length,
-          }),
-        });
-      }
-      if (linkFailures > 0) {
-        addToast({
-          type: 'warning',
-          title: t('takeoff.bulk_link_partial_title', { defaultValue: 'Some links failed' }),
-          message: t('takeoff.bulk_link_partial_msg', {
-            defaultValue:
-              '{{count}} measurements could not be linked back to their new positions. The positions were still created with the measured quantities.',
-            count: linkFailures,
-          }),
-        });
-      }
-      setBulkAddMeasurements(null);
-    } catch (err) {
-      addToast({
-        type: 'error',
-        title: t('takeoff.bulk_add_failed', { defaultValue: 'Add to BOQ failed' }),
-        message: err instanceof Error ? err.message : '',
-      });
-    } finally {
-      setLinkingInProgress(false);
-    }
-  }, [bulkAddMeasurements, linkPickerBoqId, normalizeUnit, fileName, addToast, t, queryClient]);
 
   /* ── Undo ────────────────────────────────────────────────────────── */
 
@@ -18215,6 +17906,7 @@ export default function TakeoffViewerModule({
           if (picked.length) {
             e.preventDefault();
             markupClipRef.current = picked.map((m) => JSON.parse(JSON.stringify(m)) as Measurement);
+            lastPasteRef.current = null;
             addToast({ type: 'success', title: `${picked.length} markup${picked.length === 1 ? '' : 's'} copied`, message: 'Go to any page and press Ctrl+V - they paste in the same place.' });
             return;
           }
@@ -18517,6 +18209,8 @@ export default function TakeoffViewerModule({
       // Page Up / Page Down: previous / next page, always
       // (OE-DELIVERY 2026-11-09-colours-keys).
       if ((e.key === 'PageUp' || e.key === 'PageDown') && !e.ctrlKey && !e.metaKey && !e.altKey && shouldHandleShortcut(e.target)) {
+        // The split pane owns the page keys while it is the active pane.
+        if (splitActiveRef.current) return;
         e.preventDefault();
         flipPageRef.current(e.key === 'PageDown' ? 1 : -1);
         return;
@@ -18552,7 +18246,7 @@ export default function TakeoffViewerModule({
         }
         // Nothing selected: Up = next page, Down = previous page
         // (OE-DELIVERY 2026-11-04-page-flip).
-        if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !e.shiftKey) {
+        if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !e.shiftKey && !splitActiveRef.current) {
           e.preventDefault();
           flipPageRef.current(e.key === 'ArrowUp' ? 1 : -1);
           return;
@@ -19024,6 +18718,27 @@ export default function TakeoffViewerModule({
             <button type="button" className="text-content-tertiary hover:text-content-primary" onClick={() => setOverlayPanelOpen(false)}>✕</button>
           </div>
           <p className="mb-2 text-content-tertiary">Lay another sheet over this one in colour to compare revisions. This page stays black; the overlay shows in colour.</p>
+          {/* Source: this drawing, or the revision opened for comparison
+              (OE-DELIVERY 2026-11-25-fsftm-pdf). */}
+          <label className="mb-1.5 flex items-center gap-2">
+            <span className="w-16 text-content-secondary">Source</span>
+            <select
+              className="min-w-0 flex-1 rounded border border-border bg-surface-primary px-1 py-0.5"
+              value={overlayCfg?.src === 'compare' && compareDoc ? 'compare' : 'self'}
+              onChange={(e) => {
+                const src = e.target.value === 'compare' ? 'compare' : 'self';
+                if (src === 'compare' && !compareDoc) return;
+                setOverlayCfg({ page: src === 'compare' ? Math.min(currentPage, compareDoc!.doc.numPages) : overlayCfg?.page ?? (currentPage > 1 ? 1 : 2), color: overlayCfg?.color ?? 'red', opacity: overlayCfg?.opacity ?? 0.7, dx: 0, dy: 0, src });
+              }}
+              data-testid="overlay-source-select"
+            >
+              <option value="self">This drawing</option>
+              {compareDoc && <option value="compare">{compareDoc.name} (compare)</option>}
+            </select>
+          </label>
+          {!compareDoc && (
+            <p className="mb-2 text-content-tertiary">To overlay another revision, open it in the split pane first (Document &gt; Compare Revisions…).</p>
+          )}
           <label className="mb-1.5 flex items-center gap-2">
             <span className="w-16 text-content-secondary">Overlay</span>
             <select
@@ -19031,14 +18746,18 @@ export default function TakeoffViewerModule({
               value={overlayCfg?.page ?? ''}
               onChange={(e) => {
                 const p = Number(e.target.value);
-                setOverlayCfg(p ? { page: p, color: overlayCfg?.color ?? 'red', opacity: overlayCfg?.opacity ?? 0.7, dx: 0, dy: 0 } : null);
+                setOverlayCfg(p ? { page: p, color: overlayCfg?.color ?? 'red', opacity: overlayCfg?.opacity ?? 0.7, dx: 0, dy: 0, src: overlayCfg?.src } : null);
               }}
               data-testid="overlay-page-select"
             >
               <option value="">None</option>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).filter((p) => p !== currentPage).map((p) => (
-                <option key={p} value={p}>{`${p}  ${sheetCaption(sheetFor(p))}`.trim()}</option>
-              ))}
+              {overlayCfg?.src === 'compare' && compareDoc
+                ? Array.from({ length: compareDoc.doc.numPages }, (_, i) => i + 1).map((p) => (
+                  <option key={p} value={p}>{`Page ${p} of ${compareDoc.name}`}</option>
+                ))
+                : Array.from({ length: totalPages }, (_, i) => i + 1).filter((p) => p !== currentPage).map((p) => (
+                  <option key={p} value={p}>{`${p}  ${sheetCaption(sheetFor(p))}`.trim()}</option>
+                ))}
             </select>
           </label>
           {overlayCfg && (
@@ -19099,6 +18818,7 @@ export default function TakeoffViewerModule({
                 { label: 'New PDF…', onClick: () => setNewPdfOpen(true), testId: 'fsftm-file-new-pdf' },
                 { label: 'Combine Files…', onClick: () => setCombineOpen(true), testId: 'fsftm-file-combine' },
                 { label: 'Save', shortcut: 'Ctrl+S', onClick: () => saveWorkRef.current(), testId: 'fsftm-file-save' },
+                { label: 'Where is my work saved?', onClick: () => setSaveInfoOpen(true), testId: 'fsftm-file-save-info' },
                 ...(onCloseDocument ? [{ label: 'Close PDF', onClick: () => closePdf(), testId: 'fsftm-file-close' }] : []),
                 { separator: true },
                 { label: 'Download PDF (with markups)', onClick: () => { void handleSaveVectorPdfRef.current(); }, testId: 'fsftm-file-save-pdf' },
@@ -19172,6 +18892,8 @@ export default function TakeoffViewerModule({
                   ] as [string, DisplayUnitPref][]).map(([label, u]) => ({ label, checked: displayUnitPref === u, onClick: () => setDisplayUnitPref(u) })),
                 },
                 { label: 'Sync Split Views', checked: syncViews, onClick: () => { if (splitMode === 'off') toggleSplit('vertical'); setSyncViews((x) => { if (!x) { syncDeltaRef.current = 0; setSplitPage(currentPage); setSplitZoom(zoom); } return !x; }); } },
+                { label: 'Legend', checked: legendDashboardVisible && showSidebar && sidebarTab === 'properties', onClick: () => toggleLegendRef.current(), testId: 'fsftm-view-legend' },
+                { label: `Show/Hide Markup Types…${hiddenTypes.size > 0 ? ` (${hiddenTypes.size} hidden)` : ''}`, checked: hiddenTypes.size > 0, onClick: () => setShowTypeFilter(true), testId: 'fsftm-view-show-hide' },
                 { label: 'Show Labels', checked: showLabels, onClick: () => setShowLabels((x) => !x) },
                 { label: 'Show Dimensions', checked: showDimensions, onClick: () => setShowDimensions((x) => !x) },
                 { separator: true },
@@ -19197,7 +18919,24 @@ export default function TakeoffViewerModule({
                 { label: 'Viewports…', checked: showViewportPanel, onClick: () => setShowViewportPanel((x) => !x) },
                 { separator: true },
                 { label: 'Overlay Pages…', checked: Boolean(overlayCfg), onClick: () => setOverlayPanelOpen(true), testId: 'fsftm-doc-overlay' },
+                {
+                  // Old vs new revision side by side (OE-DELIVERY 2026-11-25-fsftm-pdf).
+                  label: 'Compare Revisions…',
+                  testId: 'fsftm-doc-compare',
+                  disabled: !pdfDoc,
+                  onClick: () => {
+                    if (splitMode === 'off') toggleSplit('vertical');
+                    setSplitActive(true);
+                    addToast({ type: 'info', title: 'Compare revisions', message: 'Pick the other revision in the split pane header (project drawing or a PDF from this computer). Turn on SYNC to move both together, or use Overlay Pages with Source = the other revision.' });
+                  },
+                },
                 { label: 'Page Index', onClick: () => { setShowThumbnails(true); setLeftTab('index'); } },
+                { separator: true },
+                // FSFTM page tools with a page-range picker (OE-DELIVERY 2026-11-25-fsftm-pdf).
+                { label: 'Rotate Pages…', testId: 'fsftm-doc-rotate', disabled: !pdfDoc, onClick: () => setPageDlg({ kind: 'rotate', pages: thumbSel.size ? [...thumbSel].sort((x, y) => x - y) : [currentPage] }) },
+                { label: 'Export Pages…', testId: 'fsftm-doc-export', disabled: !pdfDoc, onClick: () => setPageDlg({ kind: 'export', pages: thumbSel.size ? [...thumbSel].sort((x, y) => x - y) : [currentPage] }) },
+                { label: 'Extract Pages…', disabled: !pdfDoc, onClick: () => setPageDlg({ kind: 'extract', pages: thumbSel.size ? [...thumbSel].sort((x, y) => x - y) : [currentPage] }) },
+                { label: 'Delete Pages…', disabled: !pdfDoc || totalPages <= 1, onClick: () => setPageDlg({ kind: 'delete', pages: thumbSel.size ? [...thumbSel].sort((x, y) => x - y) : [currentPage] }) },
               ],
             },
             {
@@ -19227,6 +18966,8 @@ export default function TakeoffViewerModule({
                 { label: 'Auto Takeoff…', onClick: () => showFSFTMPanel('auto'), testId: 'fsftm-tools-auto' },
                 { label: 'Lay out framing…', onClick: () => setShowFraming(true), testId: 'fsftm-tools-framing' },
                 { label: 'Recognize this page', onClick: () => { void handleRecognize(); } },
+                { label: 'Count Similar (click a symbol)', checked: armCountSimilar, disabled: countSimilarBusy, onClick: () => toggleCountSimilar(), testId: 'fsftm-tools-count-similar' },
+                { label: 'Count Similar on all pages', checked: countSimilarAllPages, onClick: () => setCountSimilarAllPages((v) => !v), testId: 'fsftm-tools-count-all-pages' },
                 { label: 'AI Assistant', onClick: () => showFSFTMPanel('ai') },
                 { label: 'Tool Chest', shortcut: 'Alt+X', onClick: () => showFSFTMPanel('tools') },
                 { separator: true },
@@ -19271,25 +19012,6 @@ export default function TakeoffViewerModule({
           ]}
           right={
             <div className="flex items-center gap-2">
-            {pdfDoc && onCloseDocument && (
-              <div
-                className="flex max-w-[320px] items-center gap-1 rounded-t-md border border-b-0 border-border bg-surface-primary py-0.5 pl-2.5 pr-0.5 text-[11px] text-content-primary shadow-sm"
-                title={fileName || ''}
-                data-testid="doc-tab"
-              >
-                <span className="truncate">{fileName || 'Drawing'}</span>
-                <button
-                  type="button"
-                  onClick={closePdf}
-                  className="ml-1 flex h-5 w-5 shrink-0 items-center justify-center rounded text-content-secondary transition-colors hover:bg-red-600 hover:text-white"
-                  title="Close PDF (your work is saved first)"
-                  aria-label="Close PDF"
-                  data-testid="toolbar-close-pdf"
-                >
-                  <X size={13} />
-                </button>
-              </div>
-            )}
             <button
               type="button"
               onClick={() => setFSFTMWorkspace((w) => !w)}
@@ -19436,8 +19158,12 @@ export default function TakeoffViewerModule({
             >
               <div className="flex min-h-0 min-w-0 flex-1 flex-col">
               {leftTab === 'thumbs' && (
+            <div className="flex min-h-0 flex-1 flex-col bg-neutral-100 dark:bg-[#2a2a2a]">
+            {/* FSFTM snap-style thumbnails (OE-DELIVERY 2026-11-25-fsftm-pdf): a grid
+                sized by the slider at the bottom; label + scale under each page. */}
             <div
-              className="min-h-0 flex-1 overflow-y-auto p-2 space-y-2"
+              className="grid min-h-0 flex-1 content-start gap-x-2 gap-y-3 overflow-y-auto p-2"
+              style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${thumbSize}px, 1fr))` }}
               data-testid="thumbnail-strip"
             >
               {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
@@ -19474,26 +19200,28 @@ export default function TakeoffViewerModule({
                   data-page={n}
                   data-current={n === currentPage}
                   aria-current={n === currentPage ? 'page' : undefined}
-                  className={clsx(
-                    'group block w-full overflow-hidden rounded border bg-white transition-colors',
-                    n === currentPage
-                      ? 'ring-2 ring-oe-blue border-oe-blue'
-                      : thumbSel.has(n)
-                        ? 'ring-2 ring-sky-300 border-sky-400'
-                        : 'border-border hover:border-oe-blue/60',
-                  )}
+                  className="group flex min-w-0 flex-col items-center gap-1 rounded p-0.5 text-center focus:outline-none"
                   title={sheetCaption(sheetFor(n)) || `Page ${n}`}
                 >
-                  {thumbs[n] ? (
-                    <img src={thumbs[n]} alt={sheetFor(n)?.num || `Page ${n}`} className="block w-full bg-white" style={{ imageRendering: 'auto' }} draggable={false} />
-                  ) : (
-                    <div className="flex items-center justify-center bg-white text-content-tertiary" style={{ aspectRatio: pageSizePdfRef.current ? `${pageSizePdfRef.current.w} / ${pageSizePdfRef.current.h}` : "3 / 2" }}>
-                      <Loader2 size={16} className="animate-spin" />
-                    </div>
-                  )}
-                  <span className="flex items-center justify-center gap-1 border-t border-border/60 px-1 py-0.5 text-[11px]">
-                    {/* FSFTM-style sheet label: the sheet number only; click to
-                        add or fix it (OE-DELIVERY 2026-11-02-fsftm-left-panel-v2). */}
+                  <span
+                    className={clsx(
+                      'block w-full overflow-hidden bg-white transition-shadow',
+                      n === currentPage
+                        ? 'outline outline-[3px] outline-offset-0 outline-[#1f6fd1]'
+                        : thumbSel.has(n)
+                          ? 'outline outline-[3px] outline-offset-0 outline-sky-400/80'
+                          : 'outline outline-1 outline-neutral-400/70 group-hover:outline-2 group-hover:outline-[#1f6fd1]/70',
+                    )}
+                  >
+                    {thumbs[n] ? (
+                      <img src={thumbs[n]} alt={sheetFor(n)?.num || `Page ${n}`} className="block w-full bg-white" style={{ imageRendering: 'auto' }} draggable={false} />
+                    ) : (
+                      <span className="flex items-center justify-center bg-white text-content-tertiary" style={{ aspectRatio: pageSizePdfRef.current ? `${pageSizePdfRef.current.w} / ${pageSizePdfRef.current.h}` : "3 / 2" }}>
+                        <Loader2 size={16} className="animate-spin" />
+                      </span>
+                    )}
+                  </span>
+                  <span className="flex w-full min-w-0 items-center justify-center gap-1 text-[11px]">
                     {editingThumb === n ? (
                       <input
                         autoFocus
@@ -19516,12 +19244,12 @@ export default function TakeoffViewerModule({
                         title="Click to edit the sheet number"
                         onClick={(ev) => { ev.stopPropagation(); setEditingThumb(n); }}
                         className={clsx(
-                          'min-w-0 truncate rounded px-1.5 text-[12px] font-bold leading-[18px] hover:ring-2 hover:ring-oe-blue/50',
-                          pageLabelOf(n) ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900' : 'italic font-normal text-content-tertiary',
+                          'min-w-0 truncate rounded px-1 text-[12px] font-semibold leading-[16px] hover:ring-1 hover:ring-sky-400/60',
+                          pageLabelOf(n) ? 'text-[#1f5fa8] dark:text-sky-300' : 'font-normal text-[#1f5fa8] dark:text-sky-300',
                         )}
                         data-testid="thumb-sheet-label"
                       >
-                        {pageLabelOf(n) || `+ label`}
+                        {pageLabelOf(n) || `Page ${n}`}
                       </span>
                     )}
                     {countsByPage[n] ? (
@@ -19530,36 +19258,43 @@ export default function TakeoffViewerModule({
                       </span>
                     ) : null}
                   </span>
-                  {/* FSFTM: page number, then the page's scale - click it to set the scale (update 15). */}
-                  <span className="flex items-center justify-center gap-1.5 px-1 pb-1 text-[11px] leading-4">
-                    {/* Page number as a clear badge (update 18). */}
-                    <span
-                      className={clsx(
-                        'inline-flex min-w-[22px] items-center justify-center rounded px-1 text-[12px] font-bold tabular-nums leading-[18px]',
-                        n === currentPage ? 'bg-oe-blue text-white' : 'bg-neutral-700 text-white',
-                      )}
-                      data-testid="thumb-page-no"
-                    >
-                      {n}
-                    </span>
-                    <span
-                      role="button"
-                      tabIndex={-1}
-                      onClick={(ev) => { ev.stopPropagation(); goToPage(n); setSetScaleDlg({ pages: [n] }); }}
-                      className={clsx(
-                        'truncate rounded px-1.5 text-[11px] font-semibold leading-[18px] hover:ring-2 hover:ring-oe-blue/50',
-                        pageIsCalibrated(pageScales, n) ? 'bg-emerald-700 text-white' : 'bg-amber-500 text-white',
-                      )}
-                      title="Set the scale of this page"
-                      data-testid="thumb-scale"
-                    >
-                      {pageIsCalibrated(pageScales, n)
-                        ? (DRAWING_SCALE_PRESETS.find((sp) => sameScale(scaleForPage(pageScales, n), sp.scale))?.label ?? formatScaleRatio(scaleForPage(pageScales, n)))
-                        : 'Scale Not Set'}
-                    </span>
+                  <span
+                    role="button"
+                    tabIndex={-1}
+                    onClick={(ev) => { ev.stopPropagation(); goToPage(n); setSetScaleDlg({ pages: [n] }); }}
+                    className={clsx(
+                      '-mt-1 max-w-full truncate rounded px-1 text-[11px] leading-4 hover:underline',
+                      pageIsCalibrated(pageScales, n) ? 'text-emerald-700 dark:text-emerald-300' : 'text-content-secondary dark:text-neutral-200',
+                    )}
+                    title={`Page ${n} - click to set the scale`}
+                    data-testid="thumb-scale"
+                  >
+                    {pageIsCalibrated(pageScales, n)
+                      ? (DRAWING_SCALE_PRESETS.find((sp) => sameScale(scaleForPage(pageScales, n), sp.scale))?.label ?? formatScaleRatio(scaleForPage(pageScales, n)))
+                      : 'Scale Not Set'}
                   </span>
                 </button>
               ))}
+            </div>
+            <div className="flex shrink-0 items-center gap-2 border-t border-border/60 px-2 py-1.5" data-testid="thumb-size-bar">
+              <button type="button" onClick={() => setThumbSize((v) => Math.max(THUMB_SIZE_MIN, v - 20))} className="text-content-secondary hover:text-content-primary" aria-label="Smaller thumbnails" title="Smaller thumbnails">
+                <Triangle size={9} />
+              </button>
+              <input
+                type="range"
+                min={THUMB_SIZE_MIN}
+                max={THUMB_SIZE_MAX}
+                step={5}
+                value={thumbSize}
+                onChange={(e) => setThumbSize(Number(e.target.value))}
+                className="h-1 min-w-0 flex-1 accent-neutral-400"
+                aria-label="Thumbnail size"
+                data-testid="thumb-size-slider"
+              />
+              <button type="button" onClick={() => setThumbSize((v) => Math.min(THUMB_SIZE_MAX, v + 20))} className="text-content-secondary hover:text-content-primary" aria-label="Larger thumbnails" title="Larger thumbnails">
+                <Triangle size={15} />
+              </button>
+            </div>
             </div>
               )}
               {/* FSFTM Measurements tab (OE-DELIVERY 2026-11-02-fsftm-properties-bar): the
@@ -19893,7 +19628,7 @@ export default function TakeoffViewerModule({
                 <span className="mr-1 text-[9px] font-bold uppercase tracking-widest text-content-tertiary">
                   {t('takeoff_viewer.precision', { defaultValue: 'Precision' })}
                 </span>
-                {[4, 8, 16, 32].map((d) => (
+                {([4, 8, 16, 32] as const).map((d) => (
                   <button
                     key={d}
                     onClick={() => setPreference('imperialDenominator', d)}
@@ -20039,7 +19774,7 @@ export default function TakeoffViewerModule({
               }}
             />
           </div>
-          <div className="flex flex-1 min-w-0 min-h-0 flex-col space-y-2" style={{ order: 3 }}>
+          <div className="flex flex-1 min-w-0 min-h-0 flex-col space-y-1" style={{ order: 3 }}>
             {/* Toolbar - two grouped rows so every control stays visible
                 without a horizontal scrollbar. Row 1 = navigate + view +
                 document actions; row 2 = scale + drawing tools. Related
@@ -20053,8 +19788,8 @@ export default function TakeoffViewerModule({
                   <ChevronLeft size={16} />
                 </button>
                 <details className="relative shrink-0" data-testid="page-jump">
-                  <summary className="inline-flex h-7 cursor-pointer list-none select-none items-center rounded-md px-2 text-xs font-medium tabular-nums text-content-secondary transition-colors hover:bg-surface-primary hover:text-content-primary" title={t('takeoff_viewer.jump_to_page', { defaultValue: 'Click to jump to a page' })}>
-                    {currentPage}/{totalPages}
+                  <summary className="inline-flex h-7 min-w-[4.25rem] cursor-pointer list-none select-none items-center justify-center rounded-md px-2 text-xs font-medium tabular-nums text-content-secondary transition-colors hover:bg-surface-primary hover:text-content-primary" title={t('takeoff_viewer.jump_to_page', { defaultValue: 'Click to jump to a page' })}>
+                    {navPage}/{totalPages}
                   </summary>
                   {totalPages > 1 && (
                     <div className="absolute left-0 top-full mt-1 z-30 max-h-72 w-44 overflow-y-auto rounded-lg border border-border bg-surface-elevated shadow-lg p-1">
@@ -20433,179 +20168,10 @@ export default function TakeoffViewerModule({
               <div className="flex flex-wrap items-center gap-1.5">
                 {/* View toggles */}
                 <div className={TB_GROUP}>
-                  {totalPages > 1 && (
-                    <button
-                      onClick={() => setShowThumbnails((v) => !v)}
-                      className={tbBtn(showThumbnails)}
-                      title={t('takeoff_viewer.toggle_thumbnails', { defaultValue: 'Toggle page thumbnails' })}
-                      aria-label={t('takeoff_viewer.toggle_thumbnails', { defaultValue: 'Toggle page thumbnails' })}
-                      aria-pressed={showThumbnails}
-                      data-testid="thumbnails-toggle"
-                    >
-                      <Layers size={15} />
-                      <span className="takeoff-toolbar-label">{t('takeoff_viewer.thumbnails', { defaultValue: 'Pages' })}</span>
-                    </button>
-                  )}
-                  <button
-                    onClick={() => {
-                      // Toggle on ACTUAL visibility: the flag alone can be true
-                      // while the sidebar is closed or on another tab, so a
-                      // plain !flag toggle hides on first click. If the
-                      // dashboard is not on screen, open it; else hide it.
-                      // Markups selected: Create New Legend from them, placed
-                      // with the next click on the PDF (FSFTM)
-                      // (OE-DELIVERY 2026-11-12-fsftm-ui).
-                      {
-                        const sel = new Set<string>(selectedLedgerIds);
-                        if (selectedMeasurementId) sel.add(selectedMeasurementId);
-                        if (sel.size > 0 && startLegendFromRef.current(sel)) return;
-                      }
-                      const isOpen =
-                        legendDashboardVisible && showSidebar && sidebarTab === 'properties';
-                      const next = !isOpen;
-                      setLegendDashboardVisible(next);
-                      if (next) {
-                        // Open the right-side Legend dashboard (first in Properties tab).
-                        setSidebarTab('properties');
-                        setLegendCollapsed(false);
-                        setRightPanelWidth((w) => {
-                          if (w !== 0) return w;
-                          const last = lastOpenRightWidthRef.current;
-                          return last > 0 ? last : RIGHT_PANEL_DEFAULT;
-                        });
-                        setShowSidebar(true);
-                      }
-                    }}
-                    className={tbBtn(legendDashboardVisible && showSidebar && sidebarTab === 'properties')}
-                    title={t('takeoff_viewer.toggle_legend', { defaultValue: 'Toggle legend' })}
-                    aria-label={t('takeoff_viewer.toggle_legend', { defaultValue: 'Toggle legend' })}
-                    aria-pressed={legendDashboardVisible && showSidebar && sidebarTab === 'properties'}
-                    data-testid="legend-toggle"
-                  >
-                    <List size={15} />
-                    <span className="takeoff-toolbar-label">{t('takeoff_viewer.legend', { defaultValue: 'Legend' })}</span>
-                  </button>
-                  {/* Show / hide by markup type, FSFTM markup-list filter
-                      (OE-DELIVERY 2026-11-02-fsftm-properties). "Only" solos one type. */}
-                  <div className="relative">
-                    <button
-                      onClick={() => setShowTypeFilter((v) => !v)}
-                      className={tbBtn(hiddenTypes.size > 0)}
-                      title={t('takeoff_viewer.type_filter', { defaultValue: 'Show or hide markups by type' })}
-                      aria-expanded={showTypeFilter}
-                      data-testid="type-filter-button"
-                    >
-                      {hiddenTypes.size > 0 ? <EyeOff size={15} /> : <Eye size={15} />}
-                      <span className="takeoff-toolbar-label">
-                        {t('takeoff_viewer.show_hide', { defaultValue: 'Show/Hide' })}
-                        {hiddenTypes.size > 0 ? ` (${hiddenTypes.size})` : ''}
-                      </span>
-                    </button>
-                    {showTypeFilter && (() => {
-                      const counts = new Map<string, number>();
-                      for (const m of measurements) counts.set(m.type, (counts.get(m.type) ?? 0) + 1);
-                      const types = [...counts.keys()].sort((a, b) => (TYPE_LABELS[a] ?? a).localeCompare(TYPE_LABELS[b] ?? b));
-                      return (
-                        <>
-                          <div className="fixed inset-0 z-40" onClick={() => setShowTypeFilter(false)} aria-hidden="true" />
-                          <div className="absolute left-0 top-full z-50 mt-1 w-64 rounded-lg border border-border bg-surface-elevated p-2 shadow-lg" data-testid="type-filter-panel">
-                            <div className="mb-1 flex items-center justify-between px-1">
-                              <span className="text-[11px] font-semibold uppercase tracking-wide text-content-tertiary">
-                                {t('takeoff_viewer.markup_types', { defaultValue: 'Markup types' })}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => setHiddenTypes(new Set())}
-                                className="text-[11px] text-oe-blue hover:underline"
-                              >
-                                {t('takeoff_viewer.show_all', { defaultValue: 'Show all' })}
-                              </button>
-                            </div>
-                            {types.length === 0 && (
-                              <p className="px-1 py-2 text-xs text-content-tertiary">{t('takeoff_viewer.no_markups', { defaultValue: 'No markups yet.' })}</p>
-                            )}
-                            {types.map((ty) => (
-                              <div key={ty} className="flex items-center gap-2 rounded px-1 py-1 text-xs hover:bg-surface-secondary">
-                                <input
-                                  type="checkbox"
-                                  checked={!hiddenTypes.has(ty)}
-                                  onChange={() =>
-                                    setHiddenTypes((prev) => {
-                                      const next = new Set(prev);
-                                      if (next.has(ty)) next.delete(ty);
-                                      else next.add(ty);
-                                      return next;
-                                    })
-                                  }
-                                  data-testid={`type-filter-${ty}`}
-                                />
-                                <span className="flex-1 text-content-primary">{TYPE_LABELS[ty] ?? ty}</span>
-                                <span className="tabular-nums text-content-tertiary">{counts.get(ty)}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => setHiddenTypes(new Set(types.filter((x) => x !== ty)))}
-                                  className="text-[10px] text-oe-blue hover:underline"
-                                  title={t('takeoff_viewer.show_only', { defaultValue: 'Show only this type' })}
-                                >
-                                  {t('takeoff_viewer.only', { defaultValue: 'Only' })}
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        </>
-                      );
-                    })()}
-                  </div>
-                  {/* Declutter toggles: hide the on-canvas name badges and the
-                      dimension values independently; geometry stays visible and
-                      the numbers stay in the Ledger and hover tooltip (#314). */}
-                  <button
-                    onClick={() => setShowLabels((v) => !v)}
-                    className={tbBtn(showLabels)}
-                    title={t('takeoff_viewer.toggle_names', { defaultValue: 'Show measurement names' })}
-                    aria-label={t('takeoff_viewer.toggle_names', { defaultValue: 'Show measurement names' })}
-                    aria-pressed={showLabels}
-                    data-testid="names-toggle"
-                  >
-                    <Type size={15} />
-                    <span className="takeoff-toolbar-label">{t('takeoff_viewer.names', { defaultValue: 'Names' })}</span>
-                  </button>
-                  <button
-                    onClick={() => setShowDimensions((v) => !v)}
-                    className={tbBtn(showDimensions)}
-                    title={t('takeoff_viewer.toggle_values', { defaultValue: 'Show dimension values' })}
-                    aria-label={t('takeoff_viewer.toggle_values', { defaultValue: 'Show dimension values' })}
-                    aria-pressed={showDimensions}
-                    data-testid="values-toggle"
-                  >
-                    <Hash size={15} />
-                    <span className="takeoff-toolbar-label">{t('takeoff_viewer.values', { defaultValue: 'Values' })}</span>
-                  </button>
-                  {/* Collapse the right sidebar for a larger drawing viewport (#315). */}
-                  <button
-                    onClick={() => setShowSidebar((v) => !v)}
-                    className={tbBtn(showSidebar)}
-                    title={t('takeoff_viewer.toggle_sidebar', { defaultValue: 'Toggle the properties panel' })}
-                    aria-label={t('takeoff_viewer.toggle_sidebar', { defaultValue: 'Toggle the properties panel' })}
-                    aria-pressed={showSidebar}
-                    data-testid="sidebar-toggle"
-                  >
-                    <PanelRight size={15} />
-                    <span className="takeoff-toolbar-label">{t('takeoff_viewer.panel', { defaultValue: 'Panel' })}</span>
-                  </button>
-                                    {/* AI Assistant - open the right panel on the AI tab. */}
-                  <button
-                    onClick={() => { setShowSidebar(true); setSidebarTab('ai'); }}
-                    className={tbBtn(showSidebar && sidebarTab === 'ai')}
-                    title={t('takeoff_viewer.ai_assistant', { defaultValue: 'AI Assistant: search and ask about this document' })}
-                    aria-label={t('takeoff_viewer.ai_assistant', { defaultValue: 'AI Assistant' })}
-                    aria-pressed={showSidebar && sidebarTab === 'ai'}
-                    data-testid="ai-assistant-toggle"
-                  >
-                    <Sparkles size={15} />
-                    <span className="takeoff-toolbar-label">{t('takeoff_viewer.ai_assistant_short', { defaultValue: 'AI Assistant' })}</span>
-                  </button>
-{/* Fullscreen the whole measurement workspace (strips +
+                  {/* Pages / Legend / Show-Hide / Names / Values / Panel / AI Assistant
+                      live in the View and Window menus (toolbar kept lean,
+                      OE-DELIVERY 2026-11-25-fsftm-pdf). */}
+                  {/* Fullscreen the whole measurement workspace (strips +
                       canvas) for a distraction-free measuring mode. */}
                   <button
                     onClick={toggleTakeoffFullscreen}
@@ -20736,66 +20302,8 @@ export default function TakeoffViewerModule({
                 </select>
               )}
 
-              {/* AI assist - offline Recognize (issue #194) + optional vision
-                  Read-with-AI. Pushed right as the two hero actions of the row. */}
-              <button
-                onClick={handleRecognize}
-                disabled={recognizeBusy}
-                className="inline-flex h-7 items-center gap-1.5 rounded-md bg-gradient-to-r from-violet-500 to-indigo-500 px-2.5 text-xs font-semibold text-white shadow-xs transition-all hover:from-violet-600 hover:to-indigo-600 hover:shadow-sm disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50"
-                title={t('takeoff_viewer.recognize_hint', { defaultValue: 'Scan this page and suggest measurements (AI proposes, you confirm)' })}
-                aria-label={t('takeoff_viewer.recognize', { defaultValue: 'Recognize' })}
-                data-testid="recognize-button"
-              >
-                {recognizeBusy ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                <span className="hidden sm:inline">{t('takeoff_viewer.recognize', { defaultValue: 'Recognize' })}</span>
-              </button>
-
-              {/* Count similar - seeded count-by-example. Click one symbol and
-                  the server counts every matching symbol on the page (#194). */}
-              <button
-                onClick={toggleCountSimilar}
-                disabled={countSimilarBusy}
-                aria-pressed={armCountSimilar}
-                className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold shadow-xs transition-all disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/50 ${
-                  armCountSimilar
-                    ? 'bg-emerald-600 text-white ring-2 ring-emerald-300'
-                    : 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:from-emerald-600 hover:to-teal-600 hover:shadow-sm'
-                }`}
-                title={t('takeoff_viewer.count_similar.hint', {
-                  defaultValue:
-                    'Click one symbol and count every matching symbol on this page (AI proposes, you confirm)',
-                })}
-                aria-label={t('takeoff_viewer.count_similar.action', { defaultValue: 'Count similar' })}
-                data-testid="count-similar-button"
-              >
-                {countSimilarBusy ? <Loader2 size={14} className="animate-spin" /> : <Boxes size={14} />}
-                <span className="hidden sm:inline">
-                  {t('takeoff_viewer.count_similar.action', { defaultValue: 'Count similar' })}
-                </span>
-              </button>
-
-              {/* Count-similar scope (Step 5): this page only, or the
-                  whole document (FSFTM VisualSearch scope). */}
-              <button
-                onClick={() => setCountSimilarAllPages((v) => !v)}
-                aria-pressed={countSimilarAllPages}
-                className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-xs font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/50 ${
-                  countSimilarAllPages
-                    ? 'border-emerald-500/60 bg-emerald-600/15 text-emerald-700 dark:text-emerald-300'
-                    : 'border-border text-content-secondary hover:border-emerald-400/60 hover:text-content-primary'
-                }`}
-                title={t('takeoff_viewer.count_similar.all_pages_hint', {
-                  defaultValue:
-                    'Count similar scope: search every page of the document, not just this page',
-                })}
-                aria-label={t('takeoff_viewer.count_similar.all_pages', { defaultValue: 'All pages' })}
-                data-testid="count-similar-all-pages"
-              >
-                <span className="hidden sm:inline">
-                  {t('takeoff_viewer.count_similar.all_pages', { defaultValue: 'All pages' })}
-                </span>
-              </button>
-
+              {/* Recognize / Count similar live in the Tools menu (removed from
+                  the toolbar to keep it lean, OE-DELIVERY 2026-11-25-fsftm-pdf). */}
               {planReadVision?.available && (
                 <button
                   onClick={handleReadWithAi}
@@ -20860,12 +20368,19 @@ export default function TakeoffViewerModule({
                 calibration is persisted per page so it stays hidden on reopen
                 (issue #387). Nothing auto-applies - the user confirms via
                 "Use this" (CLAUDE.md rule 7). */}
-            {documentId && !calibrationMode && !settingScale && !isCalibrated && (
-              <ScaleAutoDetect
-                documentId={documentId}
-                pageNumber={currentPage}
-                onApply={(next) => setScale(next)}
-              />
+            {SHOW_PAGE_INFO_BANNERS && documentId && !calibrationMode && !settingScale && !isCalibrated && (
+              // Floats over the top of the drawing (zero-height slot), so the
+              // sheet does not jump when the banner comes and goes from page
+              // to page (OE-DELIVERY 2026-11-25-fsftm-pdf).
+              <div className="pointer-events-none relative z-30 !mt-0 h-0 shrink-0" data-testid="scale-detect-float">
+                <div className="pointer-events-auto absolute left-2 right-2 top-1 shadow-lg">
+                  <ScaleAutoDetect
+                    documentId={documentId}
+                    pageNumber={currentPage}
+                    onApply={(next) => setScale(next)}
+                  />
+                </div>
+              </div>
             )}
             {/* Properties bars float over the top of the drawing and show only
                 while a tool is active or markups are selected (update 18), so
@@ -20980,7 +20495,7 @@ export default function TakeoffViewerModule({
                 with no text layer (usually scanned drawings) so a partly- or
                 fully-scanned PDF is clearly flagged for OCR instead of being
                 silently treated as empty. Dismissible per opened document. */}
-            {noTextLayer && noTextLayer.count > 0 && !noTextBannerDismissed && (
+            {SHOW_PAGE_INFO_BANNERS && noTextLayer && noTextLayer.count > 0 && !noTextBannerDismissed && (
               <div
                 className="mb-2 flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] text-amber-800 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-200"
                 role="status"
@@ -21107,15 +20622,182 @@ export default function TakeoffViewerModule({
             {/* Split-view wrapper: one pane normally, two independent
                 panes (same PDF) when split is on. */}
             <div
+              ref={splitAreaRef}
               className={clsx(
-                'flex min-h-0 flex-1 gap-2',
+                'flex min-h-0 flex-1',
+                splitMode === 'off' && 'gap-2',
                 splitMode === 'vertical' && 'flex-row',
                 splitMode === 'horizontal' && 'flex-col',
               )}
             >
               <div
+                className={clsx('flex min-h-0 min-w-0 flex-col', splitMode === 'off' && 'flex-1')}
+                style={splitMode !== 'off' ? { flex: `${splitRatio} 1 0%` } : undefined}
+              >
+              {/* Snap-style document tab strip above the drawing
+                  (OE-DELIVERY 2026-11-25-fsftm-pdf). Same height as the split
+                  pane's strip, so both panes keep identical viewing areas. */}
+              <div
+                className={clsx(
+                  'flex h-7 shrink-0 items-stretch bg-[#cfcfcf] dark:bg-[#252526]',
+                  splitMode !== 'off' && !splitActive && 'shadow-[inset_0_-2px_0_0_rgb(var(--oe-blue-ch))]',
+                )}
+                data-testid="doc-tab-strip"
+              >
+            {/* FSFTM multi-file tabs (OE-DELIVERY 2026-11-25-fsftm-pdf): every open
+                drawing, x to close, + to open more or compare one side by side. */}
+            <div className="flex min-w-0 flex-1 items-stretch overflow-x-auto" role="tablist" aria-label="Open drawings" data-testid="doc-tabs">
+              {(openDocuments && openDocuments.length > 0
+                ? openDocuments
+                : pdfDoc ? [{ id: documentId ?? '__local', name: fileName || 'Drawing' }] : []
+              ).map((d) => {
+                const isActive = d.id === (documentId ?? '__local');
+                const isCompared = compareDoc?.id === d.id;
+                return (
+                  <div
+                    key={d.id}
+                    role="tab"
+                    aria-selected={isActive}
+                    className={clsx(
+                      'group flex max-w-[280px] shrink-0 items-center gap-1 border-r border-black/20 pl-3 pr-1 text-[12px] dark:border-white/10',
+                      isActive ? 'bg-[#d9d9d9] text-content-primary dark:bg-[#3a3a3a] dark:text-white' : 'text-content-secondary hover:bg-black/5 dark:text-neutral-400 dark:hover:bg-white/5',
+                    )}
+                    title={isCompared ? `${d.name} (shown in the split pane)` : d.name}
+                    data-testid="doc-tab"
+                  >
+                    <button
+                      type="button"
+                      className="min-w-0 truncate text-left"
+                      onClick={() => { if (!isActive && onSwitchDocument) onSwitchDocument(d.id); }}
+                    >
+                      {d.name}
+                    </button>
+                    {isCompared && <span className="shrink-0 rounded bg-oe-blue/15 px-1 text-[9px] font-semibold text-oe-blue">SPLIT</span>}
+                    {!isActive && d.id !== '__local' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (splitMode === 'off') toggleSplit('vertical');
+                          void loadCompareDoc(d.id, d.name);
+                        }}
+                        className="hidden h-5 shrink-0 items-center rounded px-1 text-[10px] text-oe-blue hover:bg-oe-blue/10 group-hover:flex"
+                        title="Compare: show this drawing in the split pane next to the current one"
+                        data-testid="doc-tab-compare"
+                      >
+                        <Columns2 size={12} />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isActive) { closePdf(); return; }
+                        if (isCompared) replaceCompareDoc(null);
+                        onCloseDocumentTab?.(d.id);
+                      }}
+                      className="ml-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded text-content-secondary transition-colors hover:bg-red-600 hover:text-white"
+                      title={isActive ? 'Close this PDF (your work is saved first)' : 'Close this tab'}
+                      aria-label={`Close ${d.name}`}
+                      data-testid={isActive ? 'toolbar-close-pdf' : 'doc-tab-close'}
+                    >
+                      <X size={13} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="relative flex">
+              <button
+                type="button"
+                onClick={() => setOpenMenu((v) => !v)}
+                className="flex h-full w-8 items-center justify-center text-content-secondary hover:bg-black/5 hover:text-content-primary dark:hover:bg-white/10"
+                title="Open another PDF, or compare two drawings side by side"
+                aria-label="Open another PDF"
+                data-testid="doc-tab-add"
+              >
+                <Plus size={13} />
+              </button>
+              {openMenu && (
+                <>
+                  <div className="fixed inset-0 z-[80]" onClick={() => setOpenMenu(false)} />
+                  <div className="absolute right-0 top-full z-[81] mt-1 w-[320px] rounded-md border border-border bg-surface-elevated py-1 text-[12px] shadow-2xl" data-testid="doc-open-menu">
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-surface-secondary"
+                      onClick={() => { setOpenMenu(false); openFilesRef.current?.click(); }}
+                      data-testid="doc-open-file"
+                    >
+                      <Upload size={13} />Open PDF(s) from this computer…
+                    </button>
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-surface-secondary"
+                      onClick={() => { setOpenMenu(false); if (splitMode === 'off') toggleSplit('vertical'); compareFileRef.current?.click(); }}
+                      data-testid="doc-compare-file"
+                    >
+                      <Columns2 size={13} />Compare with a PDF from this computer…
+                    </button>
+                    {(recentDocuments ?? []).filter((d) => d.id !== documentId).length > 0 && (
+                      <>
+                        <div className="mt-1 border-t border-border px-3 pb-0.5 pt-1.5 text-[10px] font-semibold uppercase tracking-wide text-content-tertiary">Drawings in this project</div>
+                        <div className="max-h-72 overflow-y-auto">
+                          {(recentDocuments ?? []).filter((d) => d.id !== documentId).map((d) => (
+                            <div key={d.id} className="group flex items-center gap-1 px-3 py-1 hover:bg-surface-secondary">
+                              <button
+                                type="button"
+                                className="min-w-0 flex-1 truncate text-left"
+                                title={`Open ${d.filename} in a new tab`}
+                                onClick={() => { setOpenMenu(false); if (onSwitchDocument) onSwitchDocument(d.id); else onOpenRecentDocument?.(d.id); }}
+                                data-testid="doc-open-project"
+                              >
+                                {d.filename}
+                              </button>
+                              <button
+                                type="button"
+                                className="shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold text-oe-blue hover:bg-oe-blue/10"
+                                title="Show it in the split pane next to the current drawing (old vs new)"
+                                onClick={() => {
+                                  setOpenMenu(false);
+                                  if (splitMode === 'off') toggleSplit('vertical');
+                                  void loadCompareDoc(d.id, d.filename);
+                                }}
+                                data-testid="doc-compare-project"
+                              >
+                                Compare
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
+              <input
+                ref={openFilesRef}
+                type="file"
+                accept="application/pdf,.pdf"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  const files = Array.from(e.target.files ?? []).filter((f) => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
+                  e.target.value = '';
+                  if (!files.length) return;
+                  if (onUploadFiles) onUploadFiles(files);
+                  else void handleFileUpload({ target: { files: [files[0]!] } } as unknown as React.ChangeEvent<HTMLInputElement>);
+                }}
+                data-testid="doc-open-file-input"
+              />
+            </div>
+              </div>
+              <div
                 ref={containerRef}
-                className="relative flex flex-1 min-h-[120px] min-w-0 max-w-full rounded-lg border border-border overflow-auto bg-gray-100 dark:bg-gray-900"
+                className={clsx(
+                  // Edge-to-edge working area, no boxed frame (FSFTM, OE-DELIVERY 2026-11-25-fsftm-pdf).
+                  'relative flex min-h-[120px] min-w-0 max-w-full flex-1 overflow-auto bg-[#e9e9e9] dark:bg-[#1e1e1e]',
+                )}
+                onMouseDownCapture={() => { syncLeaderRef.current = 'main'; if (splitActive) setSplitActive(false); }}
+                onPointerEnter={() => { syncLeaderRef.current = 'main'; }}
+                onWheelCapture={() => { syncLeaderRef.current = 'main'; }}
               >
                 {/* Centering + smooth-zoom wrapper: `m-auto` inside the flex
                     scroll container centers the sheet when it is smaller than
@@ -21835,33 +21517,93 @@ export default function TakeoffViewerModule({
                 </div>
                 </div>
               </div>
+              </div>
               {splitMode !== 'off' && pdfDoc && (
+                <div
+                  role="separator"
+                  aria-orientation={splitMode === 'vertical' ? 'vertical' : 'horizontal'}
+                  title="Drag to resize the panes (double-click: equal size)"
+                  className={clsx(
+                    'group relative z-10 flex shrink-0 items-center justify-center',
+                    splitMode === 'vertical' ? 'w-1.5 cursor-col-resize bg-border/70 hover:bg-oe-blue/60' : 'h-1.5 cursor-row-resize bg-border/70 hover:bg-oe-blue/60',
+                  )}
+                  onDoubleClick={() => setSplitRatio(0.5)}
+                  onPointerDown={(e) => {
+                    const area = splitAreaRef.current;
+                    if (!area) return;
+                    e.preventDefault();
+                    const el = e.currentTarget;
+                    el.setPointerCapture(e.pointerId);
+                    const r = area.getBoundingClientRect();
+                    const move = (ev: PointerEvent) => {
+                      const f = splitMode === 'vertical' ? (ev.clientX - r.left) / r.width : (ev.clientY - r.top) / r.height;
+                      setSplitRatio(Math.min(0.85, Math.max(0.15, f)));
+                    };
+                    const up = () => {
+                      el.removeEventListener('pointermove', move);
+                      el.removeEventListener('pointerup', up);
+                      el.removeEventListener('pointercancel', up);
+                    };
+                    el.addEventListener('pointermove', move);
+                    el.addEventListener('pointerup', up);
+                    el.addEventListener('pointercancel', up);
+                  }}
+                  data-testid="split-divider"
+                >
+                  <span className={clsx('rounded-full bg-border transition-colors group-hover:bg-oe-blue', splitMode === 'vertical' ? 'h-10 w-1' : 'h-1 w-10')} />
+                </div>
+              )}
+              {splitMode !== 'off' && pdfDoc && (
+                <div
+                  className="flex min-h-0 min-w-0"
+                  style={{ flex: `${1 - splitRatio} 1 0%` }}
+                  onPointerEnter={() => { syncLeaderRef.current = 'split'; }}
+                  onMouseDownCapture={() => { syncLeaderRef.current = 'split'; }}
+                  onWheelCapture={() => { syncLeaderRef.current = 'split'; }}
+                >
                 <SplitPane
-                  pdfDoc={pdfDoc}
+                  docValue={compareDoc ? compareDoc.id : 'self'}
+                  docOptions={[
+                    ...(compareDoc && compareDoc.id.startsWith('file:') ? [{ id: compareDoc.id, name: compareDoc.name }] : []),
+                    ...(recentDocuments ?? []).filter((d) => d.id !== documentId).map((d) => ({ id: d.id, name: d.filename })),
+                  ]}
+                  docLoading={compareLoading}
+                  selfName={fileName ?? undefined}
+                  onPickDoc={(id) => {
+                    if (id === 'self') { replaceCompareDoc(null); return; }
+                    if (id === '__file') { compareFileRef.current?.click(); return; }
+                    if (compareDoc?.id === id) return;
+                    const d = (recentDocuments ?? []).find((x) => x.id === id);
+                    if (d) void loadCompareDoc(d.id, d.filename);
+                  }}
+                  active={splitActive}
+                  onActivate={() => setSplitActive(true)}
+                  onSwap={() => {
+                    const mainPage = currentPage;
+                    goToPage(splitPage);
+                    setSplitPage(mainPage);
+                    setSplitActive(false);
+                  }}
+                  pdfDoc={compareDoc?.doc ?? pdfDoc}
                   page={splitPage}
                   zoom={splitZoom}
-                  totalPages={totalPages}
-                  measurements={splitPageMeasurements}
+                  totalPages={compareDoc ? compareDoc.doc.numPages : totalPages}
+                  measurements={compareDoc ? NO_MEASUREMENTS : splitPageMeasurements}
                   groupColorMap={groupColorMap}
-                  onPageChange={(p) => { setSplitPage(p); if (syncViews) goToPage(p - syncDeltaRef.current); }}
+                  syncApiRef={splitSyncApiRef}
+                  onPageChange={(p) => { syncLeaderRef.current = 'split'; setSplitPage(p); }}
                   onZoomChange={(z) => {
                     setSplitZoom(z);
+                    // The split pane leads: the main view takes the same zoom;
+                    // the frame sync then matches the centre exactly.
                     if (syncViews && Math.abs(z - zoomRef.current) > 1e-4) {
-                      // The split pane leads: the main view follows its zoom,
-                      // then re-copies its final position once its own zoom
-                      // has settled, without echoing its interim spot back.
-                      mainSyncIgnoreUntilRef.current = Date.now() + 1000;
+                      syncLeaderRef.current = 'split';
                       zoomTo(z);
-                      window.setTimeout(() => {
-                        const v = lastSplitViewRef.current;
-                        if (v) applySplitView(v.fx, v.fy);
-                      }, 650);
                     }
                   }}
-                  onClose={() => { setSplitMode('off'); setSyncViews(false); }}
-                  syncTo={syncViews ? syncTo : null}
-                  onViewChange={syncViews ? (fx, fy) => { lastSplitViewRef.current = { fx, fy }; applySplitView(fx, fy); } : undefined}
+                  onClose={() => { setSplitMode('off'); setSyncViews(false); setSplitActive(false); }}
                 />
+                </div>
               )}
             </div>
 
@@ -22280,8 +22022,8 @@ export default function TakeoffViewerModule({
               <div className="flex min-w-0 flex-wrap items-center gap-1" data-fsftm-pager="1">
                 <button
                   type="button"
-                  onClick={() => goToPage(1)}
-                  disabled={currentPage <= 1}
+                  onClick={() => navTo(1)}
+                  disabled={navPage <= 1}
                   className={tbBtn(false)}
                   aria-label={t('takeoff_viewer.first_page', { defaultValue: 'First page' })}
                   data-testid="pager-first"
@@ -22292,7 +22034,7 @@ export default function TakeoffViewerModule({
                 <button
                   type="button"
                   onClick={prevPage}
-                  disabled={currentPage <= 1}
+                  disabled={navPage <= 1}
                   className={tbBtn(false)}
                   aria-label={t('takeoff_viewer.prev_page', { defaultValue: 'Previous page' })}
                   data-testid="pager-prev"
@@ -22316,7 +22058,7 @@ export default function TakeoffViewerModule({
                 <button
                   type="button"
                   onClick={nextPage}
-                  disabled={totalPages > 0 && currentPage >= totalPages}
+                  disabled={totalPages > 0 && navPage >= totalPages}
                   className={tbBtn(false)}
                   aria-label={t('takeoff_viewer.next_page', { defaultValue: 'Next page' })}
                   data-testid="pager-next"
@@ -22325,8 +22067,8 @@ export default function TakeoffViewerModule({
                 </button>
                 <button
                   type="button"
-                  onClick={() => goToPage(totalPages)}
-                  disabled={totalPages <= 0 || currentPage >= totalPages}
+                  onClick={() => navTo(totalPages)}
+                  disabled={totalPages <= 0 || navPage >= totalPages}
                   className={tbBtn(false)}
                   aria-label={t('takeoff_viewer.last_page', { defaultValue: 'Last page' })}
                   data-testid="pager-last"
@@ -22558,7 +22300,6 @@ export default function TakeoffViewerModule({
                     onDeleteCustomColumn={handleDeleteCustomColumn}
                     onCustomFieldChange={handleCustomFieldChange}
                     onFieldChange={handleLedgerFieldChange}
-                    onFlagsChange={handleLedgerFlagsChange}
                     hiddenColumns={hiddenLedgerColumns}
                     pageLabels={displayPageLabels}
                     areaUnit={areaAreaUnit}
@@ -24579,6 +24320,23 @@ export default function TakeoffViewerModule({
         onCancel={() => setPageDlg(null)}
         onOk={(o) => { void runExtract(o); }}
       />
+      <RotatePagesDialog
+        open={pageDlg?.kind === 'rotate'}
+        fileName={fileName ?? undefined}
+        currentPage={currentPage}
+        selected={pageDlg?.pages ?? []}
+        totalPages={totalPages || 1}
+        onCancel={() => setPageDlg(null)}
+        onOk={(pages, dir) => { setPageDlg(null); void thumbAction(dir === 'cw' ? 'rotateCw' : dir === 'ccw' ? 'rotateCcw' : 'rotate180', pages); }}
+      />
+      <ExportPagesDialog
+        open={pageDlg?.kind === 'export'}
+        currentPage={currentPage}
+        selected={pageDlg?.pages ?? []}
+        totalPages={totalPages || 1}
+        onCancel={() => setPageDlg(null)}
+        onOk={(pages, format) => { setPageDlg(null); void thumbAction(format === 'png' ? 'exportPng' : 'exportPdf', pages); }}
+      />
       <DeletePagesDialog
         open={pageDlg?.kind === 'delete'}
         currentPage={currentPage}
@@ -24630,7 +24388,7 @@ export default function TakeoffViewerModule({
               ['extract', 'Extract Pages…', 'Ctrl+Shift+X'],
               ['replace', 'Replace Pages…', 'Ctrl+Shift+Y'],
               ['delete', 'Delete Pages…', 'Ctrl+Shift+D'],
-              ['rotate', 'Rotate Pages', '>'],
+              ['rotateDlg', 'Rotate Pages…', ''],
               ['number', 'Number Pages…', ''],
               ['rename', 'Rename Page Label', ''],
               ['resetLabels', 'Reset All Page Labels', ''],
@@ -24664,7 +24422,7 @@ export default function TakeoffViewerModule({
                       {(k === 'rotate'
                         ? [['rotateCw', 'Clockwise 90°'], ['rotateCcw', 'Counter-clockwise 90°'], ['rotate180', '180°']]
                         : k === 'export'
-                          ? [['exportPdf', 'PDF'], ['exportPng', 'Image (PNG)']]
+                          ? [['exportPdf', 'PDF'], ['exportPng', 'Image (PNG)'], ['exportDlg', 'Choose pages… (current / all / custom)']]
                           : [['summaryCsv', 'CSV (Excel)']]
                       ).map(([sk, sl]) => (
                         <button key={sk} type="button" onClick={() => void thumbAction(sk!, thumbMenu.pages)} className="block w-full px-3 py-1 text-left hover:bg-oe-blue hover:text-white" data-testid={`thumb-menu-${sk}`}>
@@ -24888,6 +24646,152 @@ export default function TakeoffViewerModule({
       {/* Measurement context menu (issue #302): right-click a measurement with
           the select tool to duplicate or delete it. The transparent backdrop
           dismisses it on any outside click / right-click / scroll. */}
+      <input
+        ref={compareFileRef}
+        type="file"
+        accept="application/pdf,.pdf"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) void loadCompareFile(f);
+          e.target.value = '';
+        }}
+        data-testid="compare-file-input"
+      />
+{showTypeFilter && (() => {
+                      const counts = new Map<string, number>();
+                      for (const m of measurements) counts.set(m.type, (counts.get(m.type) ?? 0) + 1);
+                      const types = [...counts.keys()].sort((a, b) => (TYPE_LABELS[a] ?? a).localeCompare(TYPE_LABELS[b] ?? b));
+                      return (
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setShowTypeFilter(false)} aria-hidden="true" />
+                          <div className="fixed left-1/2 top-28 z-50 w-64 -translate-x-1/2 rounded-lg border border-border bg-surface-elevated p-2 shadow-lg" data-testid="type-filter-panel">
+                            <div className="mb-1 flex items-center justify-between px-1">
+                              <span className="text-[11px] font-semibold uppercase tracking-wide text-content-tertiary">
+                                {t('takeoff_viewer.markup_types', { defaultValue: 'Markup types' })}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setHiddenTypes(new Set())}
+                                className="text-[11px] text-oe-blue hover:underline"
+                              >
+                                {t('takeoff_viewer.show_all', { defaultValue: 'Show all' })}
+                              </button>
+                            </div>
+                            {types.length === 0 && (
+                              <p className="px-1 py-2 text-xs text-content-tertiary">{t('takeoff_viewer.no_markups', { defaultValue: 'No markups yet.' })}</p>
+                            )}
+                            {types.map((ty) => (
+                              <div key={ty} className="flex items-center gap-2 rounded px-1 py-1 text-xs hover:bg-surface-secondary">
+                                <input
+                                  type="checkbox"
+                                  checked={!hiddenTypes.has(ty)}
+                                  onChange={() =>
+                                    setHiddenTypes((prev) => {
+                                      const next = new Set(prev);
+                                      if (next.has(ty)) next.delete(ty);
+                                      else next.add(ty);
+                                      return next;
+                                    })
+                                  }
+                                  data-testid={`type-filter-${ty}`}
+                                />
+                                <span className="flex-1 text-content-primary">{TYPE_LABELS[ty] ?? ty}</span>
+                                <span className="tabular-nums text-content-tertiary">{counts.get(ty)}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setHiddenTypes(new Set(types.filter((x) => x !== ty)))}
+                                  className="text-[10px] text-oe-blue hover:underline"
+                                  title={t('takeoff_viewer.show_only', { defaultValue: 'Show only this type' })}
+                                >
+                                  {t('takeoff_viewer.only', { defaultValue: 'Only' })}
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      );
+                    })()}
+      {saveInfoOpen && (
+        <div className="fixed inset-0 z-[85] flex items-center justify-center bg-black/30" onMouseDown={() => setSaveInfoOpen(false)} data-testid="save-info-dialog">
+          <div className="w-[460px] max-w-[95vw] overflow-hidden rounded-md border border-border bg-surface-elevated shadow-2xl" onMouseDown={(e) => e.stopPropagation()} role="dialog" aria-label="Where is my work saved?">
+            <div className="flex items-center bg-neutral-900 px-3 py-2 text-white">
+              <span className="flex-1 text-[13px]">Where is my work saved?</span>
+              <button type="button" onClick={() => setSaveInfoOpen(false)} className="rounded p-0.5 text-white/80 hover:bg-white/10" aria-label="Close">
+                <X size={15} />
+              </button>
+            </div>
+            <div className="space-y-3 p-4 text-xs text-content-primary">
+              <div>
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-content-tertiary">Drawing</div>
+                <div className="font-medium">{fileName || 'Untitled PDF'}</div>
+              </div>
+              {storageInfo.server ? (
+                <>
+                  <div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-content-tertiary">Saved to</div>
+                    <div>Project <span className="font-semibold">{activeProjectName || storageInfo.projectId}</span>, on the server database.</div>
+                    <div className="mt-1 text-content-secondary">
+                      On the PC running the server the data folder is, by default,{' '}
+                      <code className="rounded bg-surface-secondary px-1">C:\Users\&lt;user&gt;\.openestimate\</code>{' '}
+                      (the uploaded PDFs are in its <code className="rounded bg-surface-secondary px-1">takeoff_documents</code> folder). Anyone who opens this
+                      drawing from the project sees the same markups.
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-content-tertiary">Document id</div>
+                    <code className="select-all break-all rounded bg-surface-secondary px-1">{storageInfo.documentId}</code>
+                  </div>
+                </>
+              ) : (
+                <div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-content-tertiary">Saved to</div>
+                  <div>This browser only. The PDF was opened from your computer and is not part of a project yet, so the markups are not on the server and other people cannot see them.</div>
+                  <div className="mt-1 text-content-secondary">To keep them safely, open the drawing from a project&apos;s Documents list, or use File &gt; Download PDF (with markups) to save a copy on disk.</div>
+                </div>
+              )}
+              {storageInfo.localKey && (
+                <div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-content-tertiary">Backup in this browser (local storage key)</div>
+                  <code className="select-all break-all rounded bg-surface-secondary px-1">{storageInfo.localKey}</code>
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 px-4 pb-4">
+              <button type="button" onClick={() => { void handleSaveVectorPdfRef.current(); setSaveInfoOpen(false); }} className="rounded border border-border px-3 py-1.5 text-xs hover:bg-surface-secondary">Download PDF with markups</button>
+              <button type="button" onClick={() => setSaveInfoOpen(false)} className="min-w-[70px] rounded bg-oe-blue px-3 py-1.5 text-xs font-semibold text-white">OK</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {pasteMenu && (
+        <div
+          className="fixed inset-0 z-50"
+          onClick={() => setPasteMenu(null)}
+          onContextMenu={(e) => { e.preventDefault(); setPasteMenu(null); }}
+          onWheel={() => setPasteMenu(null)}
+        >
+          <div
+            className="absolute min-w-[168px] rounded-lg border border-border bg-surface-elevated py-1 shadow-lg"
+            style={{ left: Math.min(pasteMenu.x, window.innerWidth - 184), top: Math.min(pasteMenu.y, window.innerHeight - 60) }}
+            onClick={(e) => e.stopPropagation()}
+            role="menu"
+            data-testid="paste-here-menu"
+          >
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-content-primary hover:bg-surface-secondary transition-colors"
+              role="menuitem"
+              data-testid="paste-here"
+              onClick={() => { pasteMarkupsRef.current(pasteMenu.pt); setPasteMenu(null); }}
+            >
+              <ClipboardPaste size={13} />
+              <span className="flex-1">Paste here ({markupClipRef.current?.length ?? 0})</span>
+              <span className="text-content-tertiary tabular-nums">Ctrl+V</span>
+            </button>
+          </div>
+        </div>
+      )}
       {contextMenu && (
         <div
           className="fixed inset-0 z-50"
@@ -24971,6 +24875,32 @@ export default function TakeoffViewerModule({
                         >
                           <span className="flex-1">{st}</span>
                           {first && (first.status || 'None') === st ? <span className="text-oe-blue">✓</span> : null}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {/* FSFTM: Add to Tool Chest > set (OE-DELIVERY 2026-11-25-fsftm-pdf). */}
+                  <button type="button" className={item} role="menuitem" data-testid="context-add-to-chest" onClick={() => setContextSub((v) => (v === 'chest' ? null : 'chest'))}>
+                    <Copy size={13} className="opacity-0" /><span className="flex-1">Add to Tool Chest</span><span className="text-content-tertiary">{contextSub === 'chest' ? '▾' : '▸'}</span>
+                  </button>
+                  {contextSub === 'chest' && (
+                    <div className="ml-7 border-l border-border pl-1" data-testid="context-chest-list">
+                      {chestSets.filter((cs) => !cs.recent).map((cs) => (
+                        <button
+                          key={cs.id}
+                          type="button"
+                          className={item}
+                          role="menuitem"
+                          data-testid={`context-chest-${cs.id}`}
+                          onClick={() => {
+                            addSelectionToChest(cs.id);
+                            setShowSidebar(true);
+                            setSidebarTab('tools');
+                            close();
+                          }}
+                        >
+                          <span className="flex-1 truncate">{cs.name}</span>
+                          <span className="text-[10px] text-content-tertiary">{cs.items.length}</span>
                         </button>
                       ))}
                     </div>
@@ -25060,6 +24990,62 @@ export default function TakeoffViewerModule({
               <Copy size={13} className="opacity-0" />
               <span className="flex-1">Select same profile, all sheets</span>
             </button>
+            {(() => {
+              const rm = measurements.find((x) => x.id === contextMenu.measurementId);
+              if (!rm || rm.locked || (rm.type !== 'distance' && rm.type !== 'polyline' && rm.type !== 'line') || rm.points.length < 2) return null;
+              const resumeTool: MeasureTool = rm.type === 'line' ? 'polylineMarkup' : 'polyline';
+              return (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setContextMenu(null);
+                    selectTool(resumeTool);
+                    resumeTargetRef.current = rm.id;
+                    setActivePoints(rm.points.map((q) => ({ ...q })));
+                    addToast({ type: 'info', title: 'Resume markup', message: 'Keep clicking to add points from the end of the line. Double-click, right-click or Enter to finish; Esc cancels.' });
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-content-primary hover:bg-surface-secondary transition-colors"
+                  role="menuitem"
+                  data-testid="context-resume-markup"
+                >
+                  <Spline size={13} />
+                  <span className="flex-1">Resume markup</span>
+                </button>
+              );
+            })()}
+            <button
+              type="button"
+              onClick={() => {
+                const ids = new Set(contextMenu.ids ?? [contextMenu.measurementId]);
+                const picked = measurements.filter((x) => ids.has(x.id));
+                if (picked.length) {
+                  markupClipRef.current = picked.map((x) => JSON.parse(JSON.stringify(x)) as Measurement);
+                  lastPasteRef.current = null;
+                  addToast({ type: 'info', title: `${picked.length} markup${picked.length === 1 ? '' : 's'} copied`, message: 'Right-click the sheet and choose Paste here, or press Ctrl+V over the spot.' });
+                }
+                setContextMenu(null);
+              }}
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-content-primary hover:bg-surface-secondary transition-colors"
+              role="menuitem"
+              data-testid="context-copy"
+            >
+              <Copy size={13} />
+              <span className="flex-1">Copy</span>
+              <span className="text-content-tertiary tabular-nums">Ctrl+C</span>
+            </button>
+            {!!markupClipRef.current?.length && (
+              <button
+                type="button"
+                onClick={() => { pasteMarkupsRef.current(pasteAnchorRef.current); setContextMenu(null); }}
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-content-primary hover:bg-surface-secondary transition-colors"
+                role="menuitem"
+                data-testid="context-paste-here"
+              >
+                <ClipboardPaste size={13} />
+                <span className="flex-1">Paste here</span>
+                <span className="text-content-tertiary tabular-nums">Ctrl+V</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={() => duplicateMeasurement(contextMenu.measurementId)}

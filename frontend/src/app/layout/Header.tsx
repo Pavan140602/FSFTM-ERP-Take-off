@@ -360,6 +360,9 @@ export function Header({ title, onMenuClick }: HeaderProps) {
   // the very top. `null` when the route has no sidebar entry (then nothing
   // renders and the layout is unchanged).
   const RouteIcon = getRouteIcon(location.pathname);
+  /** PDF Measurements keeps a lean, snap-style top bar: only the title,
+   *  uploads, language, theme and the account menu (OE-DELIVERY 2026-11-25-fsftm-pdf). */
+  const lean = location.pathname === '/takeoff' || location.pathname.startsWith('/takeoff/');
   const currentLang = getLanguageByCode(i18n.language) ?? { code: 'en', name: 'English', flag: '', country: 'xx' };
   const openCommandPalette = useCallback(() => {
     // Dispatch Ctrl+K to open the CommandPalette managed by App.tsx
@@ -465,7 +468,7 @@ export function Header({ title, onMenuClick }: HeaderProps) {
             project picker instead of truncating its name. The column keeps
             room for the globe, so the readout shrinks to its icon and tooltip
             rather than vanishing, which is the one thing it must not do. */}
-        <ActivePackChip className="min-w-0" />
+        {!lean && <ActivePackChip className="min-w-0" />}
         {showCoBrand && <PartnerLogoBadge variant="nav" />}
       </div>
 
@@ -484,8 +487,9 @@ export function Header({ title, onMenuClick }: HeaderProps) {
             Names the lifecycle phase the current screen belongs to and
             opens the whole-platform journey map. First in the cluster so it
             reads as "where am I" ahead of the action buttons. */}
-        <ProjectJourneyButton />
+        {!lean && <ProjectJourneyButton />}
         <PresenceAvatarStack />
+        {!lean && (<>
         <div className="hidden sm:block h-4 w-px bg-border-light/70" aria-hidden />
 
         {/* ── Zone 2 (Search) ──────────────────────────────────────── */}
@@ -551,6 +555,7 @@ export function Header({ title, onMenuClick }: HeaderProps) {
         <div className="hidden 2xl:block"><SubscribeButton /></div>
         <BugReportMenu />
         <HelpMenu />
+        </>)}
 
         {/* Hairline divider between Zone 3 and Zone 4. */}
         <div className="hidden sm:block h-4 w-px bg-border-light/70" aria-hidden />

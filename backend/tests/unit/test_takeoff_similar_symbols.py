@@ -63,3 +63,30 @@ def test_hits_are_capped_by_max_hits() -> None:
     result = recognize.find_similar_symbols(drawings, 10.0, 10.0, max_hits=5)
     assert len(result["hits"]) == 5
     assert result["seed_found"] is True
+
+
+def test_all_pages_matches_the_seed_on_every_page() -> None:
+    # Seed clicked on page 1; page 2 has two of the same symbol, page 3 only a
+    # different-sized one, page 4 is a scan with no vectors.
+    pages = {
+        1: [_rect_path(0, 0, 20, 20), _rect_path(100, 0, 120, 20)],
+        2: [_rect_path(50, 50, 70, 70), _rect_path(300, 300, 320, 320)],
+        3: [_rect_path(0, 0, 12, 12)],
+        4: [],
+    }
+    result = recognize.find_similar_symbols_all_pages(pages, 1, 10.0, 10.0)
+    assert result["seed_found"] is True
+    assert result["note"] is None
+    assert [p["page"] for p in result["pages"]] == [1, 2]
+    assert result["total_hits"] == 4
+    # Only the clicked page carries the seed flag.
+    assert sum(h["is_seed"] for h in result["pages"][0]["hits"]) == 1
+    assert not any(h["is_seed"] for h in result["pages"][1]["hits"])
+
+
+def test_all_pages_reports_a_missed_click_and_a_scanned_seed_page() -> None:
+    pages = {1: [_rect_path(0, 0, 20, 20)], 2: [_rect_path(0, 0, 20, 20)]}
+    missed = recognize.find_similar_symbols_all_pages(pages, 1, 500.0, 500.0)
+    assert missed == {"seed_found": False, "note": "no_symbol_at_point", "total_hits": 0, "pages": []}
+    scanned = recognize.find_similar_symbols_all_pages({1: [], 2: pages[2]}, 1, 10.0, 10.0)
+    assert scanned["note"] == "no_vector_layer"

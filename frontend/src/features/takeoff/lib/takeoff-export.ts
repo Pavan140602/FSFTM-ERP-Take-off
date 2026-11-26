@@ -26,6 +26,7 @@
  * here so the exported PDF matches what the user sees on screen.
  */
 
+import { drawMarkupEndings } from '@/modules/pdf-takeoff/data/line-endings';
 import type { jsPDF as JsPDF } from 'jspdf';
 import type * as ExcelJS from 'exceljs';
 import type * as PdfJsLib from 'pdfjs-dist';
@@ -715,6 +716,18 @@ export function renderMeasurementsOnCanvas(
       }
       continue;
     }
+  }
+  // FSFTM Start / End line endings (OE-DELIVERY 2026-11-25-fsftm-pdf), same as on screen.
+  for (const m of visible) {
+    if ((!m.lineStart && !m.lineEnd) || m.points.length < 2) continue;
+    const ec = m.color || groupColorMap[m.group] || '#3B82F6';
+    const sw = (m.strokeWidth ?? 2) * dpr * zoom;
+    ctx.save();
+    ctx.strokeStyle = ec;
+    ctx.fillStyle = ec;
+    ctx.lineWidth = Math.max(1, sw);
+    drawMarkupEndings(ctx, m.points.map((q) => ({ x: q.x * dpr * zoom, y: q.y * dpr * zoom })), m.lineStart, m.lineEnd, Math.max(9 * dpr, sw * 4));
+    ctx.restore();
   }
   ctx.setLineDash([]);
 }

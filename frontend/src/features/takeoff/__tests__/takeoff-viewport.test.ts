@@ -198,12 +198,18 @@ describe('zoomAtCursorScroll', () => {
 });
 
 describe('wheelZoomStep', () => {
+  // Zoom is delta-proportional (smooth trackpad zoom); one classic wheel
+  // notch is deltaY = +/-100, which lands near the old fixed 1.1x step.
   it('wheel up (deltaY < 0) zooms in', () => {
-    expect(wheelZoomStep(1, -1)).toBeCloseTo(1.1, 5);
+    const z = wheelZoomStep(1, -100);
+    expect(z).toBeGreaterThan(1);
+    expect(z).toBeCloseTo(clampZoom(Math.pow(1.0012, 100)), 2);
   });
 
   it('wheel down (deltaY > 0) zooms out', () => {
-    expect(wheelZoomStep(1, 1)).toBeCloseTo(clampZoom(1 / 1.1), 5);
+    const z = wheelZoomStep(1, 100);
+    expect(z).toBeLessThan(1);
+    expect(z).toBeCloseTo(clampZoom(Math.pow(1.0012, -100)), 2);
   });
 
   it('respects the clamp bounds', () => {

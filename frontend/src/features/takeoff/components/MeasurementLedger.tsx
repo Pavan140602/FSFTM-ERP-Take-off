@@ -1067,7 +1067,7 @@ function GroupRows({
             ? sheet.primary.num
             : measurement.type === 'count'
             ? formatCountQuantity(disp.value)
-            : lengthUnit && measurement.type !== 'count'
+            : lengthUnit
               ? (() => {
                   // signed is in canonical metres for linear/area types.
                   const [v] = convertLengthTo(signed, lengthUnit);

@@ -59,17 +59,19 @@ _SCALE_RE = re.compile(
     r"(\d+\s+\d+\s?/\s?\d+|\d+\s?/\s?\d+|\d+(?:\.\d+)?)\s*[\"″]\s*=\s*1\s*'\s*-\s*0\s*[\"″]?|\bNTS\b|NOT TO SCALE",
     re.IGNORECASE,
 )
-_PLAN_TITLE_RE = re.compile(
-    r"\b([A-Z][A-Z0-9&.'()/-]*(?:\s+[A-Z0-9&.'()/-]+){0,5}?\s+PLAN)\b"
-)
+_PLAN_TITLE_RE = re.compile(r"\b([A-Z][A-Z0-9&.'()/-]*(?:\s+[A-Z0-9&.'()/-]+){0,5}?\s+PLAN)\b")
 _PLAN_HINTS = ("FRAMING", "LEVEL", "FLOOR", "ROOF", "FOUNDATION", "MEZZANINE", "CEILING", "ENLARGED", "PARTIAL")
 
-_STUDS_COUNT_RE = re.compile(r"(\d{1,3})\s*(?:-|\s)?\s*(?:3/4|7/8|1/2)?\s*(?:\"|″|IN\.?)?\s*(?:DIA\.?\s*)?STUDS?\b", re.IGNORECASE)
+_STUDS_COUNT_RE = re.compile(
+    r"(\d{1,3})\s*(?:-|\s)?\s*(?:3/4|7/8|1/2)?\s*(?:\"|″|IN\.?)?\s*(?:DIA\.?\s*)?STUDS?\b", re.IGNORECASE
+)
 _STUD_ROWS_RE = re.compile(r"(\d)\s*ROWS?\s+(?:OF\s+)?STUDS?\b", re.IGNORECASE)
 _CAMBER_RE = re.compile(r"CAMBER\s*(?:OF|=|:)?\s*(\d+(?:\.\d+)?|\d+\s?/\s?\d+)\s*(?:\"|″|IN\.?)?", re.IGNORECASE)
 _LENGTH_RE = re.compile(r"(\d{1,2})\s*'\s*-?\s*(\d{1,2}(?:\s+\d+\s*/\s*\d+|/\d+)?)?\s*(?:\"|″)?")
 _PAREN_LEN_RE = re.compile(r"\(\+?\s*(\d{1,2}\s*'\s*-?\s*(?:\d{1,2}(?:\s+\d+\s*/\s*\d+|/\d+)?)?\s*(?:\"|″)?)\)")
-_GRADE_RE = re.compile(r"\b(?:ASTM\s*)?(?:A992|A500(?:\s*GR\.?\s*[BC])?|A36|A572(?:\s*GR\.?\s*\d+)?|A108|A325|A490)\b", re.IGNORECASE)
+_GRADE_RE = re.compile(
+    r"\b(?:ASTM\s*)?(?:A992|A500(?:\s*GR\.?\s*[BC])?|A36|A572(?:\s*GR\.?\s*\d+)?|A108|A325|A490)\b", re.IGNORECASE
+)
 
 
 def normalize_designation(raw: str) -> str:
@@ -241,9 +243,7 @@ def _extract_details(context: str, *, in_schedule: bool) -> dict[str, Any]:
 
 
 def _find_plans(lines: list[_Line], page_rect) -> list[dict[str, Any]]:
-    heights = sorted(
-        r[3] - r[1] for line in lines for _w, r, _s, _e in line.words if r[3] > r[1]
-    )
+    heights = sorted(r[3] - r[1] for line in lines for _w, r, _s, _e in line.words if r[3] > r[1])
     median_h = heights[len(heights) // 2] if heights else 10.0
     titles: list[tuple[str, tuple[float, float], float]] = []
     scales: list[tuple[str, tuple[float, float]]] = []
@@ -260,7 +260,9 @@ def _find_plans(lines: list[_Line], page_rect) -> list[dict[str, Any]]:
         for match in _SCALE_RE.finditer(line.text):
             rect = line.rect_for(match.start(), match.end())
             if rect:
-                scales.append((" ".join(match.group(0).split()), ((rect[0] + rect[2]) / 2.0, (rect[1] + rect[3]) / 2.0)))
+                scales.append(
+                    (" ".join(match.group(0).split()), ((rect[0] + rect[2]) / 2.0, (rect[1] + rect[3]) / 2.0))
+                )
     titles.sort(key=lambda item: -item[2])
     plans: list[dict[str, Any]] = []
     for name, anchor, _h in titles:
@@ -279,7 +281,9 @@ def _find_plans(lines: list[_Line], page_rect) -> list[dict[str, Any]]:
                 nearest, nearest_dist = scale_text, dist
         plans.append({"name": name, "scale": nearest, "anchor": [round(anchor[0], 1), round(anchor[1], 1)]})
     if not plans and scales:
-        plans.append({"name": "Sheet", "scale": scales[0][0], "anchor": [page_rect.width / 2.0, page_rect.height / 2.0]})
+        plans.append(
+            {"name": "Sheet", "scale": scales[0][0], "anchor": [page_rect.width / 2.0, page_rect.height / 2.0]}
+        )
     # Regions: with 2+ plans, split the page at anchor midpoints.
     if len(plans) >= 2:
         ordered = sorted(plans, key=lambda p: p["anchor"][0])
@@ -288,7 +292,7 @@ def _find_plans(lines: list[_Line], page_rect) -> list[dict[str, Any]]:
         )
         cuts = []
         seq = ordered if vertical else sorted(plans, key=lambda p: p["anchor"][1])
-        for first, second in zip(seq, seq[1:]):
+        for first, second in zip(seq, seq[1:], strict=False):
             axis = 0 if vertical else 1
             cuts.append((first["name"], second["name"], (first["anchor"][axis] + second["anchor"][axis]) / 2.0))
         for plan in plans:
@@ -367,7 +371,7 @@ def _page_segments(page) -> list[tuple[float, float, float, float, float, float 
                     fitz.Point(rect.x1, rect.y1),
                     fitz.Point(rect.x0, rect.y1),
                 ]
-                for a, b in zip(corners, corners[1:] + corners[:1]):
+                for a, b in zip(corners, corners[1:] + corners[:1], strict=False):
                     add(a, b, width)
     return segments
 
@@ -485,6 +489,7 @@ def _associate_line(entry: dict[str, Any], segments) -> None:
     # back to all nearby segments when none match the direction.
     label_angle = entry.get("label_angle")
     if label_angle is not None:
+
         def _aligned(item) -> bool:
             seg = item[0]
             seg_angle = math.degrees(math.atan2(seg[3] - seg[1], seg[2] - seg[0]))
@@ -497,6 +502,7 @@ def _associate_line(entry: dict[str, Any], segments) -> None:
         aligned = [item for item in near if _aligned(item)]
         if aligned:
             near = aligned
+
     # Rank by distance bucket first, then by run length. Labels sit
     # ON their own member, so the member is (nearly) always the
     # closest line; a long diagonal brace crossing the field a
@@ -732,7 +738,9 @@ def scan_document(pdf, weights: dict[str, dict[str, Any]]) -> dict[str, Any]:
                     # the first alphabetical scale on a multi-scale
                     # sheet is often a detail's enlarged scale.
                     page_plans = info.get("plans") or []
-                    scale_text = (page_plans[0].get("scale") if page_plans else None) or (info.get("scales") or [None])[0]
+                    scale_text = (page_plans[0].get("scale") if page_plans else None) or (info.get("scales") or [None])[
+                        0
+                    ]
                 units_per_foot = _scale_units_per_foot(scale_text)
                 if units_per_foot:
                     entry["length_ft"] = round(entry["line_length_units"] / units_per_foot, 2)
@@ -754,7 +762,9 @@ def scan_document(pdf, weights: dict[str, dict[str, Any]]) -> dict[str, Any]:
         else:
             entry["note"] = ""
         if entry.get("length_source") == "geometry":
-            entry["note"] = (entry["note"] + " " if entry["note"] else "") + "Length read from the plan line at the sheet scale — verify."
+            entry["note"] = (
+                entry["note"] + " " if entry["note"] else ""
+            ) + "Length read from the plan line at the sheet scale — verify."
 
     return {"pages": pages, "matches": all_matches, "schedules": schedules, "notes_pages": notes_pages}
 
@@ -805,11 +815,7 @@ def summarize(scan: dict[str, Any], rules: list[dict[str, Any]]) -> dict[str, An
             ],
             "pages": sorted({m["page"] for m in entries}),
         }
-    schedules = [
-        {"kind": kind, "designations": sorted(values)}
-        for kind, values in scan["schedules"].items()
-        if values
-    ]
+    schedules = [{"kind": kind, "designations": sorted(values)} for kind, values in scan["schedules"].items() if values]
     return {
         "available": True,
         "page_count": len(scan["pages"]),

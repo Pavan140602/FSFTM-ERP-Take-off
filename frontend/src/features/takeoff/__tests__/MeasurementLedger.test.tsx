@@ -42,10 +42,12 @@ const COLORS = { Walls: '#EF4444', Floors: '#3B82F6' };
 
 describe('MeasurementLedger', () => {
   // Quantities are stored metric; the ledger reads measurementSystem from
-  // the preferences store. Reset to defaults (metric) so each test starts
-  // from a known system regardless of order.
+  // the preferences store. Reset, then pin metric (the app default is
+  // imperial since the FSFTM US defaults) so each test starts from a known
+  // system regardless of order.
   beforeEach(() => {
     usePreferencesStore.getState().resetPreferences();
+    usePreferencesStore.getState().setPreference('measurementSystem', 'metric');
   });
 
   it('renders the empty state when there are no measurements', () => {
@@ -85,12 +87,12 @@ describe('MeasurementLedger', () => {
     expect(floorsRow.textContent).toContain('35'); // 20 + 15
   });
 
-  it('sorting by Value toggles asc → desc on repeat clicks', () => {
+  it('sorting by Length toggles asc → desc on repeat clicks', () => {
     render(<MeasurementLedger measurements={FIXTURE} groupColorMap={COLORS} />);
 
-    // Click the Value header once → asc.  We pick up the data-sort
-    // attribute on the header itself.
-    const valueHeader = screen.getByTestId('ledger-header-value');
+    // Click the Length header (FSFTM name of the old Value column) once →
+    // asc.  We pick up the data-sort attribute on the header itself.
+    const valueHeader = screen.getByTestId('ledger-header-length');
     fireEvent.click(valueHeader);
     expect(valueHeader.getAttribute('data-sort')).toBe('asc');
 
@@ -141,7 +143,7 @@ describe('MeasurementLedger', () => {
     expect(types).toEqual(['area', 'count', 'distance']);
   });
 
-  it('shows metric units + values by default (issue #270 baseline)', () => {
+  it('shows metric units + values when the system is metric (issue #270 baseline)', () => {
     render(<MeasurementLedger measurements={FIXTURE} groupColorMap={COLORS} />);
     // Walls distance subtotal: 10 + 5 = 15 m.
     const wallsM = screen

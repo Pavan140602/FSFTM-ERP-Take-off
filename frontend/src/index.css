@@ -1878,3 +1878,54 @@ html[data-ai-dock-resizing] * {
     transition: none;
   }
 }
+
+/* ── FSFTM login branding ─────────────────────────────────────────────────
+   The sign-in page (and only it) uses the Florida Steel Frame & Truss
+   Manufacturing brand colour #990033 with steel grey #616364. Every
+   `oe-blue` utility inside `.fsftm-login` resolves to the brand colour; the
+   rest of the app keeps the standard accent. */
+.fsftm-login {
+  --oe-blue: #990033;
+  --oe-blue-hover: #b0103f;
+  --oe-blue-active: #80002b;
+  --oe-blue-dark: #6b0024;
+  --oe-blue-text: #990033;
+  --oe-blue-subtle: #fcf0f4;
+  --oe-blue-ch: 153 0 51;
+  --oe-border-focus: #990033;
+  --oce-bp-color: rgba(153, 0, 51, 0.30);
+}
+.dark .fsftm-login {
+  /* Same hue, slightly brighter so buttons and focus rings read on the
+     near-black dark canvas; link text uses a light rose for contrast. */
+  --oe-blue: #b0103f;
+  --oe-blue-hover: #c41a4c;
+  --oe-blue-active: #990033;
+  --oe-blue-dark: #80002b;
+  --oe-blue-text: #f29ab5;
+  --oe-blue-subtle: rgba(176, 16, 63, 0.18);
+  --oe-blue-ch: 176 16 63;
+  --oe-border-focus: #d6336c;
+  --oce-bp-color: rgba(214, 90, 130, 0.22);
+}
+.dark .fsftm-login a.text-oe-blue,
+.dark .fsftm-login .text-oe-blue {
+  color: #f29ab5;
+}
+.dark .fsftm-login a.text-oe-blue:hover {
+  color: #f7bfd0;
+}
+/* Login background drawing (AuthBackground) in the FSFTM colours. */
+.fsftm-login .oce-cell { border-color: rgba(97, 99, 100, 0.08); }
+.fsftm-login .oce-cell.on   { background: rgba(153,0,51,.07); border-color: rgba(153,0,51,.10); color: rgba(153,0,51,.38); }
+.fsftm-login .oce-cell.on-m { background: rgba(153,0,51,.12); border-color: rgba(153,0,51,.16); color: rgba(153,0,51,.52); }
+.fsftm-login .oce-cell.on-h { background: rgba(153,0,51,.18); border-color: rgba(153,0,51,.22); color: rgba(153,0,51,.68); }
+.dark .fsftm-login .oce-cell { border-color: rgba(160,160,160,.04); }
+.dark .fsftm-login .oce-cell.on   { background: rgba(214,90,130,.06); border-color: rgba(214,90,130,.08); color: rgba(214,90,130,.28); }
+.dark .fsftm-login .oce-cell.on-m { background: rgba(214,90,130,.10); border-color: rgba(214,90,130,.13); color: rgba(214,90,130,.40); }
+.dark .fsftm-login .oce-cell.on-h { background: rgba(214,90,130,.15); border-color: rgba(214,90,130,.18); color: rgba(214,90,130,.55); }
+/* Solid brand buttons on the login page keep white text in dark mode too
+   (the default inverse text colour is tuned for the light-blue accent). */
+.dark .fsftm-login .bg-oe-blue.text-content-inverse {
+  color: #ffffff;
+}

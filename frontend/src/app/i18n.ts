@@ -451,8 +451,7 @@ export function applyModuleTranslations(
  *      If valid we also persist it to ``localStorage`` so the choice survives
  *      a refresh after the param is dropped from the URL.
  *   2. ``localStorage`` (``i18nextLng`` key) — last user choice.
- *   3. ``navigator.language`` — best-effort browser default.
- *   4. ``'en'`` — final fallback.
+ *   3. ``FSFTM_DEFAULT_LANGUAGE`` (``en-US``) — the browser language is ignored.
  *
  * SSR-safe: every ``window`` / ``localStorage`` / ``navigator`` access is
  * guarded so the function returns ``'en'`` when called outside a browser.
@@ -487,19 +486,14 @@ export function resolveInitialLanguage(): string {
     // localStorage unavailable — fall through.
   }
 
-  // 3. Browser locale. Asks for the full code BEFORE stripping the region,
-  //    because for five of the languages we ship the region is the whole
-  //    point: pt-BR and pt are different files and plain "pt" is European
-  //    Portuguese. Stripping first meant every Brazilian first run opened in
-  //    Portugal's Portuguese and every Mexican one in Spain's Spanish, with
-  //    the regional file sitting right there unused. "de-CH" still resolves
-  //    to "de", because we ship no de-CH.
-  const browserMatch = matchSupportedLanguage(navigator.language);
-  if (browserMatch) return browserMatch;
-
-  // 4. Final fallback.
-  return 'en';
+  // 3. FSFTM default: every first run opens in US English, whatever language
+  //    the browser reports. Users can still switch language in the header,
+  //    and that choice is stored (step 2) and wins from then on.
+  return FSFTM_DEFAULT_LANGUAGE;
 }
+
+/** First-run UI language for FSFTM: English (United States). */
+export const FSFTM_DEFAULT_LANGUAGE = 'en-US';
 
 /**
  * The writing direction of one supported language.

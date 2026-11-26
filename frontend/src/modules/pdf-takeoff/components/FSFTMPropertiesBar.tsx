@@ -23,12 +23,17 @@ import {
   type DispUnit,
 } from '../../../features/takeoff/lib/takeoff-fsftm-props';
 import { FT_TO_M, formatFeetInches, parseFeetInches } from '../data/auto-takeoff';
+import { LINE_ENDING_TYPES, type LineEnding } from '../data/line-endings';
+import LineEndingPicker from './LineEndingPicker';
 
 export interface PropsBarValue {
   color?: string;
   fillColor?: string;
   strokeWidth?: number;
   lineStyle?: 'solid' | 'dashed' | 'dotted' | 'dashdot';
+  /** Start / End line endings (OE-DELIVERY 2026-11-25-fsftm-pdf). */
+  lineStart?: LineEnding;
+  lineEnd?: LineEnding;
   fillAlpha?: number;
   strokeAlpha?: number;
   dispUnit?: DispUnit;
@@ -347,6 +352,12 @@ export function FSFTMPropertiesBar({ mode, type, title, value, subject, onSubjec
           <option value="dashdot">━·━ Dash-dot</option>
         </select>
       </Field>
+      {LINE_ENDING_TYPES.has(type) && (
+        <span className="inline-flex items-center gap-2" data-testid="props-line-endings">
+          <LineEndingPicker label="Start" flip value={value.lineStart} onChange={(v) => onPatch({ lineStart: v })} disabled={off} testId="props-line-start" />
+          <LineEndingPicker label="End" value={value.lineEnd} onChange={(v) => onPatch({ lineEnd: v })} disabled={off} testId="props-line-end" />
+        </span>
+      )}
       <Field label="Width">
         <select disabled={off} value={String(value.strokeWidth ?? 2)} onChange={(e) => onPatch({ strokeWidth: Number(e.target.value) })} className={sel} data-testid="props-width">
           {Array.from(new Set([...WIDTHS, value.strokeWidth ?? 2])).sort((a, b) => a - b).map((w) => (

@@ -6,8 +6,8 @@ from __future__ import annotations
 
 import math
 
-from app.modules.takeoff import auto_takeoff as A
-from app.modules.takeoff import framing_rules as R
+from app.modules.takeoff import auto_takeoff as A  # noqa: N812
+from app.modules.takeoff import framing_rules as R  # noqa: N812
 
 BLACK = (0, 0, 0)
 
@@ -80,7 +80,9 @@ def test_rules_per_sheet_kind():
 
     framing2 = ("framing", 2, fs)
     t = R.rule_classify("T-1", framing2)
-    assert t["category"] == "trusses" and t["series"] and t["spacing_in"] == 24 and t["rule_profile"] == "362S162-33 (50)"
+    assert (
+        t["category"] == "trusses" and t["series"] and t["spacing_in"] == 24 and t["rule_profile"] == "362S162-33 (50)"
+    )
     assert abs(t["length_ft"] - 13.0) < 1e-6
     assert R.rule_classify("W1", framing2) == "skip"  # walls belong to the wall plan
     assert R.rule_classify("HD", framing2) == "skip"
@@ -93,7 +95,13 @@ def test_rules_per_sheet_kind():
 
 def test_post_process_keeps_only_the_sheet_kind():
     items = [
-        {"category": "walls", "role": "Load Bearing Wall", "rule_height": "12'-7 1/4\"", "rule_level": "1ST TO 2ND (2)", "rule_profile": "600S200-68 (50)"},
+        {
+            "category": "walls",
+            "role": "Load Bearing Wall",
+            "rule_height": "12'-7 1/4\"",
+            "rule_level": "1ST TO 2ND (2)",
+            "rule_profile": "600S200-68 (50)",
+        },
         {"category": "beams", "role": "Beam"},
         {"category": "other", "role": "Holdown"},
         {"category": "other", "role": "Angle"},
@@ -110,10 +118,13 @@ def test_trusses_framed_from_tag_leader_at_schedule_spacing():
     # leader to where they cross.
     segments = [
         seg(10, 100, 107, 100),  # distribution (arrow body)
-        seg(107, 100, 117, 97), seg(107, 100, 117, 103),  # arrowhead to the wall
-        seg(10, 100, 0, 97), seg(10, 100, 0, 103),
+        seg(107, 100, 117, 97),
+        seg(107, 100, 117, 103),  # arrowhead to the wall
+        seg(10, 100, 0, 97),
+        seg(10, 100, 0, 103),
         seg(50, 5, 50, 256),  # span line
-        seg(50, 256, 50, 261), seg(50, 5, 50, 0),  # half arrows to the walls
+        seg(50, 256, 50, 261),
+        seg(50, 5, 50, 0),  # half arrows to the walls
         seg(50, 100, 66, 116),  # leader
     ]
     m = A.PageModel(1, 400, 400, [], segments, [], [], 9.0, '1/8" = 1\'-0"')
@@ -135,12 +146,18 @@ def test_document_schedule_titles_skip_note_references():
             def line(text, size, y):
                 return {"bbox": (0, y, 100, y + 10), "spans": [{"text": text, "size": size}]}
 
-            return {"blocks": [{"lines": [
-                line("CFMF TRUSS SCHEDULE", 15.8, 0),
-                line("SEE SCHEDULE FOR STIRRUPS", 9.6, 20),
-                line("REF. SCHEDULE", 16.0, 40),
-                line("W1 - WALL FRAMING SCHEDULE", 15.8, 60),
-            ]}]}
+            return {
+                "blocks": [
+                    {
+                        "lines": [
+                            line("CFMF TRUSS SCHEDULE", 15.8, 0),
+                            line("SEE SCHEDULE FOR STIRRUPS", 9.6, 20),
+                            line("REF. SCHEDULE", 16.0, 40),
+                            line("W1 - WALL FRAMING SCHEDULE", 15.8, 60),
+                        ]
+                    }
+                ]
+            }
 
     titles = [t for t, _r in R.schedule_titles(FakePage())]
     assert titles == ["CFMF TRUSS SCHEDULE", "W1 - WALL FRAMING SCHEDULE"]
@@ -181,8 +198,22 @@ def test_stacked_wall_and_joist_tag_on_a_framing_plan():
 
 def test_nearest_tag_owns_lines_claimed_by_two_types():
     line = [[100.0, 0.0], [100.0, 54.0]]
-    j1 = {"kind": "line", "category": "joists", "series": "a", "designation": "J-1", "points": line, "anchor": [10.0, 27.0]}
-    rj = {"kind": "line", "category": "joists", "series": "b", "designation": "RJ-1", "points": line, "anchor": [95.0, 27.0]}
+    j1 = {
+        "kind": "line",
+        "category": "joists",
+        "series": "a",
+        "designation": "J-1",
+        "points": line,
+        "anchor": [10.0, 27.0],
+    }
+    rj = {
+        "kind": "line",
+        "category": "joists",
+        "series": "b",
+        "designation": "RJ-1",
+        "points": line,
+        "anchor": [95.0, 27.0],
+    }
     items = [j1, rj]
     A._nearest_tag_owns_shared(items)
     assert [it["designation"] for it in items] == ["RJ-1"]

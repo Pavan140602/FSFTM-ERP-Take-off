@@ -15,7 +15,7 @@ import {
   MessageSquareQuote,
 } from 'lucide-react';
 import clsx from 'clsx';
-import { Card, Button, Badge, Breadcrumb, DismissibleInfo, IntroRichText } from '@/shared/ui';
+import { Card, Button, Badge, Breadcrumb, DismissibleInfo, IntroRichText, CompanyName } from '@/shared/ui';
 import { SUPPORTED_LANGUAGES } from '@/app/i18n';
 import { PageHeader } from '@/shared/ui/PageHeader';
 import { APP_VERSION } from '@/shared/lib/version';
@@ -218,7 +218,7 @@ export function AboutPage() {
             </span>
             <span className="text-xs font-semibold uppercase tracking-widest text-emerald-600">Open Source</span>
           </div>
-          <h2 className="text-3xl font-bold text-content-primary tracking-tight">Florida Steel Frame &amp; Truss Manufacturing LLC</h2>
+          <h2 className="text-3xl tracking-tight"><CompanyName className="font-bold" /></h2>
           <p className="mt-2 text-base text-content-secondary">
             {t('about.tagline', { defaultValue: 'The #1 open-source platform for construction cost estimation, project management and resource control' })}
           </p>

@@ -17,13 +17,28 @@ import math
 import re
 from typing import Any
 
-_ORD = {"GROUND": 1, "FIRST": 1, "SECOND": 2, "THIRD": 3, "FOURTH": 4, "FIFTH": 5, "SIXTH": 6, "SEVENTH": 7, "EIGHTH": 8}
-_ORD_RE = re.compile(r"\b(\d{1,2})\s*(?:ST|ND|RD|TH)\b|\b(GROUND|FIRST|SECOND|THIRD|FOURTH|FIFTH|SIXTH|SEVENTH|EIGHTH)\b")
+_ORD = {
+    "GROUND": 1,
+    "FIRST": 1,
+    "SECOND": 2,
+    "THIRD": 3,
+    "FOURTH": 4,
+    "FIFTH": 5,
+    "SIXTH": 6,
+    "SEVENTH": 7,
+    "EIGHTH": 8,
+}
+_ORD_RE = re.compile(
+    r"\b(\d{1,2})\s*(?:ST|ND|RD|TH)\b|\b(GROUND|FIRST|SECOND|THIRD|FOURTH|FIFTH|SIXTH|SEVENTH|EIGHTH)\b"
+)
 FRAMING_PAGE_RE = re.compile(
     r"FRAM(?:E|ING)\s+(?:LAYOUT|PLAN)|JOIST\s+(?:LAYOUT|PLAN)|TRUSS\s+(?:LAYOUT|PLAN)|FLOOR\s+FRAMING|ROOF\s+FRAMING|DECK(?:ING)?\s+PLAN"
 )
 WALL_PAGE_RE = re.compile(r"\bWALLS?\b[^\n]{0,40}\b(?:LAYOUT|PLAN|SECTIONS?)\b|\bSHEAR\s*WALL\b")
-_SAYS_RE = re.compile(r"NON[\s-]*(?:LOAD|BEARING|STRUCTURAL)|\bNLBW?\b|LOAD[\s-]*BEARING|\bLBW?\b|\bBEARING\s+WALL|PARTITION", re.IGNORECASE)
+_SAYS_RE = re.compile(
+    r"NON[\s-]*(?:LOAD|BEARING|STRUCTURAL)|\bNLBW?\b|LOAD[\s-]*BEARING|\bLBW?\b|\bBEARING\s+WALL|PARTITION",
+    re.IGNORECASE,
+)
 _KEEP_ROLES = {"Shear Wall", "Strap Braced Wall", "CMU Wall"}
 
 
@@ -53,7 +68,7 @@ def levels(title: str) -> set[int]:
 
 def _framing_lines(model) -> tuple[list[tuple[tuple[float, float], tuple[float, float]]], float]:
     """Joist / truss lines of a framing sheet, in feet, and their spacing."""
-    from app.modules.takeoff import detail_scan as Z
+    from app.modules.takeoff import detail_scan as Z  # noqa: N812
 
     upf = model.units_per_foot or 0.0
     if not upf or model.detail is None:
@@ -98,8 +113,16 @@ def _register(walls, joists) -> tuple[float, float, float] | None:
     wy = [p[1] for _it, a, b in walls for p in (a, b)]
     jx = [p[0] for a, b in joists for p in (a, b)]
     jy = [p[1] for a, b in joists for p in (a, b)]
-    cand_x = {round(min(wx) - min(jx), 2), round(max(wx) - max(jx), 2), round((min(wx) + max(wx) - min(jx) - max(jx)) / 2.0, 2)}
-    cand_y = {round(min(wy) - min(jy), 2), round(max(wy) - max(jy), 2), round((min(wy) + max(wy) - min(jy) - max(jy)) / 2.0, 2)}
+    cand_x = {
+        round(min(wx) - min(jx), 2),
+        round(max(wx) - max(jx), 2),
+        round((min(wx) + max(wx) - min(jx) - max(jx)) / 2.0, 2),
+    }
+    cand_y = {
+        round(min(wy) - min(jy), 2),
+        round(max(wy) - max(jy), 2),
+        round((min(wy) + max(wy) - min(jy) - max(jy)) / 2.0, 2),
+    }
     ends = [p for a, b in joists for p in (a, b)]
     if len(ends) > 400:
         ends = ends[:: max(1, len(ends) // 400)]
@@ -260,7 +283,12 @@ def apply(results: list[dict[str, Any]], models: list[Any], sources: list[Any]) 
                 n_lb += 1
             else:
                 n_nlb += 1
-        summary[str(res.get("page"))] = {"framing_sheet": fm.page_no, "fit": round(score, 2), "load_bearing": n_lb, "non_load_bearing": n_nlb}
+        summary[str(res.get("page"))] = {
+            "framing_sheet": fm.page_no,
+            "fit": round(score, 2),
+            "load_bearing": n_lb,
+            "non_load_bearing": n_nlb,
+        }
         res.setdefault("bearing", summary[str(res.get("page"))])
     return summary
 

@@ -30,6 +30,7 @@ import {
   GitCompare,
   BrainCircuit,
   FolderOpen,
+  Upload as UploadIcon,
 } from 'lucide-react';
 
 import { Button, Card, Badge, Input, Skeleton, DismissibleInfo, IntroRichText, Breadcrumb, ModuleGuideButton, ProjectFilePicker, type PickedProjectFile } from '@/shared/ui';
@@ -835,6 +836,7 @@ function TakeoffDocFilmstrip({
   onSelectDoc,
   onDeleteDoc,
   onUploadNew,
+  onDropFiles,
   recentIds = [],
 }: {
   documents: UploadedDocument[];
@@ -845,9 +847,21 @@ function TakeoffDocFilmstrip({
   onSelectDoc: (id: string) => void;
   onDeleteDoc: (id: string) => void;
   onUploadNew: () => void;
+  /** PDFs dropped on the bar (FSFTM: upload stays available while a drawing is open). */
+  onDropFiles?: (files: File[]) => void;
 }) {
   const { t } = useTranslation();
-  const [expanded, setExpanded] = useState(true);
+  // Remembered, so the drawings bar stays open after uploads / reloads.
+  const [expanded, setExpandedState] = useState<boolean>(() => {
+    try { return localStorage.getItem('takeoff.filmstripExpanded') !== 'false'; } catch { return true; }
+  });
+  const setExpanded = (fn: (v: boolean) => boolean) =>
+    setExpandedState((v) => {
+      const next = fn(v);
+      try { localStorage.setItem('takeoff.filmstripExpanded', String(next)); } catch { /* ignore */ }
+      return next;
+    });
+  const [dropOver, setDropOver] = useState(false);
   const [sortBy, setSortBy] = useState<FilmstripSort>('recent');
   const [pinned, setPinned] = useState<Set<string>>(() => readPinned());
 
@@ -885,7 +899,29 @@ function TakeoffDocFilmstrip({
   }, [documents, sortBy, pinned, recentIds, activeDocId]);
 
   return (
-    <div className="shrink-0 bg-surface-primary border border-border-light rounded-xl mt-1.5 overflow-hidden">
+    <div
+      className={clsx(
+        'shrink-0 bg-surface-primary border rounded-xl mt-1.5 overflow-hidden transition-colors',
+        dropOver ? 'border-oe-blue ring-2 ring-oe-blue/40' : 'border-border-light',
+      )}
+      onDragOver={(e) => {
+        if (!onDropFiles || !Array.from(e.dataTransfer.types).includes('Files')) return;
+        e.preventDefault();
+        setDropOver(true);
+      }}
+      onDragLeave={() => setDropOver(false)}
+      onDrop={(e) => {
+        if (!onDropFiles) return;
+        e.preventDefault();
+        setDropOver(false);
+        const files = Array.from(e.dataTransfer.files).filter((f) => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
+        if (files.length) {
+          onDropFiles(files);
+          setExpanded(() => true);
+        }
+      }}
+      data-testid="takeoff-filmstrip"
+    >
       {/* Header — always visible */}
       <button
         type="button"
@@ -899,6 +935,12 @@ function TakeoffDocFilmstrip({
         <span className="text-[11px] text-content-quaternary ml-1.5">
           ({documents.length})
         </span>
+        {onDropFiles && (
+          <span className={clsx('ml-3 inline-flex items-center gap-1 text-[11px]', dropOver ? 'text-oe-blue font-semibold' : 'text-content-quaternary')}>
+            <UploadIcon size={11} />
+            {dropOver ? 'Drop to upload and open' : 'Drop PDFs here to add them'}
+          </span>
+        )}
         <ChevronDown
           size={14}
           className={clsx(
@@ -1257,6 +1299,78 @@ export function TakeoffPage() {
 
   const viewerDocIdRef = useRef<string | null>(null);
   viewerDocIdRef.current = viewerDoc?.id ?? null;
+
+  /* ── FSFTM open-document tabs (OE-DELIVERY 2026-11-25-fsftm-pdf) ─────
+   * Every drawing the user opens stays as a tab above the viewer until its
+   * x is clicked, so several PDFs can be worked on and switched between.
+   * Switching remounts the viewer, whose teardown saves the drawing being
+   * left. The open tabs are remembered per project. */
+  type OpenDoc = { url: string; name: string; id: string };
+  const openTabsKey = `takeoff.openTabs.${selectedProjectId || 'noproject'}`;
+  const [openDocs, setOpenDocs] = useState<OpenDoc[]>([]);
+  const openTabsLoadedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (openTabsLoadedRef.current === openTabsKey) return;
+    openTabsLoadedRef.current = openTabsKey;
+    try {
+      const raw = JSON.parse(localStorage.getItem(openTabsKey) || '[]') as OpenDoc[];
+      setOpenDocs(Array.isArray(raw) ? raw.filter((d) => d && d.id && d.url && !String(d.id).startsWith('temp-')) : []);
+    } catch {
+      setOpenDocs([]);
+    }
+  }, [openTabsKey]);
+  useEffect(() => {
+    if (openTabsLoadedRef.current !== openTabsKey) return;
+    try { localStorage.setItem(openTabsKey, JSON.stringify(openDocs)); } catch { /* ignore */ }
+  }, [openDocs, openTabsKey]);
+  const addOpenDoc = useCallback((d: OpenDoc) => {
+    setOpenDocs((prev) => (prev.some((x) => x.id === d.id) ? prev.map((x) => (x.id === d.id ? { ...x, name: d.name, url: d.url } : x)) : [...prev, d]));
+  }, []);
+  // Whatever opens a drawing (list, filmstrip, deep link, upload) adds its tab.
+  useEffect(() => {
+    if (viewerDoc && !viewerDoc.id.startsWith('temp-')) addOpenDoc(viewerDoc);
+  }, [viewerDoc, addOpenDoc]);
+  const switchToTab = (d: OpenDoc) => {
+    setActiveDocId(d.id);
+    setViewerDoc(d);
+    setActiveTab('measurements');
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('doc', d.id);
+        next.set('tab', 'measurements');
+        next.delete('page');
+        next.delete('name');
+        return next;
+      },
+      { replace: true },
+    );
+  };
+  const closeTab = (id: string) => {
+    const idx = openDocs.findIndex((x) => x.id === id);
+    const rest = openDocs.filter((x) => x.id !== id);
+    setOpenDocs(rest);
+    if (viewerDocIdRef.current !== id) return;
+    const neighbour = rest[Math.min(Math.max(idx, 0), rest.length - 1)];
+    if (neighbour) {
+      switchToTab(neighbour);
+      return;
+    }
+    // Last tab closed: forget the auto-reopen target so it stays closed.
+    try { localStorage.removeItem(`takeoff.lastOpenDoc.${selectedProjectId || 'noproject'}`); } catch { /* ignore */ }
+    setViewerDoc(null);
+    setActiveDocId(null);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('doc');
+        next.delete('page');
+        next.delete('name');
+        return next;
+      },
+      { replace: true },
+    );
+  };
 
   /** True while a cross-module `?doc=X&source=document` open is resolving
    *  (the server find-or-creates the takeoff document, which parses the PDF
@@ -1834,6 +1948,7 @@ export function TakeoffPage() {
               ),
             );
             setActiveDocId(data.id);
+            addOpenDoc({ url: `/api/v1/takeoff/documents/${data.id}/download/`, name: data.filename || file.name, id: data.id });
             // Open the uploaded drawing in PDF Measurements straight away.
             const openIt = !openedOne;
             openedOne = true;
@@ -1879,7 +1994,7 @@ export function TakeoffPage() {
         });
       }
     },
-    [uploadMutation, refetchServerDocuments],
+    [uploadMutation, refetchServerDocuments, addOpenDoc],
   );
 
   const [showProjectFilePicker, setShowProjectFilePicker] = useState(false);
@@ -1971,6 +2086,7 @@ export function TakeoffPage() {
       // stable document id (issue #238) rather than a URL substring, which
       // could false-match a docId that is a substring of another.
       setViewerDoc((prev) => (prev && prev.id === docId ? null : prev));
+      setOpenDocs((prev) => prev.filter((d) => d.id !== docId));
       // Drop the doc param if it matched, so a reload doesn't revive the
       // deleted entry as a placeholder via the initial-read effect.
       setSearchParams(
@@ -2690,6 +2806,7 @@ export function TakeoffPage() {
                 </a>
               </div>
             ) : (
+              <>
               <Suspense
                 fallback={
                   <div className="flex items-center justify-center py-20">
@@ -2723,6 +2840,14 @@ export function TakeoffPage() {
                   onPageChange={handleViewerPageChange}
                   recentDocuments={serverDocuments}
                   onOpenRecentDocument={handleOpenDocInViewer}
+                  openDocuments={openDocs.map((d) => ({ id: d.id, name: d.name }))}
+                  onSwitchDocument={(id) => {
+                    const d = openDocs.find((x) => x.id === id);
+                    if (d) switchToTab(d);
+                    else handleOpenDocInViewer(id);
+                  }}
+                  onCloseDocumentTab={closeTab}
+                  onUploadFiles={(files) => handleFilesSelected(files.filter((f) => f.size <= MAX_FILE_SIZE_BYTES))}
                   onOpenUploadedDocument={(d) => {
                     // A page tool saved an edited copy (update 15): list it and open it.
                     void refetchServerDocuments();
@@ -2741,7 +2866,11 @@ export function TakeoffPage() {
                     );
                   }}
                   onCloseDocument={() => {
-                    // Close PDF (update 15): back to the drawing list.
+                    // Close PDF (update 15): close its tab; another open tab takes over.
+                    if (viewerDoc) {
+                      closeTab(viewerDoc.id);
+                      return;
+                    }
                     setViewerDoc(null);
                     setActiveDocId(null);
                     setSearchParams(
@@ -2757,6 +2886,7 @@ export function TakeoffPage() {
                   }}
                 />
               </Suspense>
+              </>
             )}
             {/* Cross-module open in flight: the server is preparing the
              * drawing (a first open parses the PDF, which takes a while for
@@ -2787,6 +2917,7 @@ export function TakeoffPage() {
             onSelectDoc={handleOpenDocInViewer}
             onDeleteDoc={handleRemoveDocument}
             onUploadNew={() => filmstripUploadRef.current?.click()}
+            onDropFiles={(files) => handleFilesSelected(files.filter((f) => f.size <= MAX_FILE_SIZE_BYTES))}
             recentIds={recentIds}
           />
           {/* Hidden file input shared between Documents tab and Measurements filmstrip. */}

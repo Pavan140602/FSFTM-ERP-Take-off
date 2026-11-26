@@ -427,18 +427,41 @@ def find_similar_symbols(
             "note": "no_symbol_at_point" if prims else "no_vector_layer",
         }
 
-    # Locate the seed: the symbol nearest the click within a size-aware radius.
-    best: tuple[float, tuple[_Primitive, Point, float, float, float]] | None = None
+    seed_entry = _locate_seed(symbols, seed_x, seed_y)
+    if seed_entry is None:
+        return {"hits": [], "seed_found": False, "note": "no_symbol_at_point"}
+
+    hits = _match_seed(symbols, seed_entry, max_hits=max_hits, mark_seed=True)
+    return {"hits": hits, "seed_found": any(h["is_seed"] for h in hits), "note": None}
+
+
+_SymbolEntry = tuple[_Primitive, Point, float, float, float]
+
+
+def _locate_seed(symbols: list[_SymbolEntry], seed_x: float, seed_y: float) -> _SymbolEntry | None:
+    """The symbol nearest the click within a size-aware radius, or ``None``."""
+    best: tuple[float, _SymbolEntry] | None = None
     for entry in symbols:
         cx, cy = entry[1]
         diag = entry[4]
         dist = math.hypot(cx - seed_x, cy - seed_y)
         if dist <= max(_SEED_PICK_TOL_PX, diag) and (best is None or dist < best[0]):
             best = (dist, entry)
-    if best is None:
-        return {"hits": [], "seed_found": False, "note": "no_symbol_at_point"}
+    return best[1] if best is not None else None
 
-    seed_entry = best[1]
+
+def _match_seed(
+    symbols: list[_SymbolEntry],
+    seed_entry: _SymbolEntry,
+    *,
+    max_hits: int,
+    mark_seed: bool,
+) -> list[dict[str, Any]]:
+    """Every symbol in ``symbols`` matching ``seed_entry``'s signature.
+
+    ``mark_seed`` flags the hit sitting on the seed itself; it is only
+    meaningful on the page the seed was clicked on.
+    """
     s_cx, s_cy = seed_entry[1]
     s_w, s_h, s_diag = seed_entry[2], seed_entry[3], seed_entry[4]
     seed_sig = (round(s_w / 4), round(s_h / 4))
@@ -468,7 +491,7 @@ def find_similar_symbols(
         if len(kept) >= max_hits:
             break
 
-    hits = [
+    return [
         {
             "x": centroid[0],
             "y": centroid[1],
@@ -477,8 +500,52 @@ def find_similar_symbols(
             "bbox_x1": bbox[2],
             "bbox_y1": bbox[3],
             "confidence": confidence,
-            "is_seed": math.hypot(centroid[0] - s_cx, centroid[1] - s_cy) <= _HIT_NMS_PX,
+            "is_seed": mark_seed and math.hypot(centroid[0] - s_cx, centroid[1] - s_cy) <= _HIT_NMS_PX,
         }
         for centroid, bbox, confidence in kept
     ]
-    return {"hits": hits, "seed_found": any(h["is_seed"] for h in hits), "note": None}
+
+
+def find_similar_symbols_all_pages(
+    pages_drawings: dict[int, list[Any]],
+    seed_page: int,
+    seed_x: float,
+    seed_y: float,
+    *,
+    max_hits_per_page: int = _MAX_SIMILAR,
+) -> dict[str, Any]:
+    """Seeded "count by example" across every page of a document.
+
+    The seed symbol is picked on ``seed_page`` exactly as
+    :func:`find_similar_symbols` picks it, then its signature is matched on
+    every page in ``pages_drawings`` (``{page_number: page.get_drawings()}``).
+    Pure and DB-free. Returns ``{"seed_found", "note", "total_hits", "pages"}``
+    where ``pages`` lists ``{"page", "hits"}`` for pages with at least one hit.
+    """
+    seed_prims = primitives_from_drawings(pages_drawings.get(seed_page) or [])
+    seed_symbols = _symbol_primitives(seed_prims)
+    if not seed_symbols:
+        note = "no_symbol_at_point" if seed_prims else "no_vector_layer"
+        return {"seed_found": False, "note": note, "total_hits": 0, "pages": []}
+    seed_entry = _locate_seed(seed_symbols, seed_x, seed_y)
+    if seed_entry is None:
+        return {"seed_found": False, "note": "no_symbol_at_point", "total_hits": 0, "pages": []}
+
+    pages: list[dict[str, Any]] = []
+    for page_no in sorted(pages_drawings):
+        symbols = (
+            seed_symbols
+            if page_no == seed_page
+            else _symbol_primitives(primitives_from_drawings(pages_drawings[page_no]))
+        )
+        if not symbols:
+            continue
+        hits = _match_seed(symbols, seed_entry, max_hits=max_hits_per_page, mark_seed=page_no == seed_page)
+        if hits:
+            pages.append({"page": page_no, "hits": hits})
+    return {
+        "seed_found": True,
+        "note": None,
+        "total_hits": sum(len(p["hits"]) for p in pages),
+        "pages": pages,
+    }

@@ -9,8 +9,8 @@ import math
 
 import pymupdf
 
-from app.modules.takeoff import auto_takeoff as A
-from app.modules.takeoff import detail_scan as Z
+from app.modules.takeoff import auto_takeoff as A  # noqa: N812
+from app.modules.takeoff import detail_scan as Z  # noqa: N812
 
 
 def _page(w: float = 1200, h: float = 800):
@@ -45,7 +45,14 @@ def _scan(model, found=()):
         model.detail,
         [{"point": p} for p in found],
         [],
-        lambda x, y: {"designation": "COLUMN", "label": "COLUMN", "mark": None, "label_rect": None, "mark_obj": None, "label_obj": None},
+        lambda x, y: {
+            "designation": "COLUMN",
+            "label": "COLUMN",
+            "mark": None,
+            "label_rect": None,
+            "mark_obj": None,
+            "label_obj": None,
+        },
         col_mark_re=A._COL_MARK_RE,
     )
 
@@ -67,7 +74,12 @@ def test_square_drawn_as_loose_pieces_in_any_order() -> None:
     doc, page = _page()
     # Outline written piece by piece, out of order and reversed (CAD export).
     sh = page.new_shape()
-    for a, b in (((300, 200), (311, 200)), ((300, 211), (300, 200)), ((311, 211), (300, 211)), ((311, 200), (311, 211))):
+    for a, b in (
+        ((300, 200), (311, 200)),
+        ((300, 211), (300, 200)),
+        ((311, 211), (300, 211)),
+        ((311, 200), (311, 211)),
+    ):
         sh.draw_line(pymupdf.Point(*a), pymupdf.Point(*b))
     sh.finish(color=(0, 0, 0), width=0.72)
     sh.commit()

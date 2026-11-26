@@ -22,6 +22,10 @@ import {
   Plus,
   Trash2,
   X,
+  Copy,
+  Palette,
+  Hash,
+  Check,
   type LucideIcon,
 } from 'lucide-react';
 import {
@@ -211,6 +215,14 @@ export function FSFTMToolChest({ sets, onChange, onUse, onApply, onAddSelection,
   const [renaming, setRenaming] = useState<string | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropSet, setDropSet] = useState<string | null>(null);
+  /** Right-click menu on a chest tool (OE-DELIVERY 2026-11-25-fsftm-pdf). */
+  const [itemMenu, setItemMenu] = useState<{ x: number; y: number; setId: string; itemId: string } | null>(null);
+  const [colorFor, setColorFor] = useState<string | null>(null);
+  const openItemMenu = (e: React.MouseEvent, setId: string, itemId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setItemMenu({ x: Math.min(e.clientX, window.innerWidth - 210), y: Math.min(e.clientY, window.innerHeight - 260), setId, itemId });
+  };
   const setViewMode = (v: 'icons' | 'list') => {
     setView(v);
     try { localStorage.setItem('takeoff.toolChest.view', v); } catch { /* ignore */ }
@@ -371,6 +383,19 @@ export function FSFTMToolChest({ sets, onChange, onUse, onApply, onAddSelection,
                 </button>
               )}
             </header>
+            {colorFor && set.items.some((it) => it.id === colorFor) && (() => {
+              const it = set.items.find((x) => x.id === colorFor)!;
+              return (
+                <div className="flex items-center gap-2 border-b border-border/60 bg-surface-secondary/40 px-2 py-1.5 text-[11px]" data-testid="chest-change-colors">
+                  <span className="min-w-0 flex-1 truncate">Colours of <b>{displayDesignation(it.name)}</b></span>
+                  <span className="text-content-tertiary">Line</span>
+                  <ColorPicklist value={it.style.color ?? '#3B82F6'} onChange={(c) => c && onChange(patchItem(sets, it.id, { style: { ...it.style, color: c } }))} title="Line colour" testId="chest-color-line" />
+                  <span className="text-content-tertiary">Fill</span>
+                  <ColorPicklist value={it.style.fillColor ?? null} allowNone onChange={(c) => onChange(patchItem(sets, it.id, { style: { ...it.style, fillColor: c ?? undefined } }))} title="Fill colour" testId="chest-color-fill" />
+                  <button type="button" onClick={() => setColorFor(null)} className="rounded px-1.5 py-0.5 text-[10px] font-semibold text-oe-blue hover:bg-oe-blue/10">Done</button>
+                </div>
+              );
+            })()}
             {creatingIn === set.id && (
               <NewToolForm
                 toolTypes={toolTypes}
@@ -394,6 +419,7 @@ export function FSFTMToolChest({ sets, onChange, onUse, onApply, onAddSelection,
                         onDragEnd={() => { setDragId(null); setDropSet(null); }}
                         onClick={() => (set.mode === 'properties' && selectionCount > 0 ? onApply(item) : onUse(item))}
                         onDoubleClick={() => setRenaming(item.id)}
+                        onContextMenu={(e) => openItemMenu(e, set.id, item.id)}
                         className={clsx(
                           'flex w-full flex-col items-center gap-0.5 rounded p-1 text-center transition-colors',
                           activeItemId === item.id ? 'bg-oe-blue/15 ring-1 ring-oe-blue' : 'hover:bg-surface-secondary',
@@ -428,6 +454,7 @@ export function FSFTMToolChest({ sets, onChange, onUse, onApply, onAddSelection,
                       draggable
                       onDragStart={() => setDragId(item.id)}
                       onDragEnd={() => { setDragId(null); setDropSet(null); }}
+                      onContextMenu={(e) => openItemMenu(e, set.id, item.id)}
                       className={clsx('group flex items-center gap-2 px-1.5 py-1', activeItemId === item.id ? 'bg-oe-blue/10' : 'hover:bg-surface-secondary/60')}
                     >
                       <button
@@ -463,8 +490,61 @@ export function FSFTMToolChest({ sets, onChange, onUse, onApply, onAddSelection,
         );
       })}
       <p className="text-[10px] leading-snug text-content-tertiary">
-        Click a tool to draw with it. Sets in Properties mode apply the tool to the selected markups instead. Drag tools between sets; double-click to rename.
+        Click a tool to draw with it. Sets in Properties mode apply the tool to the selected markups instead (with nothing selected the tool still draws). Right-click a tool for more. Drag tools between sets; double-click to rename.
       </p>
+      {itemMenu && (() => {
+        const set = sets.find((x) => x.id === itemMenu.setId);
+        const item = set?.items.find((x) => x.id === itemMenu.itemId);
+        if (!set || !item) return null;
+        const close = () => setItemMenu(null);
+        const row = 'flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-content-primary hover:bg-surface-secondary disabled:opacity-40 disabled:hover:bg-transparent';
+        const targetSet = set.recent ? (sets.find((x) => !x.recent)?.id ?? set.id) : set.id;
+        return (
+          <div className="fixed inset-0 z-[90]" onClick={close} onContextMenu={(e) => { e.preventDefault(); close(); }}>
+            <div
+              className="absolute w-[200px] rounded-md border border-border bg-surface-elevated py-1 shadow-xl"
+              style={{ left: itemMenu.x, top: itemMenu.y }}
+              onClick={(e) => e.stopPropagation()}
+              role="menu"
+              data-testid="chest-item-menu"
+            >
+              <button type="button" role="menuitem" className={row} data-testid="chest-menu-duplicate" onClick={() => {
+                onChange(addItem(sets, targetSet, { ...item, id: newId('tool'), name: `${item.name} (copy)`, style: { ...item.style } }));
+                close();
+              }}>
+                <Copy size={13} />Duplicate
+              </button>
+              <button type="button" role="menuitem" className={row} data-testid="chest-menu-colors" onClick={() => { setColorFor(item.id); close(); }}>
+                <Palette size={13} />Change Colors…
+              </button>
+              <button type="button" role="menuitem" className={row} disabled={selectionCount === 0} title={selectionCount ? 'Apply this tool\'s properties to the selected markups' : 'Select markups first'} data-testid="chest-menu-paint" onClick={() => { onApply(item); close(); }}>
+                <Paintbrush size={13} />Paint Format{selectionCount ? ` (${selectionCount})` : ''}
+              </button>
+              <div className="my-1 border-t border-border" />
+              <button type="button" role="menuitem" className={row} disabled={item.tool === 'count'} data-testid="chest-menu-count" onClick={() => {
+                onChange(addItem(sets, targetSet, { ...item, id: newId('tool'), tool: 'count', name: `${item.name} count`, style: { ...item.style } }));
+                close();
+              }}>
+                <Hash size={13} />Create Count
+              </button>
+              <button type="button" role="menuitem" className={row} data-testid="chest-menu-draw" onClick={() => { onUse(item); close(); }}>
+                <PenTool size={13} />Draw with this tool
+              </button>
+              <div className="my-1 border-t border-border" />
+              <button type="button" role="menuitem" className={row} disabled={!!set.recent} data-testid="chest-menu-delete" onClick={() => { onChange(removeItem(sets, item.id)); close(); }}>
+                <X size={13} />Delete
+              </button>
+              <div className="my-1 border-t border-border" />
+              <button type="button" role="menuitemcheckbox" aria-checked={set.mode === 'properties'} className={row} data-testid="chest-menu-properties-mode" onClick={() => {
+                onChange(patchSet(sets, set.id, { mode: set.mode === 'properties' ? 'drawing' : 'properties' }));
+                close();
+              }}>
+                {set.mode === 'properties' ? <Check size={13} /> : <span className="inline-block w-[13px]" />}Properties Mode
+              </button>
+            </div>
+          </div>
+        );
+      })()}
       {children}
     </div>
   );

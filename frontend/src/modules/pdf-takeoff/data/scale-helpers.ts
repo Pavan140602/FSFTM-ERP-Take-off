@@ -285,18 +285,21 @@ const INCH_FRACTION = 16;
  * numerals. The feet mark, the dash and the inch mark are notation, not
  * language, and stay as they are.
  */
-export function formatFeetInches(metres: number, locale?: string): string {
+export function formatFeetInches(metres: number, locale?: string, inchDenominator: number = INCH_FRACTION): string {
   if (!Number.isFinite(metres) || metres <= 0) return '';
-  const sixteenths = Math.round((metres / METERS_PER_INCH) * INCH_FRACTION);
+  // `inchDenominator` is the precision as 1/N inch (2..64); anything else falls back
+  // to the default 1/16".
+  const step = Number.isInteger(inchDenominator) && inchDenominator >= 2 && inchDenominator <= 64 ? inchDenominator : INCH_FRACTION;
+  const sixteenths = Math.round((metres / METERS_PER_INCH) * step);
   if (sixteenths <= 0) return '';
 
-  const perFoot = 12 * INCH_FRACTION;
+  const perFoot = 12 * step;
   const feet = Math.floor(sixteenths / perFoot);
   const rest = sixteenths - feet * perFoot;
-  const inches = Math.floor(rest / INCH_FRACTION);
+  const inches = Math.floor(rest / step);
 
-  let numerator = rest - inches * INCH_FRACTION;
-  let denominator = INCH_FRACTION;
+  let numerator = rest - inches * step;
+  let denominator = step;
   while (numerator > 0 && numerator % 2 === 0) {
     numerator /= 2;
     denominator /= 2;

@@ -206,6 +206,28 @@ class SimilarSymbolsResponse(BaseModel):
     measurement_id: str | None = None
 
 
+class SimilarSymbolsPage(BaseModel):
+    """Matches on one page of an all-pages similar-symbol search."""
+
+    page: int
+    hits: list[SimilarSymbolHit] = Field(default_factory=list)
+    measurement_id: str | None = None
+
+
+class SimilarSymbolsAllPagesResponse(BaseModel):
+    """Result of a seeded similar-symbol search across every page.
+
+    The seed is picked on the page that was clicked; ``pages`` lists only
+    pages with at least one hit. Nothing is stored: the frontend adds one
+    suggested count per page for the user to accept or reject.
+    """
+
+    seed_found: bool = False
+    note: str | None = None
+    total_hits: int = 0
+    pages: list[SimilarSymbolsPage] = Field(default_factory=list)
+
+
 # ── Tier-1 scale detection from the PDF text layer ──────────────────────────
 #
 # The deterministic, AI-free counterpart to the vision plan-reader's scale

@@ -91,10 +91,12 @@ def _bezier(p0, p1, p2, p3, n: int = 8) -> list[tuple[float, float]]:
     for k in range(1, n + 1):
         t = k / n
         u = 1 - t
-        out.append((
-            u * u * u * p0[0] + 3 * u * u * t * p1[0] + 3 * u * t * t * p2[0] + t * t * t * p3[0],
-            u * u * u * p0[1] + 3 * u * u * t * p1[1] + 3 * u * t * t * p2[1] + t * t * t * p3[1],
-        ))
+        out.append(
+            (
+                u * u * u * p0[0] + 3 * u * u * t * p1[0] + 3 * u * t * t * p2[0] + t * t * t * p3[0],
+                u * u * u * p0[1] + 3 * u * u * t * p1[1] + 3 * u * t * t * p2[1] + t * t * t * p3[1],
+            )
+        )
     return out
 
 
@@ -121,7 +123,7 @@ def _hull(pts: list[tuple[float, float]]) -> list[tuple[float, float]]:
 
 def _poly_area(pts: list[tuple[float, float]]) -> float:
     s = 0.0
-    for (x1, y1), (x2, y2) in zip(pts, pts[1:] + pts[:1]):
+    for (x1, y1), (x2, y2) in zip(pts, pts[1:] + pts[:1], strict=False):
         s += x1 * y2 - x2 * y1
     return abs(s) / 2.0
 
@@ -133,7 +135,7 @@ def _min_rect(pts: list[tuple[float, float]]) -> tuple[float, float, float] | No
     if len(hull) < 3:
         return None
     best = None
-    for (x1, y1), (x2, y2) in zip(hull, hull[1:] + hull[:1]):
+    for (x1, y1), (x2, y2) in zip(hull, hull[1:] + hull[:1], strict=False):
         ang = math.atan2(y2 - y1, x2 - x1)
         c, s = math.cos(ang), math.sin(ang)
         us = [x * c + y * s for x, y in hull]
@@ -254,14 +256,24 @@ def read_sheet(page, drawings: list | None = None, index_cls=None) -> DetailShee
                 push([p0] + _bezier(p0, p1, p2, p3))
             elif op == "re":
                 r = it[1]
-                pts = [_xf(matrix, r.x0, r.y0), _xf(matrix, r.x1, r.y0), _xf(matrix, r.x1, r.y1), _xf(matrix, r.x0, r.y1)]
+                pts = [
+                    _xf(matrix, r.x0, r.y0),
+                    _xf(matrix, r.x1, r.y0),
+                    _xf(matrix, r.x1, r.y1),
+                    _xf(matrix, r.x0, r.y1),
+                ]
                 if len(cur) >= 2:
                     chains.append(cur)
                 cur = []
                 chains.append(pts + [pts[0]])
             elif op == "qu":
                 q = it[1]
-                pts = [_xf(matrix, q.ul.x, q.ul.y), _xf(matrix, q.ur.x, q.ur.y), _xf(matrix, q.lr.x, q.lr.y), _xf(matrix, q.ll.x, q.ll.y)]
+                pts = [
+                    _xf(matrix, q.ul.x, q.ul.y),
+                    _xf(matrix, q.ur.x, q.ur.y),
+                    _xf(matrix, q.lr.x, q.lr.y),
+                    _xf(matrix, q.ll.x, q.ll.y),
+                ]
                 if len(cur) >= 2:
                     chains.append(cur)
                 cur = []
@@ -278,14 +290,18 @@ def read_sheet(page, drawings: list | None = None, index_cls=None) -> DetailShee
         open_pieces: list[tuple[tuple[float, float], tuple[float, float]]] = []
         for ch in chains:
             if stroked:
-                for (x1, y1), (x2, y2) in zip(ch, ch[1:]):
+                for (x1, y1), (x2, y2) in zip(ch, ch[1:], strict=False):
                     ln = math.hypot(x2 - x1, y2 - y1)
                     if ln >= 0.5:
                         ds.segs.append((x1, y1, x2, y2, ln, width, pen, did))
             span = max(max(q[0] for q in ch) - min(q[0] for q in ch), max(q[1] for q in ch) - min(q[1] for q in ch))
-            closed = len(ch) >= 4 and span >= 3.0 and (
-                math.hypot(ch[0][0] - ch[-1][0], ch[0][1] - ch[-1][1]) <= 1.0
-                or ((drawing.get("closePath") or filled) and len(chains) == 1)
+            closed = (
+                len(ch) >= 4
+                and span >= 3.0
+                and (
+                    math.hypot(ch[0][0] - ch[-1][0], ch[0][1] - ch[-1][1]) <= 1.0
+                    or ((drawing.get("closePath") or filled) and len(chains) == 1)
+                )
             )
             if closed:
                 pts = ch[:-1] if math.hypot(ch[0][0] - ch[-1][0], ch[0][1] - ch[-1][1]) <= 1.0 else ch
@@ -296,7 +312,7 @@ def read_sheet(page, drawings: list | None = None, index_cls=None) -> DetailShee
                 xs = [p[0] for p in ch]
                 ys = [p[1] for p in ch]
                 if max(xs) - min(xs) <= 44 and max(ys) - min(ys) <= 44:
-                    open_pieces.extend(zip(ch, ch[1:]))
+                    open_pieces.extend(zip(ch, ch[1:], strict=False))
         # Outlines written as loose pieces in any order (CAD exports):
         # join them where their ends meet.
         if len(open_pieces) >= 4:
@@ -532,14 +548,15 @@ def plan_parts(model, parts: int = 0) -> list[dict[str, Any]]:
                 min(ax1, ax0 + aw * (c + 1) / cols + ov),
                 min(ay1, ay0 + ah * (r + 1) / rows + ov),
             )
-            out.append({"id": len(out) + 1, "row": r + 1, "col": c + 1, "core": core, "zoom": zoom, "grid": [rows, cols]})
+            out.append(
+                {"id": len(out) + 1, "row": r + 1, "col": c + 1, "core": core, "zoom": zoom, "grid": [rows, cols]}
+            )
     return out
 
 
 def in_core(part: dict[str, Any], x: float, y: float) -> bool:
     c = part["core"]
     return c[0] <= x < c[2] and c[1] <= y < c[3]
-
 
 
 # ── columns ───────────────────────────────────────────────────────────
@@ -558,7 +575,9 @@ def _is_light(pen) -> bool:
     return pen is not None and min(pen) >= 12
 
 
-def _member_dirs(sh: Shape, ds: DetailSheet, members: list[tuple[float, float, float, float]], heavy_w: float) -> set[int]:
+def _member_dirs(
+    sh: Shape, ds: DetailSheet, members: list[tuple[float, float, float, float]], heavy_w: float
+) -> set[int]:
     """Sides (45 degree bins, 0-7) from which heavy lines and taken-off
     members run into the shape. A beam running through counts on both
     sides; two beams meeting at a corner count twice too."""
@@ -627,7 +646,7 @@ def _edge_continues(sh: Shape, ds: DetailSheet) -> bool:
     ux, uy = math.cos(a), math.sin(a)  # long side
     vx, vy = -uy, ux
     edges = []
-    for (dx, dy, hl, ex, ey) in ((vx, vy, sh.w / 2.0, ux, uy), (ux, uy, sh.h / 2.0, vx, vy)):
+    for dx, dy, hl, ex, ey in ((vx, vy, sh.w / 2.0, ux, uy), (ux, uy, sh.h / 2.0, vx, vy)):
         for sign in (-1.0, 1.0):
             off = (sh.h / 2.0) if (dx, dy) == (vx, vy) else (sh.w / 2.0)
             mx, my = sh.cx + sign * dx * off, sh.cy + sign * dy * off
@@ -703,7 +722,7 @@ def _arrow_part(sh: Shape, ds: DetailSheet) -> bool:
     if sh.aspect > 1.2 and not sh.stroked:
         return True
     x0, y0, x1, y1 = sh.bbox
-    for (r, did, dark) in ds.filled:
+    for r, did, dark in ds.filled:
         if did == sh.did or not dark:
             continue
         if r[0] <= x1 + 1.0 and r[2] >= x0 - 1.0 and r[1] <= y1 + 1.0 and r[3] >= y0 - 1.0:
@@ -843,7 +862,7 @@ def scan_columns(
 
     taken = [tuple(c["point"]) for c in kept]
     added: list[dict[str, Any]] = []
-    for part in (parts if parts is not None else plan_parts(model)):
+    for part in parts if parts is not None else plan_parts(model):
         stats["tiles"] += 1
         c0, c1, c2, c3 = part["core"]
         tile = [s for s in cands if c0 <= s.cx < c2 and c1 <= s.cy < c3]
@@ -891,11 +910,13 @@ def scan_columns(
             if _edge_continues(sh, ds):
                 continue  # a piece of a double-line wall
             named = name_at(sh.cx, sh.cy)
-            named.update({
-                "point": (sh.cx, sh.cy),
-                "size": round(sh.w, 1),
-                "zoom": True,
-            })
+            named.update(
+                {
+                    "point": (sh.cx, sh.cy),
+                    "size": round(sh.w, 1),
+                    "zoom": True,
+                }
+            )
             added.append(named)
             taken.append((sh.cx, sh.cy))
             stats["added"] += 1
@@ -917,7 +938,7 @@ def _adiff(a: float, b: float) -> float:
 
 
 def _same_pen(a, b) -> bool:
-    if a[6] is not None and b[6] is not None and max(abs(x - y) for x, y in zip(a[6], b[6])) > 2:
+    if a[6] is not None and b[6] is not None and max(abs(x - y) for x, y in zip(a[6], b[6], strict=False)) > 2:
         return False
     wa, wb = float(a[5] or 0), float(b[5] or 0)
     lo, hi = min(wa, wb), max(wa, wb)
@@ -1009,18 +1030,18 @@ def simplify(pts: list[tuple[float, float]], tol: float = 0.8) -> list[tuple[flo
 
 def poly_len(pts: Iterable[tuple[float, float]]) -> float:
     pts = list(pts)
-    return sum(math.hypot(b[0] - a[0], b[1] - a[1]) for a, b in zip(pts, pts[1:]))
+    return sum(math.hypot(b[0] - a[0], b[1] - a[1]) for a, b in zip(pts, pts[1:], strict=False))
 
 
 def _dist_poly(px: float, py: float, pts: list[tuple[float, float]]) -> float:
     if len(pts) == 1:
         return math.hypot(px - pts[0][0], py - pts[0][1])
-    return min(_pt_seg(px, py, (a[0], a[1], b[0], b[1])) for a, b in zip(pts, pts[1:]))
+    return min(_pt_seg(px, py, (a[0], a[1], b[0], b[1])) for a, b in zip(pts, pts[1:], strict=False))
 
 
 def _samples(pts: list[tuple[float, float]], step: float = 4.0) -> list[tuple[float, float]]:
     out: list[tuple[float, float]] = []
-    for a, b in zip(pts, pts[1:]):
+    for a, b in zip(pts, pts[1:], strict=False):
         L = math.hypot(b[0] - a[0], b[1] - a[1])
         n = max(1, int(L / step))
         for k in range(n):
@@ -1213,7 +1234,8 @@ def scan_beams(
     for lab, info in labels:
         des = info["designation"]
         if any(
-            it.get("category") == "beams" and it.get("designation") == des
+            it.get("category") == "beams"
+            and it.get("designation") == des
             and _dist_poly(lab.cx, lab.cy, [(float(p[0]), float(p[1])) for p in it["points"]]) <= 3.0 * lab.size
             for it in items
         ):
@@ -1286,14 +1308,25 @@ def scan_beams(
                 for lab, info in labels:
                     R = max(3.0 * lab.size, 14.0)
                     if _dist_poly(lab.cx, lab.cy, pts) <= R:
-                        k = min(range(len(pts) - 1), key=lambda q: _pt_seg(lab.cx, lab.cy, (pts[q][0], pts[q][1], pts[q + 1][0], pts[q + 1][1])))
+                        k = min(
+                            range(len(pts) - 1),
+                            key=lambda q: _pt_seg(lab.cx, lab.cy, (pts[q][0], pts[q][1], pts[q + 1][0], pts[q + 1][1])),
+                        )
                         seg = (pts[k][0], pts[k][1], pts[k + 1][0], pts[k + 1][1])
                         if _adiff(_ang(seg), lab.angle) <= 20.0:
                             d = _pt_seg(lab.cx, lab.cy, seg)
                             if named is None or d < named[0]:
                                 named = (d, lab, info)
                 if named is not None:
-                    out.append({"points": pts, "designation": named[2]["designation"], "label": named[1], "info": named[2], "unlabeled": False})
+                    out.append(
+                        {
+                            "points": pts,
+                            "designation": named[2]["designation"],
+                            "label": named[1],
+                            "info": named[2],
+                            "unlabeled": False,
+                        }
+                    )
                     stats["labelled_added"] += 1
                 else:
                     out.append({"points": pts, "designation": "BEAM", "label": None, "info": None, "unlabeled": True})
@@ -1429,7 +1462,8 @@ def scan_joists(
         des = info["designation"]
         near = max(3.0 * upf, 2.0 * s_units)
         if any(
-            it.get("category") in ("joists", "trusses") and it.get("designation") == des
+            it.get("category") in ("joists", "trusses")
+            and it.get("designation") == des
             and len(it.get("points") or []) >= 2
             and _dist_poly(lab.cx, lab.cy, [(float(p[0]), float(p[1])) for p in it["points"]]) <= near
             for it in items
@@ -1455,7 +1489,8 @@ def scan_joists(
             continue
         # Never a second copy of members already taken off.
         segs = [
-            sg for sg in segs
+            sg
+            for sg in segs
             if not any(_dist_poly((sg[0] + sg[2]) / 2.0, (sg[1] + sg[3]) / 2.0, t) <= 3.0 for t in taken)
         ]
         if len(segs) < 3:
@@ -1478,7 +1513,7 @@ def deck_bay(lab, lines: list[list[tuple[float, float]]], reach: float = 1600.0)
     def cast(dx: float, dy: float) -> float | None:
         best = None
         for ln in lines:
-            for p, q in zip(ln, ln[1:]):
+            for p, q in zip(ln, ln[1:], strict=False):
                 ex, ey = q[0] - p[0], q[1] - p[1]
                 L = math.hypot(ex, ey)
                 if L < 1e-6:
@@ -1536,14 +1571,16 @@ def part_log(
                 counts[it["category"]] = counts.get(it["category"], 0) + 1
         miss = [m for m in missed if in_core(part, m["at"][0], m["at"][1])]
         z = part["zoom"]
-        log.append({
-            "part": part["id"],
-            "row": part["row"],
-            "col": part["col"],
-            "rect": [round(v, 1) for v in z],
-            "counts": counts,
-            "missed": len(miss),
-        })
+        log.append(
+            {
+                "part": part["id"],
+                "row": part["row"],
+                "col": part["col"],
+                "rect": [round(v, 1) for v in z],
+                "counts": counts,
+                "missed": len(miss),
+            }
+        )
     return log
 
 
@@ -1560,7 +1597,8 @@ def deck_legend(model, deck_info) -> tuple[dict[str, dict[str, Any]], list[tuple
             continue
         h = max(lab.size, 6.0)
         row = [
-            o for o in labels
+            o
+            for o in labels
             if o is not lab and 0 < o.rect[0] - lab.rect[2] <= 30 * h and abs(o.cy - lab.cy) <= 2.5 * h
         ]
         if not row:
@@ -1584,7 +1622,9 @@ def deck_legend(model, deck_info) -> tuple[dict[str, dict[str, Any]], list[tuple
 
 # ── every column label must have its column ──────────────────────────
 
-_COL_SIZE_RE = re.compile(r"^(?:HSS\s*(\d+(?:\.\d+)?)\s*X\s*(\d+(?:\.\d+)?)\s*X|W\s*\d+\s*X\s*\d+|PIPE\s*\d)", re.IGNORECASE)
+_COL_SIZE_RE = re.compile(
+    r"^(?:HSS\s*(\d+(?:\.\d+)?)\s*X\s*(\d+(?:\.\d+)?)\s*X|W\s*\d+\s*X\s*\d+|PIPE\s*\d)", re.IGNORECASE
+)
 
 
 def _underline_ends(lab, ds: DetailSheet) -> list[tuple[float, float]]:
@@ -1692,7 +1732,9 @@ def label_columns(
         ends: list[tuple[float, float, float]] = [(x, y, 0.0) for x, y in _underline_ends(lab, ds)]
         if leader_ends is not None:
             try:
-                ends.extend((x, y, 1000.0) for x, y in list(leader_ends(lab))[:4])  # leaders only when the text line points nowhere
+                ends.extend(
+                    (x, y, 1000.0) for x, y in list(leader_ends(lab))[:4]
+                )  # leaders only when the text line points nowhere
             except Exception:
                 pass
         checked += 1
@@ -1711,7 +1753,10 @@ def label_columns(
                 if any(
                     _overlap(sh.bbox, w)
                     for w in ds.words
-                    if not (lab.rect[0] - 1 <= (w[0] + w[2]) / 2 <= lab.rect[2] + 1 and lab.rect[1] - 1 <= (w[1] + w[3]) / 2 <= lab.rect[3] + 1)
+                    if not (
+                        lab.rect[0] - 1 <= (w[0] + w[2]) / 2 <= lab.rect[2] + 1
+                        and lab.rect[1] - 1 <= (w[1] + w[3]) / 2 <= lab.rect[3] + 1
+                    )
                 ):
                     continue
                 if best is None or d + pen < best[0]:
@@ -1721,11 +1766,7 @@ def label_columns(
             # written on (an I-shaped W column has no closed box): this
             # label names it.
             near_k = min(
-                (
-                    (math.hypot(x - ex, y - ey), k)
-                    for k, (x, y) in enumerate(taken[:n_found])
-                    for ex, ey, pn in ends
-                ),
+                ((math.hypot(x - ex, y - ey), k) for k, (x, y) in enumerate(taken[:n_found]) for ex, ey, pn in ends),
                 default=None,
             )
             if near_k is not None and near_k[0] <= 14.0:
@@ -1734,12 +1775,15 @@ def label_columns(
             # No symbol where it points: unless a column already stands at
             # one of its ends, list it for the estimator.
             if not any(math.hypot(x - ex, y - ey) <= 20 for x, y in taken for ex, ey, _p in ends) and not any(
-                max(lab.rect[0] - x, 0.0, x - lab.rect[2]) + max(lab.rect[1] - y, 0.0, y - lab.rect[3]) <= 14 for x, y in taken
+                max(lab.rect[0] - x, 0.0, x - lab.rect[2]) + max(lab.rect[1] - y, 0.0, y - lab.rect[3]) <= 14
+                for x, y in taken
             ):
                 unresolved.append(lab)
             continue
         sh = best[1]
-        hit = next((k for k, (x, y) in enumerate(taken) if math.hypot(sh.cx - x, sh.cy - y) <= max(4.0, sh.w * 0.75)), None)
+        hit = next(
+            (k for k, (x, y) in enumerate(taken) if math.hypot(sh.cx - x, sh.cy - y) <= max(4.0, sh.w * 0.75)), None
+        )
         if hit is not None:
             if hit < n_found:
                 claims.append((lab, hit))  # the column is there: this label names it
@@ -1768,7 +1812,7 @@ def leader_beams(model, ds: DetailSheet, items: list[dict[str, Any]], cols: list
             continue
         (x1, y1), (x2, y2) = pts
         L = math.hypot(x2 - x1, y2 - y1)
-        if L > 6.0 * upf or L < 1.0:
+        if 6.0 * upf < L or L < 1.0:
             continue
         if not any(min(math.hypot(x1 - cx, y1 - cy), math.hypot(x2 - cx, y2 - cy)) <= 14.0 for cx, cy in cols):
             continue
@@ -1880,7 +1924,7 @@ def wall_geometry(
     best = None
     lo_w, hi_w = 2.5 / 12.0 * upf, 16.0 / 12.0 * upf
     for i, fa in enumerate(cands[:8]):
-        for fb in cands[i + 1:8]:
+        for fb in cands[i + 1 : 8]:
             w = abs(fa[0] - fb[0])
             if not (lo_w <= w <= hi_w):
                 continue
@@ -1900,12 +1944,7 @@ def wall_geometry(
     out["offset"] = (fa[0] + fb[0]) / 2.0
     # Openings: where neither face is drawn with the wall's own pen - only
     # hairlines (window / door lines, background) run across an opening.
-    face_segs = [
-        seg
-        for f in faces.values()
-        if abs(f[0] - fa[0]) <= 0.7 or abs(f[0] - fb[0]) <= 0.7
-        for seg in f[2]
-    ]
+    face_segs = [seg for f in faces.values() if abs(f[0] - fa[0]) <= 0.7 or abs(f[0] - fb[0]) <= 0.7 for seg in f[2]]
     hair = min((w for _lo, _hi, w in face_segs), default=0.0)
     wall_pen = max(0.6 * heavy_w, 1.2 * hair + 1e-6)
     # Faces drawn all in one light pen (a whole sheet in hairlines): the
@@ -1925,7 +1964,11 @@ def wall_geometry(
     if merged:
         # Runs go wall to wall, so a missing face at either end is an
         # opening too (a door or window right beside a cross wall).
-        edges = [(0.0, merged[0][0])] + [(hi, lo2) for (_lo, hi), (lo2, _hi2) in zip(merged, merged[1:])] + [(merged[-1][1], L)]
+        edges = (
+            [(0.0, merged[0][0])]
+            + [(hi, lo2) for (_lo, hi), (lo2, _hi2) in zip(merged, merged[1:], strict=False)]
+            + [(merged[-1][1], L)]
+        )
         for g0, g1 in edges:
             if 2.0 * upf <= g1 - g0 <= 20.0 * upf:
                 gaps.append((g0, g1))
@@ -1958,7 +2001,9 @@ def drawn_cover(
     ux, uy = (b[0] - a[0]) / L, (b[1] - a[1]) / L
     ang = (math.degrees(math.atan2(uy, ux)) + 90.0) % 180.0 - 90.0
     spans = []
-    for j in ds.index.near(min(a[0], b[0]) - reach, min(a[1], b[1]) - reach, max(a[0], b[0]) + reach, max(a[1], b[1]) + reach):
+    for j in ds.index.near(
+        min(a[0], b[0]) - reach, min(a[1], b[1]) - reach, max(a[0], b[0]) + reach, max(a[1], b[1]) + reach
+    ):
         s = ds.segs[j]
         if s[4] < 1.0 or float(s[5] or 0.0) < min_w or _is_light(s[6]) or _adiff(_ang(s), ang) > 3.0:
             continue
@@ -2024,10 +2069,7 @@ def uncovered_walls(
         return []
     tol_w = 0.6 / 12.0 * upf
     min_len = 1.0 * upf
-    face = [
-        j for j, s in enumerate(ds.segs)
-        if s[4] >= min_len and (s[6], round(float(s[5] or 0.0), 2)) in pens
-    ]
+    face = [j for j, s in enumerate(ds.segs) if s[4] >= min_len and (s[6], round(float(s[5] or 0.0), 2)) in pens]
     face_set = set(face)
     wmax = max(widths) + tol_w
     runs: list[tuple[float, float, float, float, float]] = []  # ang, off, lo, hi, width (on the midline)
@@ -2037,7 +2079,9 @@ def uncovered_walls(
         L = s[4]
         ux, uy = (s[2] - s[0]) / L, (s[3] - s[1]) / L
         nx, ny = -uy, ux
-        for j in ds.index.near(min(s[0], s[2]) - wmax, min(s[1], s[3]) - wmax, max(s[0], s[2]) + wmax, max(s[1], s[3]) + wmax):
+        for j in ds.index.near(
+            min(s[0], s[2]) - wmax, min(s[1], s[3]) - wmax, max(s[0], s[2]) + wmax, max(s[1], s[3]) + wmax
+        ):
             if j <= i or j not in face_set:
                 continue
             t = ds.segs[j]
@@ -2093,13 +2137,14 @@ def uncovered_walls(
     for ang_d, o, lo, hi, w in merged:
         ang = math.radians(ang_d)
         ex, ey = math.cos(ang), math.sin(ang)
+
         # Back to points: centre line points at lo / hi.
         def pt(t: float) -> tuple[float, float]:
             return (ex * t - ey * o, ey * t + ex * o)
 
         # Take away what the walls already found cover.
         cuts: list[tuple[float, float]] = []
-        for (ca, cb, cw) in covered:
+        for ca, cb, cw in covered:
             dx, dy = cb[0] - ca[0], cb[1] - ca[1]
             cl = math.hypot(dx, dy)
             if cl <= 0:
@@ -2164,9 +2209,17 @@ def parse_ft_in(text: str) -> float | None:
 
 # Standard architectural scales, units (pt) per foot.
 _STD_SCALES = [
-    ('3" = 1\'-0"', 216.0), ('1 1/2" = 1\'-0"', 108.0), ('1" = 1\'-0"', 72.0), ('3/4" = 1\'-0"', 54.0),
-    ('1/2" = 1\'-0"', 36.0), ('3/8" = 1\'-0"', 27.0), ('1/4" = 1\'-0"', 18.0), ('3/16" = 1\'-0"', 13.5),
-    ('1/8" = 1\'-0"', 9.0), ('3/32" = 1\'-0"', 6.75), ('1/16" = 1\'-0"', 4.5),
+    ('3" = 1\'-0"', 216.0),
+    ('1 1/2" = 1\'-0"', 108.0),
+    ('1" = 1\'-0"', 72.0),
+    ('3/4" = 1\'-0"', 54.0),
+    ('1/2" = 1\'-0"', 36.0),
+    ('3/8" = 1\'-0"', 27.0),
+    ('1/4" = 1\'-0"', 18.0),
+    ('3/16" = 1\'-0"', 13.5),
+    ('1/8" = 1\'-0"', 9.0),
+    ('3/32" = 1\'-0"', 6.75),
+    ('1/16" = 1\'-0"', 4.5),
 ]
 
 
@@ -2195,7 +2248,10 @@ def dimension_scale(
         h = max(4.0, min(x1 - x0, y1 - y0))
         best = None
         for s in longs:
-            if not (min(s[0], s[2]) - 4 * h <= cx <= max(s[0], s[2]) + 4 * h and min(s[1], s[3]) - 4 * h <= cy <= max(s[1], s[3]) + 4 * h):
+            if not (
+                min(s[0], s[2]) - 4 * h <= cx <= max(s[0], s[2]) + 4 * h
+                and min(s[1], s[3]) - 4 * h <= cy <= max(s[1], s[3]) + 4 * h
+            ):
                 continue
             ux, uy = (s[2] - s[0]) / s[4], (s[3] - s[1]) / s[4]
             if abs(ux * dx + uy * dy) < 0.995:
@@ -2233,7 +2289,12 @@ def dimension_scale(
             w = sum(feet[k] for k in members)
             if w > best_w:
                 best_w, w_upf, w_n = w, r, len(members)
-        if w_upf is not None and w_n >= 3 and best_w >= 0.4 * total_w and max(feet[k] for k, (q, _b) in enumerate(votes) if abs(q - w_upf) <= 0.03 * w_upf) >= 40.0:
+        if (
+            w_upf is not None
+            and w_n >= 3
+            and best_w >= 0.4 * total_w
+            and max(feet[k] for k, (q, _b) in enumerate(votes) if abs(q - w_upf) <= 0.03 * w_upf) >= 40.0
+        ):
             upf = w_upf
         agree = [q for q, _ in votes if abs(q - upf) <= 0.03 * upf]
         agree.sort()
@@ -2254,20 +2315,27 @@ def dimension_scale(
         if abs(val - upf) <= 0.02 * val:
             name = nm
             break
-    text = name or f"{upf / 72.0 * 12.0:.3g}\" = 1'-0\" (as printed)"
+    text = name or f'{upf / 72.0 * 12.0:.3g}" = 1\'-0" (as printed)'
     return upf, f"{text} - read from the dimensions", region
 
 
-def tick_runs(ds: DetailSheet, upf: float, region: tuple[float, float, float, float] | None = None) -> list[dict[str, Any]]:
+def tick_runs(
+    ds: DetailSheet, upf: float, region: tuple[float, float, float, float] | None = None
+) -> list[dict[str, Any]]:
     """Rows of short, evenly spaced strokes of one pen - the stud / hatch
     pattern a wall is drawn with. Ticks across the wall or slanted (hatch)
     both count; the row's centre line is the wall's, the ticks' reach across
     it the wall's width."""
     lo_w, hi_w = 2.0 / 12.0 * upf, 18.0 / 12.0 * upf
     ticks = [
-        s for s in ds.segs
-        if s[6] is not None and lo_w <= s[4] <= hi_w
-        and (region is None or (region[0] <= (s[0] + s[2]) / 2 <= region[2] and region[1] <= (s[1] + s[3]) / 2 <= region[3]))
+        s
+        for s in ds.segs
+        if s[6] is not None
+        and lo_w <= s[4] <= hi_w
+        and (
+            region is None
+            or (region[0] <= (s[0] + s[2]) / 2 <= region[2] and region[1] <= (s[1] + s[3]) / 2 <= region[3])
+        )
     ]
     used: set[int] = set()
     runs: list[dict[str, Any]] = []
@@ -2298,7 +2366,7 @@ def tick_runs(ds: DetailSheet, upf: float, region: tuple[float, float, float, fl
             pts.append((mx * ex + my * ey, -mx * ey + my * ex, i))
         pts.sort()
         # Split at gaps far above the row's own spacing.
-        gaps = [b[0] - a[0] for a, b in zip(pts, pts[1:]) if b[0] - a[0] > 0.3]
+        gaps = [b[0] - a[0] for a, b in zip(pts, pts[1:], strict=False) if b[0] - a[0] > 0.3]
         if not gaps:
             continue
         sp = sorted(gaps)[len(gaps) // 2]
@@ -2306,7 +2374,7 @@ def tick_runs(ds: DetailSheet, upf: float, region: tuple[float, float, float, fl
             continue
         cur = [pts[0]]
         chunks = []
-        for a, b in zip(pts, pts[1:]):
+        for a, b in zip(pts, pts[1:], strict=False):
             if b[0] - a[0] > 3.0 * sp:
                 chunks.append(cur)
                 cur = []
@@ -2324,11 +2392,26 @@ def tick_runs(ds: DetailSheet, upf: float, region: tuple[float, float, float, fl
             width = abs(math.sin(math.radians(ta - wa))) * s0[4]
             a = (ex * t0 - ey * off, ey * t0 + ex * off)
             b = (ex * t1 - ey * off, ey * t1 + ex * off)
-            runs.append({
-                "pen": pen, "ang": wa, "off": off, "t0": t0, "t1": t1, "width": width,
-                "spacing": sp, "n": len(ch), "a": a, "b": b,
-                "bbox": (min(a[0], b[0]) - width, min(a[1], b[1]) - width, max(a[0], b[0]) + width, max(a[1], b[1]) + width),
-            })
+            runs.append(
+                {
+                    "pen": pen,
+                    "ang": wa,
+                    "off": off,
+                    "t0": t0,
+                    "t1": t1,
+                    "width": width,
+                    "spacing": sp,
+                    "n": len(ch),
+                    "a": a,
+                    "b": b,
+                    "bbox": (
+                        min(a[0], b[0]) - width,
+                        min(a[1], b[1]) - width,
+                        max(a[0], b[0]) + width,
+                        max(a[1], b[1]) + width,
+                    ),
+                }
+            )
     return runs
 
 
@@ -2339,19 +2422,34 @@ _WALL_TYPE_RE = re.compile(
     re.IGNORECASE,
 )
 # Not a legend entry: notes, sheet titles, references.
-_NOT_LEGEND_RE = re.compile(r"^\s*(?:GENERAL\s+)?NOTES?\b|\bPLAN\b|\bLAYOUT\b|\bSEE\s+(?:SHEET|DETAIL|DWG)|\bELEVATION\b|\bSECTION\b", re.IGNORECASE)
+_NOT_LEGEND_RE = re.compile(
+    r"^\s*(?:GENERAL\s+)?NOTES?\b|\bPLAN\b|\bLAYOUT\b|\bSEE\s+(?:SHEET|DETAIL|DWG)|\bELEVATION\b|\bSECTION\b",
+    re.IGNORECASE,
+)
 _PEN_NAMES = [
-    ((0, 0, 20), "BLUE"), ((0, 20, 0), "GREEN"), ((20, 0, 20), "MAGENTA"), ((20, 10, 0), "ORANGE"),
-    ((0, 20, 20), "CYAN"), ((20, 0, 0), "RED"), ((20, 20, 0), "YELLOW"), ((0, 0, 0), "BLACK"),
-    ((10, 10, 10), "GREY"), ((10, 0, 10), "PURPLE"), ((0, 10, 0), "DARK GREEN"), ((0, 0, 10), "NAVY"),
-    ((16, 8, 3), "BROWN"), ((20, 15, 10), "TAN"), ((10, 15, 20), "LIGHT BLUE"), ((10, 20, 10), "LIGHT GREEN"),
+    ((0, 0, 20), "BLUE"),
+    ((0, 20, 0), "GREEN"),
+    ((20, 0, 20), "MAGENTA"),
+    ((20, 10, 0), "ORANGE"),
+    ((0, 20, 20), "CYAN"),
+    ((20, 0, 0), "RED"),
+    ((20, 20, 0), "YELLOW"),
+    ((0, 0, 0), "BLACK"),
+    ((10, 10, 10), "GREY"),
+    ((10, 0, 10), "PURPLE"),
+    ((0, 10, 0), "DARK GREEN"),
+    ((0, 0, 10), "NAVY"),
+    ((16, 8, 3), "BROWN"),
+    ((20, 15, 10), "TAN"),
+    ((10, 15, 20), "LIGHT BLUE"),
+    ((10, 20, 10), "LIGHT GREEN"),
 ]
 
 
 def pen_name(pen) -> str:
     if pen is None:
         return "BLACK"
-    return min(_PEN_NAMES, key=lambda pn: sum((a - b) ** 2 for a, b in zip(pn[0], pen)))[1]
+    return min(_PEN_NAMES, key=lambda pn: sum((a - b) ** 2 for a, b in zip(pn[0], pen, strict=False)))[1]
 
 
 def _bb_gap(a, b) -> float:
@@ -2403,7 +2501,8 @@ def legend_wall_types(
         # A sample: a short tick row right beside the text (a legend swatch
         # is short - a few feet, not a wall of the plan).
         near = [
-            r for r in runs
+            r
+            for r in runs
             if _bb_gap(r["bbox"], bb) <= max(4.0 * h, 1.0 * upf)
             and (r["t1"] - r["t0"]) <= max(bb[2] - bb[0], 30 * h) * 1.3
             and (not coloured(blk["pen"]) or r["pen"] == blk["pen"])
@@ -2441,21 +2540,29 @@ def legend_walls(
     pens = {t["pen"] for t in types}
     samples = [t["sample"] for t in types if t.get("sample")]
     cand = [
-        r for r in runs
-        if r["pen"] in pens and not any(r is s for s in samples)
+        r
+        for r in runs
+        if r["pen"] in pens
+        and not any(r is s for s in samples)
         and not any(_bb_gap(r["bbox"], lb) <= 1.0 * upf for lb in legend_boxes)
     ]
     # Small marks along each face of a wall (flange ticks) are part of the
     # wall drawn between them, whatever their colour - not walls of their own.
     every = [r for r in runs if r["width"] >= 2.4 / 12.0 * upf]
     cand = [
-        r for r in cand
-        if r["width"] >= 2.4 / 12.0 * upf and not any(
-            q is not r and round(q["ang"]) == round(r["ang"]) and q["width"] >= 2.0 * r["width"]
-            and abs(q["off"] - r["off"]) <= q["width"] + 1.0 and min(q["t1"], r["t1"]) - max(q["t0"], r["t0"]) > 0
+        r
+        for r in cand
+        if r["width"] >= 2.4 / 12.0 * upf
+        and not any(
+            q is not r
+            and round(q["ang"]) == round(r["ang"])
+            and q["width"] >= 2.0 * r["width"]
+            and abs(q["off"] - r["off"]) <= q["width"] + 1.0
+            and min(q["t1"], r["t1"]) - max(q["t0"], r["t0"]) > 0
             for q in every
         )
     ]
+
     # The plan: walls inside the dimensioned area, and every wall joined to
     # them (an outside wall drawn past the dimension lines). A legend's
     # elevation drawings stand apart and stay out.
@@ -2483,7 +2590,11 @@ def legend_walls(
             if lines:
                 L = lines[-1]
                 q = L[-1]
-                if round(q["ang"]) == round(r["ang"]) and abs(q["off"] - r["off"]) <= 2.0 and r["t0"] - q["t1"] <= 16.0 * upf:
+                if (
+                    round(q["ang"]) == round(r["ang"])
+                    and abs(q["off"] - r["off"]) <= 2.0
+                    and r["t0"] - q["t1"] <= 16.0 * upf
+                ):
                     L.append(r)
                     continue
             lines.append([r])
@@ -2498,7 +2609,7 @@ def legend_walls(
             widths = sorted(r["width"] for r in L)
             width = widths[len(widths) // 2]
             openings = []
-            for p, q in zip(L, L[1:]):
+            for p, q in zip(L, L[1:], strict=False):
                 g0, g1 = p["t1"], q["t0"]
                 if g1 - g0 >= 2.0 * upf:
                     openings.append((g0 - t0, g1 - t0))
@@ -2730,7 +2841,11 @@ def stair_flights(model) -> list[dict[str, Any]]:
     for f in flights:
         x0, y0, x1, y1 = f["bbox"]
         pad = 4.0 * upf
-        said = [t for t, bb in texts if x0 - pad <= (bb[0] + bb[2]) / 2.0 <= x1 + pad and y0 - pad <= (bb[1] + bb[3]) / 2.0 <= y1 + pad]
+        said = [
+            t
+            for t, bb in texts
+            if x0 - pad <= (bb[0] + bb[2]) / 2.0 <= x1 + pad and y0 - pad <= (bb[1] + bb[3]) / 2.0 <= y1 + pad
+        ]
         if not said:
             continue
         rad = math.radians(f["ang"])
@@ -2739,20 +2854,19 @@ def stair_flights(model) -> list[dict[str, Any]]:
         ts = [p[0] * ux + p[1] * uy for a, b in f["lines"] for p in (a, b)]
         os_ = [((a[0] + b[0]) / 2.0) * nx + ((a[1] + b[1]) / 2.0) * ny for a, b in f["lines"]]
         t0, t1, o0, o1 = min(ts), max(ts), min(os_), max(os_)
-        rect = [
-            (ux * t + nx * o, uy * t + ny * o)
-            for t, o in ((t0, o0), (t1, o0), (t1, o1), (t0, o1))
-        ]
+        rect = [(ux * t + nx * o, uy * t + ny * o) for t, o in ((t0, o0), (t1, o0), (t1, o1), (t0, o1))]
         treads = len(f["lines"])
-        out.append({
-            "treads": treads,
-            "risers": treads + 1,
-            "width_ft": (t1 - t0) / upf,
-            "run_ft": (o1 - o0) / upf,
-            "going_in": f["pitch"] / upf * 12.0,
-            "rect": rect,
-            "text": " ".join(" ".join(t.split()) for t in said[:2]),
-        })
+        out.append(
+            {
+                "treads": treads,
+                "risers": treads + 1,
+                "width_ft": (t1 - t0) / upf,
+                "run_ft": (o1 - o0) / upf,
+                "going_in": f["pitch"] / upf * 12.0,
+                "rect": rect,
+                "text": " ".join(" ".join(t.split()) for t in said[:2]),
+            }
+        )
     return out
 
 

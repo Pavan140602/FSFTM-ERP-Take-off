@@ -64,7 +64,15 @@ interface Preferences {
   dateFormat: DateFormat;
   numberLocale: NumberLocale;
   defaultCurrency: string;
+  /**
+   * Smallest inch fraction imperial lengths are rounded to (1/N"), used by
+   * the PDF Measurements module. 16 = nearest 1/16".
+   */
+  imperialDenominator: ImperialDenominator;
 }
+
+export const IMPERIAL_DENOMINATORS = [2, 4, 8, 16, 32, 64] as const;
+export type ImperialDenominator = (typeof IMPERIAL_DENOMINATORS)[number];
 
 /**
  * Keys this store used to carry and no longer does.
@@ -80,12 +88,16 @@ interface Preferences {
  */
 const RETIRED_KEYS = ['vatRate', 'defaultRegion', 'defaultStandard'] as const;
 
+// FSFTM defaults: United States region - US dollars and imperial units.
+// Dates and numbers stay 'auto', which on the default English UI renders
+// US style (12/31/2026, 1,234.56). A user's saved choice still wins.
 const DEFAULTS: Preferences = {
-  currency: 'EUR',
-  measurementSystem: 'metric',
+  currency: 'USD',
+  measurementSystem: 'imperial',
   dateFormat: 'auto',
   numberLocale: 'auto',
-  defaultCurrency: 'EUR',
+  defaultCurrency: 'USD',
+  imperialDenominator: 16,
 };
 
 /**
@@ -113,6 +125,9 @@ function readPreferences(): Preferences {
     const { _v: version, ...stored } = JSON.parse(raw) as Partial<Preferences> & { _v?: number };
     const prefs: Preferences = { ...DEFAULTS, ...stored };
     for (const key of RETIRED_KEYS) delete (prefs as unknown as Record<string, unknown>)[key];
+    if (!(IMPERIAL_DENOMINATORS as readonly number[]).includes(prefs.imperialDenominator)) {
+      prefs.imperialDenominator = DEFAULTS.imperialDenominator;
+    }
     if ((version ?? 1) < SCHEMA_VERSION && prefs.numberLocale === LEGACY_NUMBER_LOCALE) {
       prefs.numberLocale = 'auto';
     }

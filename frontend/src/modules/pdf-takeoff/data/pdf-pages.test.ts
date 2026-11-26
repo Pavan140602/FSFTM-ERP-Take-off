@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PDFArray, PDFDocument, PDFName } from 'pdf-lib';
+import { PDFArray, PDFDocument, PDFName, degrees } from 'pdf-lib';
 import { editPages, extractPages, makeSnapshot, saveVectorPdf, rotatePoint, type AnnotInput } from './pdf-pages';
 import type { Measurement } from '../../../features/takeoff/lib/takeoff-types';
 
@@ -28,6 +28,19 @@ describe('pdf-pages', () => {
     expect(r.pageMap).toEqual({ 1: 1, 2: 4, 3: 5 });
     const r0 = await editPages(await threePages(), { kind: 'insertBlank', after: 0, count: 1 });
     expect(r0.pageMap).toEqual({ 1: 2, 2: 3, 3: 4 });
+  });
+  it('makes an inserted blank page match the selected page as displayed (rotated sheet)', async () => {
+    // A sheet stored portrait (400 x 600) with /Rotate 90 reads landscape.
+    const d = await PDFDocument.create();
+    d.addPage([600, 400]);
+    d.addPage([400, 600]).setRotation(degrees(90));
+    d.addPage([600, 400]);
+    const r = await editPages(await d.save(), { kind: 'insertBlank', after: 2, count: 1 });
+    const out = await PDFDocument.load(r.bytes);
+    const blank = out.getPage(2); // right after page 2
+    expect([Math.round(blank.getWidth()), Math.round(blank.getHeight())]).toEqual([600, 400]);
+    expect(blank.getRotation().angle).toBe(0);
+    expect(r.pageMap).toEqual({ 1: 1, 2: 2, 3: 4 });
   });
   it('inserts and replaces from another PDF', async () => {
     const other = await extractPages(await threePages(), [3]);

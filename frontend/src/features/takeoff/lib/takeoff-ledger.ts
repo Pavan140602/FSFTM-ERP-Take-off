@@ -128,6 +128,7 @@ function compareByColumn(
       return ((a.customFields?.Material || '') as string).localeCompare((b.customFields?.Material || '') as string);
     case 'group':
       return (a.group || 'General').localeCompare(b.group || 'General');
+    case 'value': // pre-FSFTM name of the Length column
     case 'length':
       // Sort by the figure the column shows (wall area, wastage, deduction sign).
       return effectiveQuantity(a) - effectiveQuantity(b);
@@ -145,12 +146,13 @@ function compareByColumn(
       return (a.author || '').localeCompare(b.author || '');
     case 'date':
       return (a.createdAt || '').localeCompare(b.createdAt || '');
-    default:
+    default: {
       // Custom user column: sort by the custom field value (string compare).
       // The column key is the custom column name.
       const av = (a.customFields as Record<string, string> | undefined)?.[column] || '';
       const bv = (b.customFields as Record<string, string> | undefined)?.[column] || '';
       return av.localeCompare(bv);
+    }
   }
 }
 

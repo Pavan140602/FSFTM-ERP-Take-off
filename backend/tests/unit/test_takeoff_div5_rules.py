@@ -8,10 +8,10 @@ from __future__ import annotations
 
 import pymupdf
 
-from app.modules.takeoff import auto_takeoff as A
-from app.modules.takeoff import bearing_walls as BW
-from app.modules.takeoff import detail_scan as Z
-from app.modules.takeoff import detect as D
+from app.modules.takeoff import auto_takeoff as A  # noqa: N812
+from app.modules.takeoff import bearing_walls as BW  # noqa: N812
+from app.modules.takeoff import detail_scan as Z  # noqa: N812
+from app.modules.takeoff import detect as D  # noqa: N812
 
 UPF = 9.0  # 1/8" = 1'-0"
 
@@ -43,7 +43,7 @@ def test_vocabulary_joist_girders_round_hss_pipe_kcs() -> None:
 def test_bare_wall_code_is_not_deck() -> None:
     assert A.deck_info("1B") is None and A.deck_info("3A") is None
     assert A.deck_info('1.5" B 20GA') is not None
-    assert A.deck_info("1 1/2\" TYPE B ROOF DECK") is not None
+    assert A.deck_info('1 1/2" TYPE B ROOF DECK') is not None
 
 
 def test_joist_field_named_from_zone_mark_and_legend() -> None:
@@ -117,7 +117,10 @@ def test_wall_type_codes_in_diamonds_tag_walls() -> None:
     model = _model(page)
     tags = A.symbol_wall_tags(model)
     assert len(tags) == 3
-    assert all(info["designation"] == "2A" and "600S162-54" in info["spec"] and "FIRE RATED" in info["spec"] for _l, info in tags)
+    assert all(
+        info["designation"] == "2A" and "600S162-54" in info["spec"] and "FIRE RATED" in info["spec"]
+        for _l, info in tags
+    )
 
 
 def test_one_off_numbers_in_symbols_are_not_wall_types() -> None:
@@ -144,8 +147,16 @@ def test_bearing_from_joists_above() -> None:
 
 
 def _wall(x0, y0, x1, y1, role="Wall"):
-    return {"category": "walls", "kind": "line", "segment": "wall", "role": role, "designation": "WALL",
-            "points": [[x0, y0], [x1, y1]], "wall_width": 4.5, "spec": "Drawn wall with no wall tag"}
+    return {
+        "category": "walls",
+        "kind": "line",
+        "segment": "wall",
+        "role": role,
+        "designation": "WALL",
+        "points": [[x0, y0], [x1, y1]],
+        "wall_width": 4.5,
+        "spec": "Drawn wall with no wall tag",
+    }
 
 
 def test_default_roles_exterior_demising_partition() -> None:

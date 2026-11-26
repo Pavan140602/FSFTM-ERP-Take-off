@@ -9,6 +9,9 @@ import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { visualizer } from 'rollup-plugin-visualizer';
 import { VitePWA } from 'vite-plugin-pwa';
+
+/** Low-memory production build for 16 GB PCs (build-frontend.bat sets it). */
+const LEAN_BUILD = process.env.OE_LEAN_BUILD === '1';
 import path from 'path';
 import { cpSync, existsSync, readFileSync, readdirSync, createReadStream, statSync } from 'fs';
 import type { Plugin } from 'vite';
@@ -186,12 +189,19 @@ export default defineConfig({
   },
   plugins: [
     react(),
-    visualizer({
-      filename: 'stats.html',
-      gzipSize: true,
-      brotliSize: true,
-      open: false,
-    }),
+    // OE_LEAN_BUILD=1 (build-frontend.bat): skip the bundle-size report, whose
+    // gzip + brotli pass over every chunk is what runs a 16 GB PC out of memory.
+    // CI and normal builds keep it.
+    ...(LEAN_BUILD
+      ? []
+      : [
+          visualizer({
+            filename: 'stats.html',
+            gzipSize: true,
+            brotliSize: true,
+            open: false,
+          }),
+        ]),
     cesiumAssets(),
     pdfjsAssets(),
     jsonLdSoftwareVersion(),
@@ -491,6 +501,12 @@ export default defineConfig({
     ],
   },
   build: {
+    // Lean build: no compressed-size report either (memory, see LEAN_BUILD).
+    reportCompressedSize: !LEAN_BUILD,
+    // Lean build: no minification - the minifier is the memory peak, and a
+    // bundle served from this PC gains nothing from smaller files. React still
+    // runs its production build (NODE_ENV=production).
+    ...(LEAN_BUILD ? { minify: false } : {}),
     // Keep heavy, route-only vendor chunks out of the entry HTML's eager
     // <link rel="modulepreload"> set. They are reached only through lazy()
     // routes (geo hub globe, flow editor, 3D viewer, PDF/takeoff, Excel
@@ -507,6 +523,8 @@ export default defineConfig({
       },
     },
     rollupOptions: {
+      // Lean build: fewer files open at once keeps peak memory down.
+      ...(LEAN_BUILD ? { maxParallelFileOps: 4 } : {}),
       output: {
         manualChunks(id) {
           // i18n locales: each ``src/app/locales/<code>.ts`` is fetched

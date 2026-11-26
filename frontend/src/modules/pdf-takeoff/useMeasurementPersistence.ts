@@ -1,5 +1,6 @@
 // DDC-CWICR-OE: DataDrivenConstruction · OpenConstructionERP
 // Copyright (c) 2026 Artem Boiko / DataDrivenConstruction
+import { isLineEnding, type LineEnding } from './data/line-endings';
 import { cleanLegendSetup } from './data/legend-setup';
 import { cleanLabelStyle, labelStyleOf } from '../../features/takeoff/lib/takeoff-fsftm-props';
 import { cleanTextStyle } from './data/text-box';
@@ -54,7 +55,7 @@ interface Measurement {
     | 'perimeter' | 'diameter' | 'radiusCenter' | 'radius3Point' | 'angle'
     // FSFTM markup + arc tools (OE-DELIVERY 2026-10-30-fsftm-markup-tools).
     | 'line' | 'polygon' | 'ellipse' | 'pen' | 'callout' | 'stamp' | 'arc'
-    | 'polygonCutout' | 'ellipseCutout' | 'dynamicFill';
+    | 'polygonCutout' | 'ellipseCutout' | 'dynamicFill' | 'legend';
   points: Point[];
   value: number;
   unit: string;
@@ -92,6 +93,8 @@ interface Measurement {
    *  line pattern, a fill colour independent of the line colour, and which
    *  label parts show on the drawing. Undefined = previous behaviour. */
   lineStyle?: 'solid' | 'dashed' | 'dotted' | 'dashdot';
+  lineStart?: LineEnding;
+  lineEnd?: LineEnding;
   fillColor?: string;
   labelMode?: 'all' | 'value' | 'name' | 'none';
   /** FSFTM Properties toolbar (OE-DELIVERY 2026-11-02-fsftm-properties-bar):
@@ -453,6 +456,8 @@ function toApiFormat(
       stroke_alpha: m.strokeAlpha,
       // FSFTM-style properties (OE-DELIVERY 2026-11-02-fsftm-properties).
       line_style: m.lineStyle,
+      line_start: m.lineStart,
+      line_end: m.lineEnd,
       fill_color: m.fillColor,
       label_mode: m.labelMode,
       label_style: labelStyleOf(m) ?? undefined,
@@ -537,6 +542,8 @@ function syncSignature(m: Measurement): string {
     swr: m.strokeWidthReal ?? null,
     sa: m.strokeAlpha ?? null,
     ls: m.lineStyle ?? null,
+    lnS: m.lineStart ?? null,
+    lnE: m.lineEnd ?? null,
     fc: m.fillColor ?? null,
     lm: m.labelMode ?? null,
     lst: labelStyleOf(m),
@@ -640,6 +647,8 @@ function toApiUpdate(
     stroke_alpha: m.strokeAlpha,
     // FSFTM-style properties (OE-DELIVERY 2026-11-02-fsftm-properties); NULL clears.
     line_style: m.lineStyle ?? null,
+    line_start: m.lineStart ?? null,
+    line_end: m.lineEnd ?? null,
     fill_color: m.fillColor ?? null,
     label_mode: m.labelMode ?? null,
     label_style: labelStyleOf(m),
@@ -773,6 +782,8 @@ function fromApiFormat(r: MeasurementResponse): Measurement {
     strokeWidthReal: (meta.stroke_width_real as number) ?? undefined,
     strokeAlpha: (meta.stroke_alpha as number) ?? undefined,
     lineStyle: isLineStyle(meta.line_style) ? meta.line_style : undefined,
+    lineStart: isLineEnding(meta.line_start) ? meta.line_start : undefined,
+    lineEnd: isLineEnding(meta.line_end) ? meta.line_end : undefined,
     fillColor: typeof meta.fill_color === 'string' ? meta.fill_color : undefined,
     labelMode: isLabelMode(meta.label_mode) ? meta.label_mode : undefined,
     ...cleanLabelStyle(meta.label_style),
@@ -915,6 +926,9 @@ interface UseMeasurementPersistenceOptions {
 }
 
 interface UseMeasurementPersistenceResult {
+  /** Where the markups are kept: on the server (project + document) and/or
+   *  in this browser under `localKey`. */
+  storageInfo: { server: boolean; localKey: string | null; projectId: string | null; documentId: string | null };
   hasPersistedData: boolean;
   saveNow: () => void;
   clearPersisted: () => void;
@@ -1730,5 +1744,8 @@ export function useMeasurementPersistence({
     syncedToServer,
     registerDeletion,
     hasUnsavedChanges,
+    // Where the markups live, for the viewer's "Where is my work saved?" info
+    // (OE-DELIVERY 2026-11-25-fsftm-pdf).
+    storageInfo: { server: canSync, localKey, projectId: projectId ?? null, documentId },
   };
 }

@@ -3,8 +3,8 @@
 
 from __future__ import annotations
 
-from app.modules.takeoff import auto_takeoff as A
-from app.modules.takeoff import auto_takeoff_ai as X
+from app.modules.takeoff import auto_takeoff as A  # noqa: N812
+from app.modules.takeoff import auto_takeoff_ai as X  # noqa: N812
 
 BLACK = (0, 0, 0)
 GREY = (17, 17, 17)
@@ -51,13 +51,20 @@ def test_classify_categories():
 
 
 def test_ai_hint_can_veto_and_classify():
-    hints = {"A3": {"category": "walls", "designation": "A3", "spacing_in": None, "spec": "6in stud"}, "SW-1": {"category": "ignore"}}
+    hints = {
+        "A3": {"category": "walls", "designation": "A3", "spacing_in": None, "spec": "6in stud"},
+        "SW-1": {"category": "ignore"},
+    }
     assert A.classify(lab("A3", 0, 0, 10, 8), hints)["category"] == "walls"
     assert A.classify(lab("SW-1", 0, 0, 20, 8), hints) is None
 
 
 def test_fragments_merge_along_baseline():
-    parts = [lab("1200S200-54", 100, 100, 157, 109), lab("@", 160, 100, 169, 109), lab("4' - 0\" o.c.", 172, 100, 214, 109)]
+    parts = [
+        lab("1200S200-54", 100, 100, 157, 109),
+        lab("@", 160, 100, 169, 109),
+        lab("4' - 0\" o.c.", 172, 100, 214, 109),
+    ]
     merged = A._merge_fragments(parts)
     assert len(merged) == 1 and merged[0].text.startswith("1200S200-54 @ 4'")
 
@@ -113,13 +120,20 @@ def test_dedupe_drops_identical_lines():
 
 
 def test_parse_hints_and_vision_labels():
-    hints, specs = X.parse_hints({
-        "labels": [{"text": "T 10", "category": "trusses", "designation": "T10", "spacing_in": 24}, {"text": "x", "category": "bogus"}],
-        "wall_types": {"W1": "6in metal stud"},
-    })
+    hints, specs = X.parse_hints(
+        {
+            "labels": [
+                {"text": "T 10", "category": "trusses", "designation": "T10", "spacing_in": 24},
+                {"text": "x", "category": "bogus"},
+            ],
+            "wall_types": {"W1": "6in metal stud"},
+        }
+    )
     assert hints["T10"]["category"] == "trusses" and "X" not in hints
     assert specs == {"W1": "6in metal stud"}
-    labels = X.labels_from_vision({"labels": [{"text": "W12X26", "box": [0.1, 0.2, 0.12, 0.3], "angle": 90}]}, 1000, 1000)
+    labels = X.labels_from_vision(
+        {"labels": [{"text": "W12X26", "box": [0.1, 0.2, 0.12, 0.3], "angle": 90}]}, 1000, 1000
+    )
     assert labels[0].angle == -90 and abs(labels[0].rect[0] - 100) < 1e-6
 
 
@@ -127,7 +141,7 @@ def test_parse_hints_and_vision_labels():
 
 
 def _line(*words):
-    from app.modules.takeoff import detect as D
+    from app.modules.takeoff import detect as D  # noqa: N812
 
     ln = D._Line()
     for text, x0, y0 in words:
@@ -141,7 +155,11 @@ def _sched_model(lines):
 
 
 def test_column_schedule_row_form():
-    lines = [_line(("MARK", 100, 100), ("SIZE", 200, 100)), _line(("C1", 100, 120), ("HSS8X8X1/2", 200, 120)), _line(("C2", 100, 140), ("W10X33", 200, 140))]
+    lines = [
+        _line(("MARK", 100, 100), ("SIZE", 200, 100)),
+        _line(("C1", 100, 120), ("HSS8X8X1/2", 200, 120)),
+        _line(("C2", 100, 140), ("W10X33", 200, 140)),
+    ]
     assert A.column_schedule([_sched_model(lines)]) == {"C1": "HSS8X8X1/2", "C2": "W10X33"}
 
 
@@ -194,7 +212,7 @@ def test_header_and_jamb_classification():
 
 # OE-DELIVERY 2026-11-03-auto-takeoff-members
 def test_steel_and_cfs_member_types():
-    from app.modules.takeoff.auto_takeoff import Label, classify, deck_info, wall_role, _bearing_of_openings
+    from app.modules.takeoff.auto_takeoff import Label, _bearing_of_openings, classify, deck_info, wall_role
 
     def lab(t):
         return Label(text=t, rect=(0, 0, 40, 8), angle=0.0, size=6.0)
@@ -203,7 +221,7 @@ def test_steel_and_cfs_member_types():
     assert deck_info('3" VLI 20 COMPOSITE DECK')["deck_type"] == "Composite Deck"
     assert deck_info("0.6C FORM DECK")["deck_type"] == "Form Deck"
     assert deck_info("W12X26") is None
-    assert classify(lab('18K5 @ 4\'-0" O.C.'))["role"] == "Steel Joist"
+    assert classify(lab("18K5 @ 4'-0\" O.C."))["role"] == "Steel Joist"
     assert classify(lab("24LH06"))["role"] == "Steel Joist"
     hat = classify(lab('7/8" HAT CHANNEL @ 16" O.C.'))
     assert hat["role"] == "Hat Channel" and hat["series"] is True

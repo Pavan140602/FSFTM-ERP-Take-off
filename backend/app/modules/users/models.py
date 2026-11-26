@@ -10,7 +10,7 @@ Tables:
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -70,8 +70,11 @@ class User(Base):
 
     # Regional preferences
     timezone: Mapped[str] = mapped_column(String(50), nullable=False, default="UTC", server_default="UTC")
+    # FSFTM: new accounts start imperial (US). server_default is left as
+    # "metric" so the table DDL does not change and no migration is needed;
+    # ORM inserts always use the Python-side default.
     measurement_system: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="metric", server_default="metric"
+        String(20), nullable=False, default="imperial", server_default="metric"
     )
     # "auto" means the paper size follows the country of the project the
     # document belongs to, resolved by app.core.paper_size. The old default of
@@ -270,7 +273,7 @@ class RoleModuleConfig(Base):
         JSON, nullable=False, default=list, server_default="[]"
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )
     updated_by: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True)
 

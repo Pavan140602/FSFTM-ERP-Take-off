@@ -260,7 +260,7 @@ function addAnnots(doc: PDFDocument, pageIndex: number, items: AnnotInput[], fon
     page.node.addAnnot(ctx.register(ctx.obj(dict as never)));
     n++;
   };
-  const clean = (t: string) => t.replace(/[^\x20-\x7E -ÿ]/g, '');
+  const clean = (t: string) => t.replace(/[^\x20-\x7E\u00A0-\u00FF]/g, '');
   const sub = (a: Pt, b: Pt): Pt => ({ x: a.x - b.x, y: a.y - b.y });
   const fontOf = (bold?: boolean, italic?: boolean) =>
     bold && italic ? { f: fonts.boldItalic, k: FONT_KEYS.boldItalic }
@@ -629,10 +629,14 @@ export async function editPages(bytes: Uint8Array, edit: PageEdit): Promise<{ by
   return { bytes: await out.save(), pageMap: map, numPages: plan.length };
 }
 
-function sizeOf(doc: PDFDocument, idx: number): [number, number] {
+/** Size of a page as it is DISPLAYED: a page stored portrait with /Rotate 90
+ *  reads landscape, so a blank page inserted next to it is made landscape too
+ *  (OE-DELIVERY 2026-11-25-fsftm-pdf). */
+export function sizeOf(doc: PDFDocument, idx: number): [number, number] {
   const p = doc.getPage(Math.max(0, Math.min(idx, doc.getPageCount() - 1)));
   const { width, height } = p.getSize();
-  return [width, height];
+  const rot = ((p.getRotation().angle % 360) + 360) % 360;
+  return rot === 90 || rot === 270 ? [height, width] : [width, height];
 }
 
 /** Write (or clear) the ERP snapshot on finished bytes. */

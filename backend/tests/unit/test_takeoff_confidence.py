@@ -83,6 +83,8 @@ class TestExtractedElementConfidenceBound:
 class _DocStub:
     def __init__(self, page_data: list) -> None:
         self.page_data = page_data
+        self.metadata_: dict = {}
+        self.file_path = None
 
 
 class _RepoStub:

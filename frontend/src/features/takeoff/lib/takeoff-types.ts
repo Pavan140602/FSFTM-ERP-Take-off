@@ -133,6 +133,9 @@ export interface Measurement {
    *  line pattern, a fill colour independent of the line colour, and which
    *  label parts show on the drawing. Undefined = previous behaviour. */
   lineStyle?: 'solid' | 'dashed' | 'dotted' | 'dashdot';
+  /** FSFTM Start / End line endings (OE-DELIVERY 2026-11-25-fsftm-pdf). */
+  lineStart?: import('@/modules/pdf-takeoff/data/line-endings').LineEnding;
+  lineEnd?: import('@/modules/pdf-takeoff/data/line-endings').LineEnding;
   fillColor?: string;
   labelMode?: 'all' | 'value' | 'name' | 'none';
   /** FSFTM Properties toolbar (OE-DELIVERY 2026-11-02-fsftm-properties-bar):

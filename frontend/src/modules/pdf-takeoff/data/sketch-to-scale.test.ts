@@ -134,8 +134,11 @@ describe('viewport model', () => {
 });
 
 describe('viewport value reconciliation', () => {
-  const recompute = (m: Parameters<typeof recomputeMeasurement>[0], pts: { x: number; y: number }[], sc: Parameters<typeof recomputeMeasurement>[2]) =>
-    recomputeMeasurement(m, pts, sc) as { value: number };
+  // Test rows are plain objects, so the helper takes the reconciler's generic
+  // row shape and hands it to the real recompute as a full Measurement.
+  type Row = { id: string; type: string; page: number; points: { x: number; y: number }[]; value: number };
+  const recompute = (m: Row, pts: { x: number; y: number }[], sc: Parameters<typeof recomputeMeasurement>[2]) =>
+    recomputeMeasurement(m as unknown as Parameters<typeof recomputeMeasurement>[0], pts, sc) as { value: number };
   const line = (id: string, x: number, page = 1) => ({
     id,
     type: 'distance',

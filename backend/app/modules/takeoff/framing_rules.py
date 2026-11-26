@@ -26,6 +26,7 @@ the house rules for every similar project:
 Pure helpers + one entry point (:func:`apply_framing_rules`) used by
 ``auto_takeoff.run_models``.
 """
+
 from __future__ import annotations
 
 import re
@@ -61,7 +62,7 @@ def sheet_kind(titles: list[str]) -> tuple[str | None, int | None]:
     best: tuple[str | None, int | None] = (None, None)
     # Title blocks often break a title over two lines ("1ST FLOOR SHEAR" /
     # "WALL PLAN"): try each line joined with the next one first.
-    cands = [f"{a} {b}" for a, b in zip(titles, titles[1:])] + list(titles)
+    cands = [f"{a} {b}" for a, b in zip(titles, titles[1:], strict=False)] + list(titles)
     wall_nolevel = False
     for t in cands:
         u = " ".join((t or "").upper().split())
@@ -320,11 +321,14 @@ def parse_schedule_table(title: str, rows: list[list[str]]) -> dict[str, Any] | 
     if not rows:
         return None
     # header row = first row naming DESIGNATION / LEVEL / LOCATION / MARK
-    hi = next((i for i, r in enumerate(rows) if any(re.search(r"DESIGNATION|^LEVEL$|LOCATION|^MARK$", c.upper()) for c in r)), None)
+    hi = next(
+        (i for i, r in enumerate(rows) if any(re.search(r"DESIGNATION|^LEVEL$|LOCATION|^MARK$", c.upper()) for c in r)),
+        None,
+    )
     if hi is None:
         return None
     header = rows[hi]
-    body = rows[hi + 1:]
+    body = rows[hi + 1 :]
     out: dict[str, Any] = {}
 
     m_wall = re.search(r"\b(W\s*-?\s*\d+[A-Z]?)\s*-\s*WALL\s+FRAMING\s+SCHEDULE", t)
@@ -347,8 +351,13 @@ def parse_schedule_table(title: str, rows: list[list[str]]) -> dict[str, Any] | 
                 continue
             g = lambda c: r[c] if c is not None and c < len(r) else ""  # noqa: E731
             levels[lv] = {
-                "framing": g(c_fr), "spacing": g(c_sp), "height": g(c_ht),
-                "chord": g(c_chord), "holdown": g(c_hd), "bracing": g(c_br), "level": g(c_lvl),
+                "framing": g(c_fr),
+                "spacing": g(c_sp),
+                "height": g(c_ht),
+                "chord": g(c_chord),
+                "holdown": g(c_hd),
+                "bracing": g(c_br),
+                "level": g(c_lvl),
             }
         if levels:
             out = {"kind": kind, "entries": {tag: {"levels": levels}}}
@@ -376,7 +385,10 @@ def parse_schedule_table(title: str, rows: list[list[str]]) -> dict[str, Any] | 
             if lv is None:
                 continue
             entries.setdefault(cur, {"levels": {}})["levels"][lv] = {
-                "framing": cur_fr, "jack": g(c_j), "king": g(c_k), "level": g(c_lv),
+                "framing": cur_fr,
+                "jack": g(c_j),
+                "king": g(c_k),
+                "level": g(c_lv),
             }
         return {"kind": "header", "entries": entries} if entries else None
 
@@ -480,7 +492,7 @@ def level_row(entry: dict[str, Any] | None, level: int | None) -> dict[str, str]
 
 
 def feet_inches(text: str) -> float | None:
-    """"9'-7 1/4\"" -> feet."""
+    """ "9'-7 1/4\"" -> feet."""
     t = (text or "").replace("''", '"').replace("’", "'")
     m = re.search(r"(\d+)\s*'\s*-?\s*(\d+)?(?:\s+(\d+)/(\d+))?", t)
     if not m:
@@ -614,7 +626,7 @@ def rule_classify(text: str, rules: tuple[str, int | None, dict[str, Any]]) -> d
                 row = level_row(_sched_entry(fs, "wall", second), level)
                 first["wall_type"] = second
                 if row:
-                    extra = f"wall {second}: {row['framing']} @ {row['spacing']}\" O.C., {row['height']} high"
+                    extra = f'wall {second}: {row["framing"]} @ {row["spacing"]}" O.C., {row["height"]} high'
                     first["spec"] = f"{first['spec']}; {extra}" if first.get("spec") else extra
                     first["rule_height"] = row.get("height")
             return first
@@ -627,56 +639,110 @@ def rule_classify(text: str, rules: tuple[str, int | None, dict[str, Any]]) -> d
             tag = f"{m.group(1)}-{m.group(2)}"
             e = _sched_entry(fs, "truss", tag)
             sp = spacing_in(e.get("spacing", "")) if e else None
-            return {"category": "trusses", "designation": tag, "spacing_in": sp or 24.0, "series": True, "tag": True,
-                    "length_ft": feet_inches((e or {}).get("length") or ""),
-                    "role": "Roof Truss" if m.group(1) == "RT" else "Floor Truss", "rule_profile": (e or {}).get("framing"),
-                    "spec": (f"{e['framing']} @ {e['spacing']}\" O.C., {e.get('length') or ''}".strip(", ") if e else None)}
+            return {
+                "category": "trusses",
+                "designation": tag,
+                "spacing_in": sp or 24.0,
+                "series": True,
+                "tag": True,
+                "length_ft": feet_inches((e or {}).get("length") or ""),
+                "role": "Roof Truss" if m.group(1) == "RT" else "Floor Truss",
+                "rule_profile": (e or {}).get("framing"),
+                "spec": (f'{e["framing"]} @ {e["spacing"]}" O.C., {e.get("length") or ""}'.strip(", ") if e else None),
+            }
         m = re.fullmatch(r"(RJ|J)-?(\d{1,2})", t)
         if m:
             tag = f"{m.group(1)}-{m.group(2)}"
             e = _sched_entry(fs, "joist", tag)
             sp = spacing_in(e.get("spacing", "")) if e else None
-            return {"category": "joists", "designation": tag, "spacing_in": sp or 24.0, "series": True, "tag": True,
-                    "length_ft": feet_inches((e or {}).get("length") or ""),
-                    "role": "Roof Joist" if m.group(1) == "RJ" else "CFS Joist", "rule_profile": (e or {}).get("framing"),
-                    "spec": (f"{e['framing']} @ {e['spacing']}\" O.C., {e.get('length') or ''}".strip(", ") if e else None)}
+            return {
+                "category": "joists",
+                "designation": tag,
+                "spacing_in": sp or 24.0,
+                "series": True,
+                "tag": True,
+                "length_ft": feet_inches((e or {}).get("length") or ""),
+                "role": "Roof Joist" if m.group(1) == "RJ" else "CFS Joist",
+                "rule_profile": (e or {}).get("framing"),
+                "spec": (f'{e["framing"]} @ {e["spacing"]}" O.C., {e.get("length") or ""}'.strip(", ") if e else None),
+            }
         m = re.fullmatch(r"B-?(\d{1,2})", t)
         if m and _sched_entry(fs, "cfs_beam", t):
             e = _sched_entry(fs, "cfs_beam", t)
-            return {"category": "beams", "designation": f"B-{m.group(1)}", "spacing_in": None, "series": False, "tag": True,
-                    "role": "CFS Beam", "rule_profile": (e or {}).get("framing"), "spec": (e or {}).get("framing")}
+            return {
+                "category": "beams",
+                "designation": f"B-{m.group(1)}",
+                "spacing_in": None,
+                "series": False,
+                "tag": True,
+                "role": "CFS Beam",
+                "rule_profile": (e or {}).get("framing"),
+                "spec": (e or {}).get("framing"),
+            }
         if re.fullmatch(r"W\d{1,2}[A-Z]?|H-?\d{1,2}|HD|SW-?\d+|BR-?\d+|BRACE-?X?\d*", t) or _SSMA_ONLY.match(t):
             return "skip"
         return None
     if kind == "walls":
         if re.fullmatch(r"W\d{1,2}[A-Z]?", t):
             row = level_row(_sched_entry(fs, "wall", t), level)
-            spec = f"{row['framing']} @ {row['spacing']}\" O.C., {row['height']} high ({row['level']})" if row else None
-            return {"category": "walls", "designation": t, "spacing_in": None, "series": False, "tag": True,
-                    "spec": spec, "role": "Load Bearing Wall", "rule_profile": (row or {}).get("framing"),
-                    "rule_height": (row or {}).get("height"), "rule_level": (row or {}).get("level"),
-                    "rule_spacing": (row or {}).get("spacing")}
+            spec = f'{row["framing"]} @ {row["spacing"]}" O.C., {row["height"]} high ({row["level"]})' if row else None
+            return {
+                "category": "walls",
+                "designation": t,
+                "spacing_in": None,
+                "series": False,
+                "tag": True,
+                "spec": spec,
+                "role": "Load Bearing Wall",
+                "rule_profile": (row or {}).get("framing"),
+                "rule_height": (row or {}).get("height"),
+                "rule_level": (row or {}).get("level"),
+                "rule_spacing": (row or {}).get("spacing"),
+            }
         m = re.fullmatch(r"(SW|BR)-?(\d{1,2})", t)
         if m:
             tag = f"{m.group(1)}-{m.group(2)}"
             row = level_row(_sched_entry(fs, "shear_wall" if m.group(1) == "SW" else "brace_wall", tag), level)
-            spec = (f"Chord studs {row['chord']}; {row['holdown']}; {row['bracing']} ({row['level']})" if row else None)
-            return {"category": "walls", "designation": tag, "spacing_in": None, "series": False, "tag": True, "spec": spec,
-                    "role": "Shear Wall" if m.group(1) == "SW" else "Strap Braced Wall",
-                    "rule_profile": (row or {}).get("chord"), "rule_level": (row or {}).get("level")}
+            spec = f"Chord studs {row['chord']}; {row['holdown']}; {row['bracing']} ({row['level']})" if row else None
+            return {
+                "category": "walls",
+                "designation": tag,
+                "spacing_in": None,
+                "series": False,
+                "tag": True,
+                "spec": spec,
+                "role": "Shear Wall" if m.group(1) == "SW" else "Strap Braced Wall",
+                "rule_profile": (row or {}).get("chord"),
+                "rule_level": (row or {}).get("level"),
+            }
         m = re.fullmatch(r"H-?(\d{1,2})", t)
         if m:
             tag = f"H{m.group(1)}"
             row = level_row(_sched_entry(fs, "header", tag), level)
-            spec = (f"{row['framing']}; jack {row['jack']}; king {row['king']} ({row['level']})" if row else None)
-            return {"category": "other", "designation": tag, "spacing_in": None, "series": False, "tag": True, "spec": spec,
-                    "role": "Load Bearing Header", "count_role": "Load Bearing Header",
-                    "rule_profile": (row or {}).get("framing"), "rule_level": (row or {}).get("level")}
+            spec = f"{row['framing']}; jack {row['jack']}; king {row['king']} ({row['level']})" if row else None
+            return {
+                "category": "other",
+                "designation": tag,
+                "spacing_in": None,
+                "series": False,
+                "tag": True,
+                "spec": spec,
+                "role": "Load Bearing Header",
+                "count_role": "Load Bearing Header",
+                "rule_profile": (row or {}).get("framing"),
+                "rule_level": (row or {}).get("level"),
+            }
         if t == "HD":
             return {"category": "other", "designation": "HD", "count_role": "Holdown", "role": "Holdown", "tag": True}
         m = re.fullmatch(r"BRACE-?(X?\d{1,2})", t)
         if m:
-            return {"category": "other", "designation": f"BRACE-{m.group(1)}", "count_role": "Steel Brace", "role": "Steel Brace", "tag": True}
+            return {
+                "category": "other",
+                "designation": f"BRACE-{m.group(1)}",
+                "count_role": "Steel Brace",
+                "role": "Steel Brace",
+                "tag": True,
+            }
         if re.fullmatch(r"(RT|T|RJ|J|B)-?\d{1,2}", t) or _AISC_ONLY.match(t) or _SSMA_ONLY.match(t):
             return "skip"
         return None
@@ -686,8 +752,15 @@ def rule_classify(text: str, rules: tuple[str, int | None, dict[str, Any]]) -> d
             e = _sched_entry(fs, "base_plate", t)
             raw = (e or {}).get("raw", {})
             spec = ", ".join(f"{k.title()}: {v}" for k, v in raw.items() if v and k != "MARK") or None
-            return {"category": "other", "designation": f"BP-{m.group(1)}", "count_role": "Base Plate", "role": "Base Plate",
-                    "tag": True, "spec": spec, "rule_profile": (e or {}).get("framing")}
+            return {
+                "category": "other",
+                "designation": f"BP-{m.group(1)}",
+                "count_role": "Base Plate",
+                "role": "Base Plate",
+                "tag": True,
+                "spec": spec,
+                "rule_profile": (e or {}).get("framing"),
+            }
         if _AISC_ONLY.match(t):
             return {"category": "columns", "designation": t, "spacing_in": None, "series": False}
         if re.fullmatch(r"W?F\d+(\.\d+)?(X\d+)?|SOG-?\d+|SL-?\d+", t):
@@ -712,7 +785,7 @@ def post_process(items: list[dict[str, Any]], kind: str, level: int | None, fs: 
             if cat == "areas":
                 sheathing = (diaphragm[1].get("framing") if diaphragm else None) or ""
                 it["role"] = "Deck"
-                it["designation"] = (diaphragm[0] if diaphragm else "DECK")
+                it["designation"] = diaphragm[0] if diaphragm else "DECK"
                 it["profile"] = re.split(r"\s+FASTENED|,|;", sheathing, maxsplit=1)[0].strip() or "Deck"
                 it["spec"] = sheathing or it.get("spec")
                 it["label"] = it["designation"]
@@ -739,7 +812,9 @@ def post_process(items: list[dict[str, Any]], kind: str, level: int | None, fs: 
     return out
 
 
-def page_schedule_rects(page, known: dict[int, list[tuple[float, float, float, float]]], index: int) -> list[tuple[float, float, float, float]]:
+def page_schedule_rects(
+    page, known: dict[int, list[tuple[float, float, float, float]]], index: int
+) -> list[tuple[float, float, float, float]]:
     """Schedule table outlines of one sheet (from the document read, or read
     now for a sheet that was skipped as a repeat)."""
     if index in known:

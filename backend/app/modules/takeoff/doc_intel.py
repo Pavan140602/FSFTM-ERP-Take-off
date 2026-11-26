@@ -40,7 +40,7 @@ import logging
 import math
 import re
 import uuid as _uuid
-from datetime import datetime, time, timezone
+from datetime import UTC, datetime, time
 from io import BytesIO
 from pathlib import Path
 from typing import Any
@@ -95,8 +95,40 @@ OCR_MAX_PIXELS = 40_000_000
 OCR_MAX_PAGES = 200
 
 _STOPWORDS = frozenset(
-    "a an the and or of to in on for with is are was were be by at from "
-    "what where which show me find list give tell how many all any".split()
+    [
+        "a",
+        "an",
+        "the",
+        "and",
+        "or",
+        "of",
+        "to",
+        "in",
+        "on",
+        "for",
+        "with",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "by",
+        "at",
+        "from",
+        "what",
+        "where",
+        "which",
+        "show",
+        "me",
+        "find",
+        "list",
+        "give",
+        "tell",
+        "how",
+        "many",
+        "all",
+        "any",
+    ]
 )
 
 
@@ -106,7 +138,7 @@ _STOPWORDS = frozenset(
 def embedded_page_texts(doc: Any) -> list[dict[str, Any]]:
     """Per-page embedded texts from the upload flow's ``page_data``."""
     pages: list[dict[str, Any]] = []
-    for entry in (getattr(doc, "page_data", None) or []):
+    for entry in getattr(doc, "page_data", None) or []:
         try:
             page = int(entry.get("page"))
         except (TypeError, ValueError):
@@ -208,9 +240,7 @@ def search_pages(doc: Any, query: str) -> list[dict[str, Any]]:
         at = text.lower().find(needle)
         if at < 0:
             continue
-        matches.append(
-            {"page": page, "snippet": _snippet(text, at, len(needle))}
-        )
+        matches.append({"page": page, "snippet": _snippet(text, at, len(needle))})
         if len(matches) >= MAX_MATCHES:
             break
     return matches
@@ -246,8 +276,7 @@ def ocr_available() -> tuple[bool, str]:
     except Exception:
         return (
             False,
-            "The Tesseract binary was not found on the server. Install "
-            "Tesseract OCR, then retry.",
+            "The Tesseract binary was not found on the server. Install Tesseract OCR, then retry.",
         )
 
 
@@ -297,8 +326,8 @@ async def run_ocr_build(doc_id: str) -> None:
     """
     try:
         import fitz
-        from PIL import Image
         import pytesseract
+        from PIL import Image
     except Exception:
         logger.warning("OCR build skipped: PyMuPDF/Pillow/pytesseract missing")
         return
@@ -308,9 +337,7 @@ async def run_ocr_build(doc_id: str) -> None:
         return
     try:
         async with async_session_factory() as session:
-            result = await session.execute(
-                select(TakeoffDocument).where(TakeoffDocument.id == doc_uuid)
-            )
+            result = await session.execute(select(TakeoffDocument).where(TakeoffDocument.id == doc_uuid))
             doc = result.scalar_one_or_none()
             if doc is None:
                 return
@@ -332,9 +359,7 @@ async def run_ocr_build(doc_id: str) -> None:
                     if len(ocr_pages) >= OCR_MAX_PAGES:
                         break
                     try:
-                        scale = _clamp_render_scale(
-                            page.rect.width, page.rect.height, OCR_DPI, OCR_MAX_PIXELS
-                        )
+                        scale = _clamp_render_scale(page.rect.width, page.rect.height, OCR_DPI, OCR_MAX_PIXELS)
                         pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale), alpha=False)
                         with Image.open(BytesIO(pix.tobytes("png"))) as img:
                             ocr_pages[str(number)] = pytesseract.image_to_string(img) or ""
@@ -430,7 +455,7 @@ async def today_activity(session: Any, user_id: str) -> dict[str, Any]:
     if uid is None:
         return empty
     local_midnight = datetime.combine(datetime.now().date(), time.min)
-    start_utc = local_midnight.astimezone(timezone.utc)
+    start_utc = local_midnight.astimezone(UTC)
     try:
         result = await session.execute(
             select(DocIntelActivity)
@@ -456,7 +481,7 @@ async def today_activity(session: Any, user_id: str) -> dict[str, Any]:
     for row in rows[:10]:
         ts = row.created_at
         if ts is not None and ts.tzinfo is None:
-            ts = ts.replace(tzinfo=timezone.utc)
+            ts = ts.replace(tzinfo=UTC)
         detail = row.detail or {}
         if row.action == "search":
             summary = f"Search '{detail.get('query', '')}' - {detail.get('matches', 0)} matches"
@@ -517,9 +542,7 @@ async def ask_about_document(
     key_attr = f"{provider}_api_key"
     raw = getattr(settings, key_attr, None) if settings else None
     if not raw and not self_hosted:
-        raise ValueError(
-            f"No API key configured for {provider}. Save it in Settings > AI first."
-        )
+        raise ValueError(f"No API key configured for {provider}. Save it in Settings > AI first.")
     api_key = ""
     if raw:
         try:

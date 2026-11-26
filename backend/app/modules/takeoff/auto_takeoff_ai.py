@@ -28,8 +28,8 @@ import re
 import uuid
 from typing import Any
 
-from app.modules.takeoff import auto_takeoff as A
-from app.modules.takeoff import detect as D
+from app.modules.takeoff import auto_takeoff as A  # noqa: N812
+from app.modules.takeoff import detect as D  # noqa: N812
 
 logger = logging.getLogger(__name__)
 
@@ -119,7 +119,9 @@ async def ai_status(session: Any, user_id: str) -> dict[str, Any]:
     }
 
 
-async def _call(creds: dict[str, Any], system: str, prompt: str, image_b64: str | None = None, media: str = "image/png") -> Any:
+async def _call(
+    creds: dict[str, Any], system: str, prompt: str, image_b64: str | None = None, media: str = "image/png"
+) -> Any:
     from app.modules.ai.ai_client import call_ai, extract_json
 
     text, _tokens = await call_ai(
@@ -185,7 +187,9 @@ def parse_hints(data: Any) -> tuple[dict[str, dict[str, Any]], dict[str, str]]:
     return hints, specs
 
 
-async def classify_pages(creds: dict[str, Any], models: list[A.PageModel]) -> tuple[dict[int, dict[str, dict[str, Any]]], dict[str, str], list[str]]:
+async def classify_pages(
+    creds: dict[str, Any], models: list[A.PageModel]
+) -> tuple[dict[int, dict[str, dict[str, Any]]], dict[str, str], list[str]]:
     sem = asyncio.Semaphore(AI_CONCURRENCY)
     hints_by_page: dict[int, dict[str, dict[str, Any]]] = {}
     specs: dict[str, str] = {}
@@ -196,7 +200,9 @@ async def classify_pages(creds: dict[str, Any], models: list[A.PageModel]) -> tu
         if not inventory:
             return
         labels = "\n".join(f"- {row['text']} (x{row['count']})" for row in inventory)
-        prompt = _PROMPT_TEXT.format(page=model.page_no, schedules=A.schedule_text(model) or "(none on this sheet)", labels=labels)
+        prompt = _PROMPT_TEXT.format(
+            page=model.page_no, schedules=A.schedule_text(model) or "(none on this sheet)", labels=labels
+        )
         async with sem:
             try:
                 data = await _call(creds, _SYSTEM_TEXT, prompt)
@@ -251,7 +257,9 @@ def page_png(page, long_edge_px: int = 2000) -> tuple[str, float, float]:
     return base64.b64encode(pix.tobytes("png")).decode("ascii"), float(page.rect.width), float(page.rect.height)
 
 
-def page_tiles_png(page, grid: int = 2, overlap: float = 0.08, long_edge_px: int = 2000) -> list[tuple[str, float, float, float, float]]:
+def page_tiles_png(
+    page, grid: int = 2, overlap: float = 0.08, long_edge_px: int = 2000
+) -> list[tuple[str, float, float, float, float]]:
     """The sheet cut into grid x grid overlapping tiles, each rendered zoomed
     in (OE-DELIVERY 2026-11-04-auto-takeoff-zoom). Returns (png, x0, y0, w, h)
     per tile in PDF points."""
@@ -367,6 +375,7 @@ async def run_for_document(
                     errors.append("Your AI model cannot read images, so scanned pages were skipped.")
                 else:
                     for model in scanned[:AI_PAGE_LIMIT]:
+
                         def _render(page_no: int = model.page_no):
                             pdf = pymupdf.open(path)
                             try:
@@ -389,7 +398,16 @@ async def run_for_document(
                             shifted = []
                             for lab in labels_from_vision(data, tw, th):
                                 r = lab.rect
-                                shifted.append(A.Label(lab.text, (r[0] + x0, r[1] + y0, r[2] + x0, r[3] + y0), lab.angle, lab.size, lab.ux, lab.uy))
+                                shifted.append(
+                                    A.Label(
+                                        lab.text,
+                                        (r[0] + x0, r[1] + y0, r[2] + x0, r[3] + y0),
+                                        lab.angle,
+                                        lab.size,
+                                        lab.ux,
+                                        lab.uy,
+                                    )
+                                )
                             parts.append(shifted)
                         if failed and not parts:
                             continue

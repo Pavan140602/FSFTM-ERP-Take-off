@@ -75,6 +75,67 @@ Re-run the two install commands only when `git pull` changed
 `backend/pyproject.toml` or `frontend/package-lock.json`. Running them anyway
 does no harm.
 
+## Fast mode for everyday takeoff work (recommended)
+
+`start-dev.bat` runs the **development** setup: a Vite dev server (about
+0.7 GB of RAM) plus React in its slow debugging mode. That is meant for
+changing the code, not for doing takeoffs.
+
+For daily work use **fast mode** instead:
+
+1. Build the frontend once: double-click **`build-frontend.bat`** (a few minutes).
+2. Start the app: double-click **`start-fast.bat`**, then open
+   **http://localhost:8000** (not 5173).
+
+One backend process serves everything, React runs in production mode (much
+smoother on big drawing sets, no double renders), and about 0.7 GB of memory
+is freed. VS Code is not needed to run it.
+
+`start-fast.bat` rebuilds by itself when the code version changed (after
+`git pull`, or on a fresh clone, where the build is never stored in git), so
+after pulling just start it - the first start takes a few minutes longer.
+Run `build-frontend.bat` by hand only after editing code locally without
+committing. Do not run `start-dev.bat` and `start-fast.bat` at the same time.
+
+**Keeping the PC responsive (16 GB RAM):** close the browser tabs and apps
+you are not using while taking off - Chrome, VS Code and other Electron apps
+(ChatGPT, Cliq, ...) each hold 0.2-2 GB. Keep big drawing sets in single-page
+view, close PDF tabs you no longer need, and turn split view off when you are
+not comparing. If you regularly work with 70+ page sets, 32 GB of RAM is the
+upgrade that helps most.
+
+## Default settings
+
+A fresh browser opens in **English (US)**, **imperial units**, **US dollars**
+and the **dark theme**. Each person can still change these (language in the
+header, theme toggle, Settings > Regional). A browser that already used the
+app keeps its saved choices; to get the defaults back, open the browser
+console (F12) on http://localhost:5173 and run
+`localStorage.removeItem('oe_theme'); localStorage.removeItem('oe_preferences'); localStorage.removeItem('i18nextLng'); location.reload()`.
+
+## Check your changes before pushing (same checks as GitHub CI)
+
+Run these from the project folder. Each should finish with no errors.
+
+```powershell
+# Frontend: lint, then the PDF Measurements tests
+cd frontend
+npx eslint src/modules/pdf-takeoff src/features/takeoff
+npx vitest run src/modules/pdf-takeoff src/features/takeoff
+cd ..
+
+# Backend: install the dev tools once, then lint, format check and tests
+.\.venv\Scripts\python.exe -m pip install -e ".\backend[dev]"
+cd backend
+..\.venv\Scripts\ruff.exe check app/modules/takeoff tests/unit
+..\.venv\Scripts\ruff.exe format --check app/modules/takeoff tests/unit
+..\.venv\Scripts\python.exe -m pytest tests/unit -k takeoff -q
+cd ..
+```
+
+The full frontend build (`npm run build` in `frontend`) also type-checks
+everything; it needs about 12 GB of free RAM.
+
 ## What is NOT copied by GitHub
 
 - **Your projects, drawings and takeoff data.** These are stored in the

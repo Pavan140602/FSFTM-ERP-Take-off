@@ -98,6 +98,7 @@ from app.modules.takeoff.schemas import (
     ProposalQueueResponse,
     RecognizeResponse,
     ScaleDetectionResponse,
+    SimilarSymbolsAllPagesResponse,
     SimilarSymbolsResponse,
     TakeoffCompareResponse,
     TakeoffMeasurementBulkCreate,
@@ -4595,6 +4596,40 @@ def _get_service(session: SessionDep) -> TakeoffService:
 # ── Upload ────────────────────────────────────────────────────────────────
 
 
+@router.put(
+    "/documents/{doc_id}/file/",
+    dependencies=[Depends(RequirePermission("takeoff.update"))],
+)
+async def replace_document_file(
+    doc_id: str,
+    user_id: CurrentUserId,
+    session: SessionDep,
+    file: UploadFile = File(..., description="Edited PDF file (.pdf)"),
+    service: TakeoffService = Depends(_get_service),
+) -> dict[str, Any]:
+    """Replace a document's PDF with an edited copy, keeping its id.
+
+    The viewer's page tools (insert blank page, rotate pages, ...) edit the
+    PDF in the browser and save it back here, so the drawing stays the same
+    document with the same markups instead of being uploaded as a copy.
+    """
+    doc = await service.get_document(doc_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail=translate("errors.document_not_found", locale=get_locale()))
+    await _verify_takeoff_doc_access(doc, str(user_id) if user_id else "", session)
+    cap = _max_upload_bytes()
+    content = await file.read(cap + 1)
+    if len(content) > cap:
+        raise HTTPException(status_code=413, detail=f"PDF file is too large (over {cap // 1024 // 1024} MB).")
+    updated = await service.replace_document_file(doc_id, content)
+    return {
+        "id": str(updated.id),
+        "filename": updated.filename,
+        "pages": updated.pages,
+        "size_bytes": updated.size_bytes,
+    }
+
+
 @router.post(
     "/documents/upload/",
     status_code=201,
@@ -5147,7 +5182,6 @@ async def download_document(
     )
 
 
-
 # OE-DELIVERY: 2026-10-28-doc-intel
 # ── Document intelligence (AI Assistant panel) ─────────────────────────
 # Reads the per-page text the upload flow already extracted
@@ -5326,7 +5360,9 @@ async def run_detect_category(
 
 class AutoTakeoffBody(BaseModel):
     pages: list[int] | None = Field(default=None, max_length=400)
-    categories: list[str] = Field(default_factory=lambda: ["beams", "columns", "joists", "trusses", "walls", "areas", "other"])
+    categories: list[str] = Field(
+        default_factory=lambda: ["beams", "columns", "joists", "trusses", "walls", "areas", "other"]
+    )
     use_ai: bool = Field(default=False)
     include_details: bool = Field(default=False)
     # House framing rules (OE-DELIVERY 2026-11-05-framing-rules).
@@ -5402,14 +5438,16 @@ async def put_auto_takeoff_rejected(
         if not isinstance(row, dict) or not isinstance(row.get("key"), str):
             continue
         a = row.get("a")
-        clean.append({
-            "key": row["key"][:200],
-            "cat": str(row.get("cat") or "")[:20],
-            "des": str(row.get("des") or "")[:60],
-            "a": [float(a[0]), float(a[1])] if isinstance(a, list) and len(a) == 2 else [0.0, 0.0],
-            "idx": row.get("idx") if isinstance(row.get("idx"), int) else None,
-            "page": int(row.get("page") or 0),
-        })
+        clean.append(
+            {
+                "key": row["key"][:200],
+                "cat": str(row.get("cat") or "")[:20],
+                "des": str(row.get("des") or "")[:60],
+                "a": [float(a[0]), float(a[1])] if isinstance(a, list) and len(a) == 2 else [0.0, 0.0],
+                "idx": row.get("idx") if isinstance(row.get("idx"), int) else None,
+                "page": int(row.get("page") or 0),
+            }
+        )
     meta = dict(doc.metadata_ or {})
     meta["auto_takeoff_rejected"] = clean
     doc.metadata_ = meta
@@ -5784,6 +5822,37 @@ async def similar_symbols(
 
     result = await service.find_similar_symbols(doc_id, page, seed_x, seed_y, user_id=str(user_id) if user_id else "")
     return SimilarSymbolsResponse(**result)
+
+
+@router.post(
+    "/documents/{doc_id}/similar-symbols/all-pages/",
+    response_model=SimilarSymbolsAllPagesResponse,
+    # Read-only (nothing is stored), but gated like the single-page search so
+    # the two "count similar" modes share one permission.
+    dependencies=[Depends(RequirePermission("takeoff.create"))],
+)
+async def similar_symbols_all_pages(
+    doc_id: str,
+    user_id: CurrentUserId,
+    session: SessionDep,
+    seed_x: float = Query(..., description="X of the clicked point, in PDF points"),
+    seed_y: float = Query(..., description="Y of the clicked point, in PDF points"),
+    page: int = Query(1, ge=1, description="1-indexed page the seed was clicked on"),
+    service: TakeoffService = Depends(_get_service),
+) -> SimilarSymbolsAllPagesResponse:
+    """Count by example across every page of the document.
+
+    The clicked symbol on ``page`` is the seed; every page is searched for
+    the same symbol. Hits are returned per page and nothing is persisted -
+    the user reviews one suggested count per page.
+    """
+    doc = await service.get_document(doc_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail=translate("errors.document_not_found", locale=get_locale()))
+    await _verify_takeoff_doc_access(doc, str(user_id) if user_id else "", session)
+
+    result = await service.find_similar_symbols_all_pages(doc_id, page, seed_x, seed_y)
+    return SimilarSymbolsAllPagesResponse(**result)
 
 
 # ── Proposal review queue ──────────────────────────────────────────────────

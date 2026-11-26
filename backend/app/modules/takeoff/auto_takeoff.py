@@ -42,7 +42,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Iterable
 
-from app.modules.takeoff import detect as D
+from app.modules.takeoff import detect as D  # noqa: N812
 
 CATEGORIES = ("beams", "columns", "joists", "trusses", "walls", "areas", "other")
 
@@ -64,7 +64,9 @@ _DIM_RE = re.compile(r"^\d+\s*['’]\s*-?\s*\d*")
 _JAMB_RE = re.compile(r"\bJAMBS?\b|\bJMB\b", re.IGNORECASE)
 _HDR_TAG_RE = re.compile(r"^(?:HDR|H)-?\d{1,2}[A-Z]?$", re.IGNORECASE)
 # Hat / furring channels and metal deck (OE-DELIVERY 2026-11-03-auto-takeoff-members).
-_HAT_RE = re.compile(r"\bHAT\s*(?:CHANNEL|CHNL|SECTION)?S?\b|FURRING\s+CHANNEL|RESILIENT\s+CHANNEL|\bRC-?1\b", re.IGNORECASE)
+_HAT_RE = re.compile(
+    r"\bHAT\s*(?:CHANNEL|CHNL|SECTION)?S?\b|FURRING\s+CHANNEL|RESILIENT\s+CHANNEL|\bRC-?1\b", re.IGNORECASE
+)
 _DECK_WORD_RE = re.compile(r"\bDECK(?:ING)?\b", re.IGNORECASE)
 _DECK_DES_RE = re.compile(
     r"(\d(?:\.\d+)?|\d\s+\d/\d)\s*(?:\"|IN\.?)?\s*(?:TYPE\s+)?(VLI|VLR|VL|PLB|LOK|B|F|A|N|C)\b[\s,-]*(\d{2})?\s*(?:GA\.?)?",
@@ -113,7 +115,7 @@ class PageModel:
     units_per_foot: float | None
     scale_text: str | None
     schedule_rects: list[tuple[float, float, float, float]] = field(default_factory=list)
-    index: "SegIndex | None" = None
+    index: SegIndex | None = None
     # A sheet that prints column sizes at the columns (column / foundation
     # plan); used to name columns on other sheets at the same grid spot.
     column_source: bool = False
@@ -129,7 +131,7 @@ class PageModel:
     # plan's extent from its dimensions (OE-DELIVERY 2026-11-10-legend-walls).
     text_lines: list[Any] = field(default_factory=list)
     plan_region: tuple[float, float, float, float] | None = None
-    fine_index: "SegIndex | None" = None
+    fine_index: SegIndex | None = None
     # The sheet read at full detail: every closed small shape and every
     # stroke, curves included (OE-DELIVERY 2026-11-06-zoom-scan).
     detail: Any = None
@@ -205,7 +207,11 @@ def _merge_fragments(raw: list[Label]) -> list[Label]:
             cur_hi = 0.0
             for lab in row:
                 lo, hi = along(lab)
-                if cur is not None and lo - cur_hi <= 1.6 * max(lab.size, cur.size) and abs(lab.size - cur.size) <= 0.35 * max(lab.size, cur.size):
+                if (
+                    cur is not None
+                    and lo - cur_hi <= 1.6 * max(lab.size, cur.size)
+                    and abs(lab.size - cur.size) <= 0.35 * max(lab.size, cur.size)
+                ):
                     cur = Label(
                         f"{cur.text} {lab.text}",
                         (
@@ -256,7 +262,7 @@ def page_boxes(page, drawings: list | None = None) -> list[tuple[float, float, f
             xs = [p.x for p in pts]
             ys = [p.y for p in pts]
             closed = math.hypot(pts[0].x - pts[-1].x, pts[0].y - pts[-1].y) < 1.0 or drawing.get("closePath")
-            axis = all(abs(a.x - b.x) < 0.6 or abs(a.y - b.y) < 0.6 for a, b in zip(pts, pts[1:]))
+            axis = all(abs(a.x - b.x) < 0.6 or abs(a.y - b.y) < 0.6 for a, b in zip(pts, pts[1:], strict=False))
             if closed and axis:
                 rect = (min(xs), min(ys), max(xs), max(ys))
         elif drawing.get("rect") is not None and len(items) <= 2 and filled:
@@ -322,7 +328,7 @@ def page_segments(page, min_len: float = 20.0, drawings: list | None = None) -> 
 
 def same_pen(a: Seg, b: Seg) -> bool:
     if len(a) > 6 and len(b) > 6 and a[6] is not None and b[6] is not None:
-        if max(abs(x - y) for x, y in zip(a[6], b[6])) > 2:
+        if max(abs(x - y) for x, y in zip(a[6], b[6], strict=False)) > 2:
             return False
     wa, wb = float(a[5] or 0), float(b[5] or 0)
     if wa <= 0.5 and wb <= 0.5:
@@ -393,7 +399,9 @@ def _pt_seg_dist(px: float, py: float, s: Seg) -> float:
     return D._point_segment_distance(px, py, s)
 
 
-def merge_run(seed: Seg, model: PageModel, max_gap: float = 12.0, width_tol: float | None = None) -> tuple[float, float, float, float]:
+def merge_run(
+    seed: Seg, model: PageModel, max_gap: float = 12.0, width_tol: float | None = None
+) -> tuple[float, float, float, float]:
     """Grow a segment into its collinear run (indexed ``detect._merge_run``)."""
     assert model.index is not None
     x1, y1, x2, y2, length = seed[0], seed[1], seed[2], seed[3], seed[4]
@@ -464,7 +472,7 @@ def build_page_model(page, page_no: int) -> PageModel:
     # No scale printed: read it from the dimensions, as an estimator would
     # check one (OE-DELIVERY 2026-11-10-legend-walls).
     try:
-        from app.modules.takeoff import detail_scan as Z
+        from app.modules.takeoff import detail_scan as Z  # noqa: N812
 
         model.text_lines = _text_lines(page)
         d_upf, d_text, region = Z.dimension_scale(model.text_lines, segments, upf)
@@ -475,7 +483,7 @@ def build_page_model(page, page_no: int) -> PageModel:
     except Exception:
         pass
     try:
-        from app.modules.takeoff import detail_scan as Z
+        from app.modules.takeoff import detail_scan as Z  # noqa: N812
 
         model.detail = Z.read_sheet(page, drawings=drawings, index_cls=SegIndex)
     except Exception:
@@ -488,7 +496,7 @@ def _text_lines(page) -> list[tuple[str, tuple[float, float, float, float], tupl
     colour pen."""
     import pymupdf
 
-    from app.modules.takeoff import detail_scan as Z
+    from app.modules.takeoff import detail_scan as Z  # noqa: N812
 
     rot = getattr(page, "rotation", 0)
     mat = page.rotation_matrix if rot else None
@@ -569,17 +577,26 @@ def deck_info(text: str) -> dict[str, Any] | None:
         des = f'{depth}" {m.group(2).upper()}' + (f"-{m.group(3)} GA" if m.group(3) else "")
     else:
         des = kind.upper()
-    return {"category": "areas", "designation": des, "spacing_in": None, "series": False, "role": "Deck", "deck_type": kind}
+    return {
+        "category": "areas",
+        "designation": des,
+        "spacing_in": None,
+        "series": False,
+        "role": "Deck",
+        "deck_type": kind,
+    }
 
 
 def _deck_region(label: Label, model: PageModel) -> list[tuple[float, float]] | None:
     """The bay a deck callout sits in: the nearest long framing line on each side."""
+
     def accept_dir(vertical: bool):
         def acc(seg) -> bool:
             if seg[4] < 90:
                 return False
             ang = abs(_seg_angle(seg))
             return (abs(ang - 90) <= 8) if vertical else (ang <= 8 or ang >= 172)
+
         return acc
 
     r = _cast(model, label.cx, label.cy, 1.0, 0.0, 1600.0, accept_dir(True))
@@ -615,11 +632,23 @@ def classify(label: Label, hints: dict[str, dict[str, Any]] | None = None) -> di
     if _HAT_RE.search(text):
         hm = re.search(r"(\d+/\d+|\d+(?:\.\d+)?)\s*(?:\"|IN\.?)?\s*(?:DEEP\s+)?(?:HAT|FURRING)", upper)
         des = f'{hm.group(1)}" HAT CHANNEL' if hm else "HAT CHANNEL"
-        return {"category": "joists" if spacing is not None else "other", "designation": des, "spacing_in": spacing, "series": spacing is not None, "role": "Hat Channel"}
+        return {
+            "category": "joists" if spacing is not None else "other",
+            "designation": des,
+            "spacing_in": spacing,
+            "series": spacing is not None,
+            "role": "Hat Channel",
+        }
     # Joist girders run column to column like a beam (OE-DELIVERY 2026-11-11-div5-rules).
     girder = D._GIRDER_RE.search(upper)
     if girder:
-        return {"category": "beams", "designation": D.normalize_designation(girder.group(0)), "spacing_in": None, "series": False, "role": "Joist Girder"}
+        return {
+            "category": "beams",
+            "designation": D.normalize_designation(girder.group(0)),
+            "spacing_in": None,
+            "series": False,
+            "role": "Joist Girder",
+        }
     aisc = D._AISC_RE.search(text)
     ssma = D._SSMA_RE.search(text)
     sji = D._JOIST_RE.search(text)
@@ -629,14 +658,26 @@ def classify(label: Label, hints: dict[str, dict[str, Any]] | None = None) -> di
         if 8 <= depth <= 72:
             series = spacing is not None
             cat = "trusses" if _TRUSS_WORD_RE.search(text) else "joists"
-            return {"category": cat, "designation": des, "spacing_in": spacing, "series": series, "role": "Steel Joist" if cat == "joists" else None}
+            return {
+                "category": cat,
+                "designation": des,
+                "spacing_in": spacing,
+                "series": series,
+                "role": "Steel Joist" if cat == "joists" else None,
+            }
     if ssma:
         des = D.normalize_designation(ssma.group(0))
         if D._ssma_valid(des):
             if _JAMB_RE.search(text):
                 return {"category": "other", "designation": des, "spacing_in": None, "series": False, "role": "Jamb"}
             if _HEADER_RE.search(text):
-                return {"category": "other", "designation": f"{des} HDR" if "HDR" not in des else des, "spacing_in": None, "series": False, "role": "Header"}
+                return {
+                    "category": "other",
+                    "designation": f"{des} HDR" if "HDR" not in des else des,
+                    "spacing_in": None,
+                    "series": False,
+                    "role": "Header",
+                }
             if spacing is not None:
                 cat = "trusses" if _TRUSS_WORD_RE.search(text) else "joists"
                 return {"category": cat, "designation": des, "spacing_in": spacing, "series": True}
@@ -672,13 +713,34 @@ def classify(label: Label, hints: dict[str, dict[str, Any]] | None = None) -> di
         tag = re.sub(r"@.*", "", text).strip() or "JOIST"
         return {"category": "joists", "designation": tag.upper(), "spacing_in": spacing, "series": True}
     if _COL_MARK_RE.match(compact) and spacing is None:
-        return {"category": "columns", "designation": compact, "spacing_in": None, "series": False, "tag": True, "mark": True}
+        return {
+            "category": "columns",
+            "designation": compact,
+            "spacing_in": None,
+            "series": False,
+            "tag": True,
+            "mark": True,
+        }
     if (_TRUSS_TAG_RE.match(compact) or _TRUSS_SOFT_RE.match(compact)) and spacing is None and len(compact) <= 5:
         return {"category": "trusses", "designation": compact, "spacing_in": None, "series": False, "tag": True}
     if _HDR_TAG_RE.match(compact) and spacing is None:
-        return {"category": "other", "designation": compact, "spacing_in": None, "series": False, "tag": True, "role": "Header"}
+        return {
+            "category": "other",
+            "designation": compact,
+            "spacing_in": None,
+            "series": False,
+            "tag": True,
+            "role": "Header",
+        }
     if _JAMB_TAG_RE.match(compact) and spacing is None:
-        return {"category": "other", "designation": compact, "spacing_in": None, "series": False, "tag": True, "role": "Jamb"}
+        return {
+            "category": "other",
+            "designation": compact,
+            "spacing_in": None,
+            "series": False,
+            "tag": True,
+            "role": "Jamb",
+        }
     if _WALL_TAG_RE.match(compact) and len(compact) <= 6:
         return {"category": "walls", "designation": compact, "spacing_in": None, "series": False, "tag": True}
     if re.fullmatch(r"\(?\d\)?\s*HDR|HDR|HEADER", compact) or compact in ("HDR", "BOXHEADER", "BOXBEAM"):
@@ -712,7 +774,12 @@ def schedule_rows(models: list[PageModel]) -> tuple[dict[str, str], set[tuple[in
                 if len(cl) < 2:
                     continue
                 first = re.sub(r"\s+", "", cl[0][0].upper())
-                if not (_WALL_TAG_RE.match(first) or _TRUSS_TAG_RE.match(first) or _HDR_TAG_RE.match(first) or _JAMB_TAG_RE.match(first)):
+                if not (
+                    _WALL_TAG_RE.match(first)
+                    or _TRUSS_TAG_RE.match(first)
+                    or _HDR_TAG_RE.match(first)
+                    or _JAMB_TAG_RE.match(first)
+                ):
                     continue
                 rest_words = [w[0] for w in cl[1:]]
                 tags = sum(1 for w in rest_words if _WALL_TAG_RE.match(re.sub(r"\s+", "", w.upper())))
@@ -747,7 +814,7 @@ def _profile_in(text: str) -> str | None:
     return None
 
 
-def column_schedule(models: list["PageModel"]) -> dict[str, str]:
+def column_schedule(models: list[PageModel]) -> dict[str, str]:
     """Column mark -> profile from column schedules.
 
     Two table shapes are read:
@@ -785,12 +852,13 @@ def column_schedule(models: list["PageModel"]) -> dict[str, str]:
                 mx0, mx1 = mk[1][0], mk[1][2]
                 cx = (mx0 + mx1) / 2.0
                 reach = max(30.0, (mx1 - mx0) * 2)
-                for below in lines[li + 1:]:
+                for below in lines[li + 1 :]:
                     by = min(w[1][1] for w in below.words)
                     if by - y_top > 400:
                         break
                     cell = " ".join(
-                        w[0] for w in sorted(below.words, key=lambda w: w[1][0])
+                        w[0]
+                        for w in sorted(below.words, key=lambda w: w[1][0])
                         if abs((w[1][0] + w[1][2]) / 2.0 - cx) <= reach
                     )
                     prof = _profile_in(cell)
@@ -803,7 +871,9 @@ def column_schedule(models: list["PageModel"]) -> dict[str, str]:
 # ── geometry: members ─────────────────────────────────────────────────
 
 
-def _member_seed(label: Label, model: PageModel, radius: float = 60.0, min_len: float = 40.0, strict: bool = False) -> Seg | None:
+def _member_seed(
+    label: Label, model: PageModel, radius: float = 60.0, min_len: float = 40.0, strict: bool = False
+) -> Seg | None:
     cx, cy = label.cx, label.cy
     assert model.index is not None
     near: list[tuple[Seg, float]] = []
@@ -850,7 +920,13 @@ def _cut_candidates(run, model: PageModel, boxes_only: bool = False) -> list[flo
     length = math.hypot(run[2] - run[0], run[3] - run[1])
     out: list[float] = []
     ang = _fold(math.degrees(math.atan2(run[3] - run[1], run[2] - run[0])))
-    for i in [] if boxes_only else model.index.near(min(run[0], run[2]) - 4, min(run[1], run[3]) - 4, max(run[0], run[2]) + 4, max(run[1], run[3]) + 4):
+    for i in (
+        []
+        if boxes_only
+        else model.index.near(
+            min(run[0], run[2]) - 4, min(run[1], run[3]) - 4, max(run[0], run[2]) + 4, max(run[1], run[3]) + 4
+        )
+    ):
         s = model.segments[i]
         # Supports meet a member square-on; hips and braces crossing at
         # an angle are not where the member stops.
@@ -877,7 +953,9 @@ def _cut_candidates(run, model: PageModel, boxes_only: bool = False) -> list[flo
         # crossing the run 3-9 units apart.
         ux, uy = (run[2] - run[0]) / (length or 1.0), (run[3] - run[1]) / (length or 1.0)
         sides: list[float] = []
-        for i in model.fine_index.near(min(run[0], run[2]) - 6, min(run[1], run[3]) - 6, max(run[0], run[2]) + 6, max(run[1], run[3]) + 6):
+        for i in model.fine_index.near(
+            min(run[0], run[2]) - 6, min(run[1], run[3]) - 6, max(run[0], run[2]) + 6, max(run[1], run[3]) + 6
+        ):
             sg = model.fine[i]
             ln = math.hypot(sg[2] - sg[0], sg[3] - sg[1])
             if not (3.0 <= ln <= 9.5) or abs(((sg[2] - sg[0]) * ux + (sg[3] - sg[1]) * uy) / ln) > 0.2:
@@ -888,7 +966,7 @@ def _cut_candidates(run, model: PageModel, boxes_only: bool = False) -> list[flo
                 continue
             sides.append(((sg[0] + sg[2]) / 2.0 - run[0]) * ux + ((sg[1] + sg[3]) / 2.0 - run[1]) * uy)
         sides.sort()
-        for a, b in zip(sides, sides[1:]):
+        for a, b in zip(sides, sides[1:], strict=False):
             if 3.0 <= b - a <= 9.5 and 0 < (a + b) / 2.0 < length:
                 out.append((a + b) / 2.0)
     return sorted(out)
@@ -917,7 +995,7 @@ def _split_shared(entries: list[dict[str, Any]], model: PageModel, strict: bool 
         group.sort(key=lambda g: g["_t"])
         cuts = _cut_candidates(run, model)
         bounds = [0.0]
-        for a, b in zip(group, group[1:]):
+        for a, b in zip(group, group[1:], strict=False):
             mid = (a["_t"] + b["_t"]) / 2.0
             between = [c for c in cuts if a["_t"] + 4 < c < b["_t"] - 4]
             bounds.append(min(between, key=lambda c: abs(c - mid)) if between else mid)
@@ -927,7 +1005,7 @@ def _split_shared(entries: list[dict[str, Any]], model: PageModel, strict: bool 
         # is far longer than the pieces between the labels (or > 70 ft),
         # end it at the nearest column / support past its label
         # (OE-DELIVERY 2026-11-05-framing-rules).
-        inner = sorted(hi - lo for lo, hi in zip(bounds[1:-1], bounds[2:-1]))
+        inner = sorted(hi - lo for lo, hi in zip(bounds[1:-1], bounds[2:-1], strict=False))
         ref = inner[len(inner) // 2] if inner else None
         too_long = 70 * model.units_per_foot if model.units_per_foot else None
         box_cuts = _cut_candidates(run, model, boxes_only=True)
@@ -945,7 +1023,7 @@ def _split_shared(entries: list[dict[str, Any]], model: PageModel, strict: bool 
             pick = [c for c in box_cuts if c > t1 + 4] or [c for c in cuts if c > t1 + 4]
             if pick:
                 bounds[-1] = min(pick)
-        for g, lo, hi in zip(group, bounds, bounds[1:]):
+        for g, lo, hi in zip(group, bounds, bounds[1:], strict=False):
             if hi - lo < 12:
                 g["run"] = None
                 continue
@@ -987,7 +1065,9 @@ def _distribution_line(label: Label, model: PageModel) -> tuple[float, float, fl
     c_n = nx * label.cx + ny * label.cy
     reach = 2.2 * label.size
     best: tuple[float, Seg] | None = None
-    for i in model.index.near(label.rect[0] - reach, label.rect[1] - reach, label.rect[2] + reach, label.rect[3] + reach):
+    for i in model.index.near(
+        label.rect[0] - reach, label.rect[1] - reach, label.rect[2] + reach, label.rect[3] + reach
+    ):
         s = model.segments[i]
         if s[4] < 0.35 * lab_len or is_light(s) or _angle_diff(_seg_angle(s), label.angle) > 3.0:
             continue
@@ -1005,14 +1085,21 @@ def _distribution_line(label: Label, model: PageModel) -> tuple[float, float, fl
     return merge_run(best[1], model, max_gap=14.0)
 
 
-def _crossing_members(dist: tuple[float, float, float, float], model: PageModel, spacing_units: float | None) -> list[tuple[float, float, float, float]]:
+def _crossing_members(
+    dist: tuple[float, float, float, float], model: PageModel, spacing_units: float | None
+) -> list[tuple[float, float, float, float]]:
     """Member lines crossing a distribution line, one per member, in order."""
     assert model.index is not None
     length = math.hypot(dist[2] - dist[0], dist[3] - dist[1]) or 1.0
     ang = _fold(math.degrees(math.atan2(dist[3] - dist[1], dist[2] - dist[0])))
     margin = 4.0
     hits: list[tuple[float, tuple[float, float, float, float]]] = []
-    for i in model.index.near(min(dist[0], dist[2]) - margin, min(dist[1], dist[3]) - margin, max(dist[0], dist[2]) + margin, max(dist[1], dist[3]) + margin):
+    for i in model.index.near(
+        min(dist[0], dist[2]) - margin,
+        min(dist[1], dist[3]) - margin,
+        max(dist[0], dist[2]) + margin,
+        max(dist[1], dist[3]) + margin,
+    ):
         s = model.segments[i]
         if s[4] < 30 or is_light(s) or _angle_diff(_seg_angle(s), ang) < 75:
             continue
@@ -1042,7 +1129,9 @@ def _crossing_members(dist: tuple[float, float, float, float], model: PageModel,
     return [r for _p, r in out]
 
 
-def _series_from_distribution(label: Label, info: dict[str, Any], model: PageModel) -> tuple[list[tuple[float, float, float, float]], bool, list[tuple[float, float]] | None] | None:
+def _series_from_distribution(
+    label: Label, info: dict[str, Any], model: PageModel
+) -> tuple[list[tuple[float, float, float, float]], bool, list[tuple[float, float]] | None] | None:
     dist = _distribution_line(label, model)
     if dist is None:
         return None
@@ -1083,7 +1172,9 @@ def _series_from_distribution(label: Label, info: dict[str, Any], model: PageMod
     return lines, True, _bay_poly(jx, jy, dx, dy, s_lo, s_hi, d_lo, d_hi)
 
 
-def _series_lines(label: Label, info: dict[str, Any], model: PageModel) -> tuple[list[tuple[float, float, float, float]], bool, list[tuple[float, float]] | None]:
+def _series_lines(
+    label: Label, info: dict[str, Any], model: PageModel
+) -> tuple[list[tuple[float, float, float, float]], bool, list[tuple[float, float]] | None]:
     """Joist lines of the bay a series callout sits in.
 
     Returns (lines, generated, bay_polygon).
@@ -1124,7 +1215,11 @@ def _series_lines(label: Label, info: dict[str, Any], model: PageModel) -> tuple
     generated = False
     if cand and span_lo is not None and span_hi is not None:
         span = span_hi - span_lo
-        inbay = [c for c in cand if c[1] >= span_lo - 0.15 * span and c[2] <= span_hi + 0.15 * span and (c[2] - c[1]) >= 0.6 * span]
+        inbay = [
+            c
+            for c in cand
+            if c[1] >= span_lo - 0.15 * span and c[2] <= span_hi + 0.15 * span and (c[2] - c[1]) >= 0.6 * span
+        ]
         inbay.sort(key=lambda c: c[0])
         # Walk outward from the callout while the spacing stays regular.
         left = [c for c in inbay if c[0] < c_n]
@@ -1177,12 +1272,14 @@ def _series_lines(label: Label, info: dict[str, Any], model: PageModel) -> tuple
     start = edge_lo + (width - (count - 1) * spacing_units) / 2.0
     for k in range(count):
         off = start + k * spacing_units
-        lines.append((
-            ux * span_lo + nx * off,
-            uy * span_lo + ny * off,
-            ux * span_hi + nx * off,
-            uy * span_hi + ny * off,
-        ))
+        lines.append(
+            (
+                ux * span_lo + nx * off,
+                uy * span_lo + ny * off,
+                ux * span_hi + nx * off,
+                uy * span_hi + ny * off,
+            )
+        )
     generated = True
     return lines, generated, _bay_poly(ux, uy, nx, ny, span_lo, span_hi, edge_lo, edge_hi)
 
@@ -1232,7 +1329,9 @@ def leader_tips(label: Label, model: PageModel) -> list[tuple[tuple[int, float],
     return found
 
 
-def _follow_leader(segs, index, i: int, start: tuple[float, float], sg, inside) -> list[tuple[tuple[float, float], float]]:
+def _follow_leader(
+    segs, index, i: int, start: tuple[float, float], sg, inside
+) -> list[tuple[tuple[float, float], float]]:
     """Every bend / end along a leader, with the length walked to it."""
     cur = start
     out: list[tuple[tuple[float, float], float]] = []
@@ -1274,7 +1373,11 @@ def _symbol_pieces(model: PageModel, x: float, y: float, reach: float = 9.0) -> 
     n = 0
     for i in model.fine_index.near(x - reach, y - reach, x + reach, y + reach):
         sg = model.fine[i]
-        if sg[4] <= 2.2 * reach and max(abs(sg[0] - x), abs(sg[2] - x)) <= reach and max(abs(sg[1] - y), abs(sg[3] - y)) <= reach:
+        if (
+            sg[4] <= 2.2 * reach
+            and max(abs(sg[0] - x), abs(sg[2] - x)) <= reach
+            and max(abs(sg[1] - y), abs(sg[3] - y)) <= reach
+        ):
             n += 1
     return n
 
@@ -1321,7 +1424,9 @@ def _snap_symbol(model: PageModel, x: float, y: float) -> tuple[float, float] | 
     return x, y
 
 
-def _leader_columns(model: PageModel, labels_by_cat: dict[str, list[tuple[Label, dict[str, Any]]]]) -> list[dict[str, Any]]:
+def _leader_columns(
+    model: PageModel, labels_by_cat: dict[str, list[tuple[Label, dict[str, Any]]]]
+) -> list[dict[str, Any]]:
     """Foundation plans: one column at the end of each column-size leader;
     each column symbol belongs to one label."""
     cands: list[tuple[tuple[int, float], int, Label, dict[str, Any], tuple[float, float]]] = []
@@ -1338,16 +1443,18 @@ def _leader_columns(model: PageModel, labels_by_cat: dict[str, list[tuple[Label,
         if li in done or any(math.hypot(pt[0] - c["point"][0], pt[1] - c["point"][1]) < 4 for c in out):
             continue
         done.add(li)
-        out.append({
-            "mark_obj": None,
-            "label_obj": lab,
-            "point": pt,
-            "designation": info["designation"],
-            "label": info["designation"],
-            "mark": None,
-            "label_rect": list(lab.rect),
-            "size": None,
-        })
+        out.append(
+            {
+                "mark_obj": None,
+                "label_obj": lab,
+                "point": pt,
+                "designation": info["designation"],
+                "label": info["designation"],
+                "mark": None,
+                "label_rect": list(lab.rect),
+                "size": None,
+            }
+        )
     return out
 
 
@@ -1434,7 +1541,7 @@ def _grow_hatch(model: PageModel, si: int, stroke) -> tuple[float, float, float,
             lo -= 1
         while hi < len(vals) - 1 and vals[hi + 1] - vals[hi] <= 8.0:
             hi += 1
-        return vals[lo:hi + 1]
+        return vals[lo : hi + 1]
 
     vert = [m for m in mids if abs(m[0] - sx) <= 5.0]
     horz = [m for m in mids if abs(m[1] - sy) <= 5.0]
@@ -1460,7 +1567,9 @@ def _grow_hatch(model: PageModel, si: int, stroke) -> tuple[float, float, float,
     return (x, min(ys) - 1.0, x, max(ys) + 1.0)
 
 
-def _dimension_span(label: Label, model: PageModel, want: float | None = None) -> tuple[float, float, float, float] | None:
+def _dimension_span(
+    label: Label, model: PageModel, want: float | None = None
+) -> tuple[float, float, float, float] | None:
     """Dimension line drawn with the tag (the panel length, e.g. 7'-0"):
     a line parallel to the text just beside it, covering it, with a tick
     across each end."""
@@ -1472,7 +1581,11 @@ def _dimension_span(label: Label, model: PageModel, want: float | None = None) -
     near = 3.5 * label.size
     best: tuple[float, tuple[float, float, float, float]] | None = None
     min_len = 3.0 * (model.units_per_foot or 9.0)
-    for i in model.fine_index.near(cx - 200, cy - near, cx + 200, cy + near) if abs(math.sin(math.radians(label.angle))) < 0.5 else model.fine_index.near(cx - near, cy - 200, cx + near, cy + 200):
+    for i in (
+        model.fine_index.near(cx - 200, cy - near, cx + 200, cy + near)
+        if abs(math.sin(math.radians(label.angle))) < 0.5
+        else model.fine_index.near(cx - near, cy - 200, cx + near, cy + 200)
+    ):
         sg = model.fine[i]
         if sg[4] < min_len or _angle_diff(_seg_angle(sg), label.angle) > 3:
             continue
@@ -1511,7 +1624,9 @@ def shear_panel(label: Label, model: PageModel) -> tuple[float, float, float, fl
     when there is one; a panel drawn without hatching sits on the wall
     beyond the tag, between the dimension's ends."""
     hatch = _hatch_panel(label, model)
-    dim = _dimension_span(label, model, want=math.hypot(hatch[2] - hatch[0], hatch[3] - hatch[1]) if hatch is not None else None)
+    dim = _dimension_span(
+        label, model, want=math.hypot(hatch[2] - hatch[0], hatch[3] - hatch[1]) if hatch is not None else None
+    )
     if hatch is not None and dim is not None and _angle_diff(_seg_angle((*hatch, 1.0)), _seg_angle((*dim, 1.0))) <= 3:
         lo = _project(hatch, dim[0], dim[1])
         hi = _project(hatch, dim[2], dim[3])
@@ -1534,7 +1649,9 @@ def shear_panel(label: Label, model: PageModel) -> tuple[float, float, float, fl
     return None
 
 
-def _panel_from_dimension(label: Label, model: PageModel, dim: tuple[float, float, float, float] | None = None) -> tuple[float, float, float, float] | None:
+def _panel_from_dimension(
+    label: Label, model: PageModel, dim: tuple[float, float, float, float] | None = None
+) -> tuple[float, float, float, float] | None:
     """Shear wall panel = the wall beside the tag, between the ends of the
     dimension drawn with the tag."""
     dim = dim or _dimension_span(label, model)
@@ -1553,7 +1670,9 @@ def _panel_from_dimension(label: Label, model: PageModel, dim: tuple[float, floa
     return (*_point_on(wall, lo), *_point_on(wall, hi))
 
 
-def _line_beyond(label: Label, dim: tuple[float, float, float, float], model: PageModel) -> tuple[float, float, float, float] | None:
+def _line_beyond(
+    label: Label, dim: tuple[float, float, float, float], model: PageModel
+) -> tuple[float, float, float, float] | None:
     """Nearest line parallel to a dimension on the far side of the tag
     (the wall the dimensioned panel is on)."""
     if model.fine_index is None:
@@ -1606,8 +1725,12 @@ def opening_at(label: Label, model: PageModel) -> tuple[float, float, float, flo
     reach = 25.0 * upf
     pieces: list[tuple[float, float]] = []
     shift = None
-    for j in model.index.near(min(ox + ux * (t0 - reach), ox + ux * (t0 + reach)) - 12, min(oy + uy * (t0 - reach), oy + uy * (t0 + reach)) - 12,
-                              max(ox + ux * (t0 - reach), ox + ux * (t0 + reach)) + 12, max(oy + uy * (t0 - reach), oy + uy * (t0 + reach)) + 12):
+    for j in model.index.near(
+        min(ox + ux * (t0 - reach), ox + ux * (t0 + reach)) - 12,
+        min(oy + uy * (t0 - reach), oy + uy * (t0 + reach)) - 12,
+        max(ox + ux * (t0 - reach), ox + ux * (t0 + reach)) + 12,
+        max(oy + uy * (t0 - reach), oy + uy * (t0 + reach)) + 12,
+    ):
         o = model.segments[j]
         if o[4] < 6 or is_light(o) or _angle_diff(_seg_angle(o), ang) > 1.5:
             continue
@@ -1629,7 +1752,7 @@ def opening_at(label: Label, model: PageModel) -> tuple[float, float, float, flo
         else:
             merged.append([a, b])
     best: tuple[float, float, float] | None = None
-    for (a0, a1), (b0, b1) in zip(merged, merged[1:]):
+    for (a0, a1), (b0, b1) in zip(merged, merged[1:], strict=False):
         lo, hi = a1, b0
         w = hi - lo
         if not (1.5 * upf <= w <= 20.0 * upf):
@@ -1667,7 +1790,9 @@ def _has_partner(sg: Seg, model: PageModel, lo: float = 2.0, hi: float = 10.0) -
     """A parallel face ``lo``..``hi`` units away (a double-line wall)."""
     assert model.index is not None
     ux, uy = (sg[2] - sg[0]) / sg[4], (sg[3] - sg[1]) / sg[4]
-    for j in model.index.near(min(sg[0], sg[2]) - hi - 1, min(sg[1], sg[3]) - hi - 1, max(sg[0], sg[2]) + hi + 1, max(sg[1], sg[3]) + hi + 1):
+    for j in model.index.near(
+        min(sg[0], sg[2]) - hi - 1, min(sg[1], sg[3]) - hi - 1, max(sg[0], sg[2]) + hi + 1, max(sg[1], sg[3]) + hi + 1
+    ):
         o = model.segments[j]
         if o is sg or o[4] < 20 or _angle_diff(_seg_angle(o), _seg_angle(sg)) > 2:
             continue
@@ -1688,7 +1813,9 @@ def _wall_seed_on_line(line: tuple[float, float, float, float], model: PageModel
     ux, uy = (line[2] - line[0]) / ll, (line[3] - line[1]) / ll
     ang = _fold(math.degrees(math.atan2(uy, ux)))
     best: tuple[float, Seg] | None = None
-    for j in model.index.near(min(line[0], line[2]) - 8, min(line[1], line[3]) - 8, max(line[0], line[2]) + 8, max(line[1], line[3]) + 8):
+    for j in model.index.near(
+        min(line[0], line[2]) - 8, min(line[1], line[3]) - 8, max(line[0], line[2]) + 8, max(line[1], line[3]) + 8
+    ):
         o = model.segments[j]
         if o[4] < 20 or is_light(o) or _angle_diff(_seg_angle(o), ang) > 2:
             continue
@@ -1730,7 +1857,9 @@ def wall_between_walls(
     # Nearest face of the wall on the other side (for the centre line).
     centre_shift = 0.0
     best_off: float | None = None
-    for j in model.index.near(min(seed[0], seed[2]) - 11, min(seed[1], seed[3]) - 11, max(seed[0], seed[2]) + 11, max(seed[1], seed[3]) + 11):
+    for j in model.index.near(
+        min(seed[0], seed[2]) - 11, min(seed[1], seed[3]) - 11, max(seed[0], seed[2]) + 11, max(seed[1], seed[3]) + 11
+    ):
         o = model.segments[j]
         if o is seed or o[4] < 20 or _angle_diff(_seg_angle(o), ang) > 2:
             continue
@@ -1742,7 +1871,11 @@ def wall_between_walls(
             best_off = off
     if best_off is not None:
         centre_shift = best_off / 2.0
-    t0 = along((on_line[0] + on_line[2]) / 2.0, (on_line[1] + on_line[3]) / 2.0) if on_line is not None else along(label.cx, label.cy)
+    t0 = (
+        along((on_line[0] + on_line[2]) / 2.0, (on_line[1] + on_line[3]) / 2.0)
+        if on_line is not None
+        else along(label.cx, label.cy)
+    )
     reach = 70.0 * upf
     band = 14.0
     # Wall face pieces along the line (both faces), and walls across it.
@@ -1760,7 +1893,9 @@ def wall_between_walls(
         a, b = along(o[0], o[1]), along(o[2], o[3])
         na, nb = across(o[0], o[1]), across(o[2], o[3])
         if d_ang <= 1.5:
-            if max(abs(na), abs(nb)) <= abs(centre_shift) * 2 + 1.5 and (abs(na - 0) <= 1.5 or abs(na - 2 * centre_shift) <= 1.5):
+            if max(abs(na), abs(nb)) <= abs(centre_shift) * 2 + 1.5 and (
+                abs(na - 0) <= 1.5 or abs(na - 2 * centre_shift) <= 1.5
+            ):
                 cover.append((min(a, b), max(a, b)))
         elif d_ang >= 80 and o[4] >= 20:
             # Reaches the wall line (touches or crosses it) and is a wall.
@@ -1834,7 +1969,9 @@ def _wall_seed_beside(label: Label, model: PageModel) -> Seg | None:
         if d > radius:
             continue
         partner = False
-        for j in model.index.near(min(sg[0], sg[2]) - 11, min(sg[1], sg[3]) - 11, max(sg[0], sg[2]) + 11, max(sg[1], sg[3]) + 11):
+        for j in model.index.near(
+            min(sg[0], sg[2]) - 11, min(sg[1], sg[3]) - 11, max(sg[0], sg[2]) + 11, max(sg[1], sg[3]) + 11
+        ):
             o = model.segments[j]
             if o is sg or o[4] < 20 or _angle_diff(_seg_angle(o), _seg_angle(sg)) > 2:
                 continue
@@ -1864,7 +2001,9 @@ def _hatch_extent(run: tuple[float, float, float, float], t_tag: float, model: P
         return None
     ux, uy = (run[2] - run[0]) / length, (run[3] - run[1]) / length
     hits: list[float] = []
-    for i in model.fine_index.near(min(run[0], run[2]) - 8, min(run[1], run[3]) - 8, max(run[0], run[2]) + 8, max(run[1], run[3]) + 8):
+    for i in model.fine_index.near(
+        min(run[0], run[2]) - 8, min(run[1], run[3]) - 8, max(run[0], run[2]) + 8, max(run[1], run[3]) + 8
+    ):
         sg = model.fine[i]
         ln = math.hypot(sg[2] - sg[0], sg[3] - sg[1])
         if not (2.0 <= ln <= 14.0):
@@ -1919,7 +2058,10 @@ def _clip_same_type_overlaps(entries: list[dict[str, Any]]) -> None:
         for d2, r in kept:
             if d2 != des:
                 continue
-            if abs((r[0] - run[0]) * -uy + (r[1] - run[1]) * ux) > 4 or abs((r[2] - run[0]) * -uy + (r[3] - run[1]) * ux) > 4:
+            if (
+                abs((r[0] - run[0]) * -uy + (r[1] - run[1]) * ux) > 4
+                or abs((r[2] - run[0]) * -uy + (r[3] - run[1]) * ux) > 4
+            ):
                 continue
             a = (r[0] - run[0]) * ux + (r[1] - run[1]) * uy
             b = (r[2] - run[0]) * ux + (r[3] - run[1]) * uy
@@ -1950,7 +2092,9 @@ def _heavy_line_at(label: Label, model: PageModel) -> Seg | None:
     reach = 2.0 * label.size
     ux, uy = math.cos(math.radians(label.angle)), math.sin(math.radians(label.angle))
     best: tuple[tuple[float, float], Seg] | None = None
-    for i in model.index.near(label.rect[0] - reach, label.rect[1] - reach, label.rect[2] + reach, label.rect[3] + reach):
+    for i in model.index.near(
+        label.rect[0] - reach, label.rect[1] - reach, label.rect[2] + reach, label.rect[3] + reach
+    ):
         sg = model.segments[i]
         if sg[4] < 24 or _angle_diff(_seg_angle(sg), label.angle) > 3:
             continue
@@ -1969,7 +2113,9 @@ def _heavy_line_at(label: Label, model: PageModel) -> Seg | None:
     return best[1] if (best[1][5] or 0.0) >= 0.8 else None
 
 
-def _walk_arrow(model: PageModel, line: tuple[float, float, float, float], ux: float, uy: float, max_ext: float) -> float:
+def _walk_arrow(
+    model: PageModel, line: tuple[float, float, float, float], ux: float, uy: float, max_ext: float
+) -> float:
     """How far a drawn line continues past its end (direction ``ux, uy``)
     in short pieces - arrowheads, half arrows - before a gap."""
     if model.fine_index is None:
@@ -1999,8 +2145,12 @@ def _walk_arrow(model: PageModel, line: tuple[float, float, float, float], ux: f
             break
         # Never walk through a wall: stop at the first line across the path.
         stop = None
-        for i in model.fine_index.near(min(ex, px + ux * grown) - 3, min(ey, py + uy * grown) - 3,
-                                       max(ex, px + ux * grown) + 3, max(ey, py + uy * grown) + 3):
+        for i in model.fine_index.near(
+            min(ex, px + ux * grown) - 3,
+            min(ey, py + uy * grown) - 3,
+            max(ex, px + ux * grown) + 3,
+            max(ey, py + uy * grown) + 3,
+        ):
             sg = model.fine[i]
             ln = math.hypot(sg[2] - sg[0], sg[3] - sg[1])
             if ln < 3.0 or abs(((sg[2] - sg[0]) * ux + (sg[3] - sg[1]) * uy) / ln) > 0.2:
@@ -2058,8 +2208,14 @@ def _series_from_leader(
             run = merge_run(w, model, max_gap=3.0)
             if math.hypot(run[2] - run[0], run[3] - run[1]) < 3 * spacing_units * 0.5:
                 continue
-            if any(_angle_diff(_fold(math.degrees(math.atan2(run[3] - run[1], run[2] - run[0]))),
-                               _fold(math.degrees(math.atan2(o[3] - o[1], o[2] - o[0])))) < 5 for o in lines_at):
+            if any(
+                _angle_diff(
+                    _fold(math.degrees(math.atan2(run[3] - run[1], run[2] - run[0]))),
+                    _fold(math.degrees(math.atan2(o[3] - o[1], o[2] - o[0]))),
+                )
+                < 5
+                for o in lines_at
+            ):
                 continue
             lines_at.append(run)
         if len(lines_at) < 2:
@@ -2258,7 +2414,9 @@ def _wall_from_seed(seed: Seg, model: PageModel, strict: bool = False) -> tuple[
     hi = ux * run[2] + uy * run[3]
     lo, hi = min(lo, hi), max(lo, hi)
     best: tuple[float, float, float] | None = None
-    for i in model.index.near(min(run[0], run[2]) - 18, min(run[1], run[3]) - 18, max(run[0], run[2]) + 18, max(run[1], run[3]) + 18):
+    for i in model.index.near(
+        min(run[0], run[2]) - 18, min(run[1], run[3]) - 18, max(run[0], run[2]) + 18, max(run[1], run[3]) + 18
+    ):
         s = model.segments[i]
         if s[4] < 0.3 * (hi - lo) or _angle_diff(_seg_angle(s), ang) > 2.0 or not same_pen(seed, s):
             continue
@@ -2322,6 +2480,7 @@ def _columns(
             uniq.append(b)
         if len(uniq) < 3:
             continue
+
         # Column symbols stand on a grid, far apart; boxes huddled together
         # are parts of one symbol (section / detail markers).
         def _c(b):
@@ -2370,7 +2529,7 @@ def _column_symbol(model: PageModel, x: float, y: float) -> list[float] | None:
     if model.detail is None:
         return None
     try:
-        from app.modules.takeoff import detail_scan as Z
+        from app.modules.takeoff import detail_scan as Z  # noqa: N812
 
         return Z.symbol_at(model.detail, x, y)
     except Exception:
@@ -2436,7 +2595,7 @@ def _column_named(
         size = next(iter(marks.values()))
     name = size or mark or default_name or "COLUMN"
     label = f"{mark} {size}" if (mark and size) else name
-    src = (size_lab or mark_lab)
+    src = size_lab or mark_lab
     rect = list(src[1].rect) if src else None
     if mark_lab and not size_lab:
         rect = list(mark_lab[1].rect)
@@ -2457,9 +2616,14 @@ def _column_named(
 # auto markup lands with the same Subject as the tool you would draw it with.
 
 _ROOF_CTX_RE = re.compile(r"ROOF\s+(?:FRAMING|PLAN|TRUSS)|TRUSS\s+LAYOUT|RAFTER", re.IGNORECASE)
-_FLOOR_CTX_RE = re.compile(r"FLOOR\s+(?:FRAMING|PLAN|TRUSS|JOIST)|(?:LEVEL|LVL)\s*\d+\s+FRAMING|(?:2ND|3RD|\dTH|SECOND|THIRD)\s+FLOOR", re.IGNORECASE)
+_FLOOR_CTX_RE = re.compile(
+    r"FLOOR\s+(?:FRAMING|PLAN|TRUSS|JOIST)|(?:LEVEL|LVL)\s*\d+\s+FRAMING|(?:2ND|3RD|\dTH|SECOND|THIRD)\s+FLOOR",
+    re.IGNORECASE,
+)
 _CEILING_CTX_RE = re.compile(r"CEILING\s+(?:FRAMING|JOIST|PLAN)", re.IGNORECASE)
-_NLB_RE = re.compile(r"NON[\s-]*(?:LOAD|BEARING|STRUCTURAL)|\bNLB\b|\bNLBW\b|PARTITION|CURTAIN\s*WALL|INTERIOR\s+NON", re.IGNORECASE)
+_NLB_RE = re.compile(
+    r"NON[\s-]*(?:LOAD|BEARING|STRUCTURAL)|\bNLB\b|\bNLBW\b|PARTITION|CURTAIN\s*WALL|INTERIOR\s+NON", re.IGNORECASE
+)
 _LB_RE = re.compile(r"LOAD[\s-]*BEARING|\bLBW?\b|\bBEARING\s+WALL|SHEAR\s*WALL|\bSW\b|STRUCTURAL\s+STUD", re.IGNORECASE)
 
 
@@ -2504,7 +2668,11 @@ def wall_role(tag: str, spec: str | None) -> str:
     # (2-1/2", 3-5/8", 4"); 6" and up is read from where the wall sits -
     # exterior and demising walls bear (default_wall_roles)
     # (OE-DELIVERY 2026-11-11-div5-rules, user rule).
-    m_d = re.search(r"(\d+(?:\.\d+)?)(?:\s*-?\s*(\d)/(\d))?\s*(?:\"|IN\.?|INCH)\s*(?:CH\s+)?(?:METAL\s+|CFS\s+|LGS\s+|STEEL\s+)?STUD", text, re.IGNORECASE)
+    m_d = re.search(
+        r"(\d+(?:\.\d+)?)(?:\s*-?\s*(\d)/(\d))?\s*(?:\"|IN\.?|INCH)\s*(?:CH\s+)?(?:METAL\s+|CFS\s+|LGS\s+|STEEL\s+)?STUD",
+        text,
+        re.IGNORECASE,
+    )
     if m_d:
         depth = float(m_d.group(1)) + (float(m_d.group(2)) / float(m_d.group(3)) if m_d.group(2) else 0.0)
         if depth < 6.0:
@@ -2617,7 +2785,9 @@ def _bearing_of_openings(items: list[dict[str, Any]]) -> None:
 # ── precise member ends (OE-DELIVERY 2026-11-04-snap-ends) ─────────────
 
 
-def snap_member_ends(items: list[dict[str, Any]], col_reach: float = 16.0, col_perp: float = 4.5, line_reach: float = 10.0) -> int:
+def snap_member_ends(
+    items: list[dict[str, Any]], col_reach: float = 16.0, col_perp: float = 4.5, line_reach: float = 10.0
+) -> int:
     """Pull each end of a beam / joist / truss line onto the column centre or
     the crossing framing line it stops at, so lengths read centre-to-centre.
 
@@ -2626,13 +2796,22 @@ def snap_member_ends(items: list[dict[str, Any]], col_reach: float = 16.0, col_p
     and within ``col_reach`` of the end, else to the crossing of a framing
     line within ``line_reach``. Returns how many ends moved.
     """
-    cols = [(float(p[0]), float(p[1])) for it in items if it.get("category") == "columns" for p in (it.get("points") or [])]
-    members = [
-        it for it in items
-        if it.get("kind") == "line" and it.get("category") in ("beams", "joists", "trusses", "other")
-        and not it.get("generated") and len(it.get("points") or []) == 2
+    cols = [
+        (float(p[0]), float(p[1])) for it in items if it.get("category") == "columns" for p in (it.get("points") or [])
     ]
-    framing = [it for it in items if it.get("kind") == "line" and it.get("category") in ("beams", "walls") and len(it.get("points") or []) == 2]
+    members = [
+        it
+        for it in items
+        if it.get("kind") == "line"
+        and it.get("category") in ("beams", "joists", "trusses", "other")
+        and not it.get("generated")
+        and len(it.get("points") or []) == 2
+    ]
+    framing = [
+        it
+        for it in items
+        if it.get("kind") == "line" and it.get("category") in ("beams", "walls") and len(it.get("points") or []) == 2
+    ]
     moved = 0
     for it in members:
         (x1, y1), (x2, y2) = it["points"]
@@ -2712,7 +2891,9 @@ def labels_by_category(model: PageModel, hints=None, skip_spots=None) -> dict[st
 _SQUARE_HSS_RE = re.compile(r"HSS\s?(\d+(?:\.\d+)?)\s?[Xx]\s?\1\s?[Xx]")
 
 
-def name_columns_across_sheets(results: list[dict[str, Any]], sources: list[PageModel], col_marks: dict[str, str] | None) -> int:
+def name_columns_across_sheets(
+    results: list[dict[str, Any]], sources: list[PageModel], col_marks: dict[str, str] | None
+) -> int:
     """Unnamed columns take the profile printed at the same grid spot on a
     column plan of the same sheet size (framing plans rarely repeat column
     sizes; the column / foundation plan does). Returns how many were named."""
@@ -2748,7 +2929,7 @@ def name_columns_across_sheets(results: list[dict[str, Any]], sources: list[Page
     return count
 
 
-def label_quad(lab: "Label") -> list[list[float]]:
+def label_quad(lab: Label) -> list[list[float]]:
     """The text band of a label as 4 corners, following its reading
     direction, so the sheet highlight hugs rotated / diagonal text the way a
     FSFTM highlighter does (OE-DELIVERY 2026-11-02-fsftm-workspace)."""
@@ -2780,7 +2961,9 @@ def is_detail_sheet(model: PageModel) -> bool:
 
 
 _SYMBOL_CODE_RE = re.compile(r"^(?:\d{1,2}[A-Z]{0,2}|[A-Z]{1,2}\d{1,2}[A-Z]?)$")
-_WALL_SHEET_RE = re.compile(r"\bWALLS?\b.*\b(?:LAYOUT|PLAN|TYPES?|SECTIONS?|SCHEDULE|LEGEND)\b|\bWALL\s+TYPES?\b|\bPARTITION\s+TYPES?\b")
+_WALL_SHEET_RE = re.compile(
+    r"\bWALLS?\b.*\b(?:LAYOUT|PLAN|TYPES?|SECTIONS?|SCHEDULE|LEGEND)\b|\bWALL\s+TYPES?\b|\bPARTITION\s+TYPES?\b"
+)
 
 
 def _enclosing_symbol(model: PageModel, lab: Label):
@@ -2853,7 +3036,7 @@ def symbol_wall_tags(model: PageModel) -> list[tuple[Label, dict[str, Any]]]:
         cap = [t]
         # The caption may wrap onto the next lines just below it.
         h = bb[3] - bb[1]
-        for text2, bb2, _d2, _p2 in lines[k + 1:k + 4]:
+        for text2, bb2, _d2, _p2 in lines[k + 1 : k + 4]:
             if -0.2 * h <= bb2[1] - bb[3] <= 1.2 * h and min(bb[2], bb2[2]) - max(bb[0], bb2[0]) > 0:
                 cap.append(" ".join(text2.upper().split()))
                 bb = bb2
@@ -2874,8 +3057,20 @@ def symbol_wall_tags(model: PageModel) -> list[tuple[Label, dict[str, Any]]]:
         if "WALL" not in cap:
             cap = f"WALL TYPE {cap}"
         spec = cap + (f" - {stud_note}" if stud_note else "")
-        out.append((lab, {"category": "walls", "designation": code, "spacing_in": spacing_inches(stud_note) if stud_note else None,
-                          "series": False, "tag": True, "spec": spec, "symbol": True}))
+        out.append(
+            (
+                lab,
+                {
+                    "category": "walls",
+                    "designation": code,
+                    "spacing_in": spacing_inches(stud_note) if stud_note else None,
+                    "series": False,
+                    "tag": True,
+                    "spec": spec,
+                    "symbol": True,
+                },
+            )
+        )
     return out
 
 
@@ -2893,7 +3088,7 @@ def take_off_page(
     zoom_parts: int = 0,
 ) -> dict[str, Any]:
     """Run every requested category on one page model."""
-    from app.modules.takeoff import framing_rules as FR
+    from app.modules.takeoff import framing_rules as FR  # noqa: N812
 
     wanted = set(categories) & set(CATEGORIES)
     rule_on = bool(rules and model.kind)
@@ -2947,7 +3142,9 @@ def take_off_page(
             pass
 
     p = model.page_no
-    unit_note = None if model.units_per_foot else "No sheet scale found — calibrate this page so lengths read correctly."
+    unit_note = (
+        None if model.units_per_foot else "No sheet scale found — calibrate this page so lengths read correctly."
+    )
 
     # Column symbols first: a size printed at a column names the column and
     # must not also become a beam (OE-DELIVERY 2026-11-02-auto-takeoff-columns).
@@ -2955,11 +3152,20 @@ def take_off_page(
         col_found = _leader_columns(model, labels_by_cat)
         # Base plate tags print under the column size: count them at the column.
         for lab_bp, _ri in rule_counts:
-            near = min(col_found, key=lambda c: math.hypot(c["label_obj"].cx - lab_bp.cx, c["label_obj"].cy - lab_bp.cy), default=None)
-            if near is not None and math.hypot(near["label_obj"].cx - lab_bp.cx, near["label_obj"].cy - lab_bp.cy) <= 4.5 * lab_bp.size:
+            near = min(
+                col_found,
+                key=lambda c: math.hypot(c["label_obj"].cx - lab_bp.cx, c["label_obj"].cy - lab_bp.cy),
+                default=None,
+            )
+            if (
+                near is not None
+                and math.hypot(near["label_obj"].cx - lab_bp.cx, near["label_obj"].cy - lab_bp.cy) <= 4.5 * lab_bp.size
+            ):
                 _ri["_at"] = near["point"]
     else:
-        col_found = _columns(model, labels_by_cat, column_name, col_marks) if ("columns" in wanted or "beams" in wanted) else []
+        col_found = (
+            _columns(model, labels_by_cat, column_name, col_marks) if ("columns" in wanted or "beams" in wanted) else []
+        )
     # Detailed (zoomed) scan, tile by tile: columns drawn any way (rotated,
     # loose lines, odd sizes) and false ones (deck-span arrows) removed
     # (OE-DELIVERY 2026-11-06-zoom-scan).
@@ -2967,7 +3173,7 @@ def take_off_page(
     zparts: list[dict[str, Any]] = []
     col_unresolved: list[Label] = []
     if detail_scan and model.detail is not None:
-        from app.modules.takeoff import detail_scan as Z
+        from app.modules.takeoff import detail_scan as Z  # noqa: N812
 
         try:
             # The sheet split into parts zoomed into one by one (4, 6, 9 ...).
@@ -2975,7 +3181,7 @@ def take_off_page(
         except Exception:
             zparts = []
     if detail_scan and model.detail is not None and ("columns" in wanted or "beams" in wanted):
-        from app.modules.takeoff import detail_scan as Z
+        from app.modules.takeoff import detail_scan as Z  # noqa: N812
 
         try:
             added, removed, zoom_stats = Z.scan_columns(
@@ -3004,17 +3210,19 @@ def take_off_page(
                     lab = lc["label"]
                     info = classify(lab) or {}
                     des = info.get("designation") or re.sub(r"\s+", "", lab.text.upper())
-                    col_found.append({
-                        "mark_obj": None,
-                        "label_obj": lab,
-                        "point": lc["point"],
-                        "designation": des,
-                        "label": des,
-                        "mark": None,
-                        "label_rect": list(lab.rect),
-                        "size": lc["size"],
-                        "zoom": True,
-                    })
+                    col_found.append(
+                        {
+                            "mark_obj": None,
+                            "label_obj": lab,
+                            "point": lc["point"],
+                            "designation": des,
+                            "label": des,
+                            "mark": None,
+                            "label_rect": list(lab.rect),
+                            "size": lc["size"],
+                            "zoom": True,
+                        }
+                    )
                 zoom_stats["labels_checked"] = checked
                 zoom_stats["added"] = zoom_stats.get("added", 0) + len(lab_cols)
                 col_unresolved = list(getattr(Z.label_columns, "unresolved", []))
@@ -3055,7 +3263,9 @@ def take_off_page(
                 continue
             # Scheduled beam tags (B-1 ...) name the heavy beam line drawn
             # under them (OE-DELIVERY 2026-11-05-framing-rules).
-            seed = (_heavy_line_at(lab, model) if (rule_on and "rule_profile" in info) else None) or _member_seed(lab, model, strict=bool(info.get("tag")))
+            seed = (_heavy_line_at(lab, model) if (rule_on and "rule_profile" in info) else None) or _member_seed(
+                lab, model, strict=bool(info.get("tag"))
+            )
             if seed is None:
                 if info.get("tag") and info.get("role") in ("Header", "Jamb") and cat in wanted:
                     tag_marks.append((lab, info))
@@ -3071,27 +3281,33 @@ def take_off_page(
         if not run:
             continue
         lab, info = e["label"], e["info"]
-        if not e.get("_heavy") and e["cat"] != "trusses" and not any(o is not e and o.get("run") and _run_key(o["run"]) == _run_key(run) for o in member_entries):
+        if (
+            not e.get("_heavy")
+            and e["cat"] != "trusses"
+            and not any(o is not e and o.get("run") and _run_key(o["run"]) == _run_key(run) for o in member_entries)
+        ):
             run = _trim_to_supports(run, lab, model)
-        items.append({
-            "key": _key(p, e["cat"], info["designation"], lab.cx, lab.cy),
-            "category": e["cat"],
-            "kind": "line",
-            "designation": info["designation"],
-            "label": info["designation"],
-            "spec": info.get("spec") or lab.text if lab.text != info["designation"] else info.get("spec"),
-            "points": [[_r(run[0]), _r(run[1])], [_r(run[2]), _r(run[3])]],
-            "anchor": [_r(lab.cx), _r(lab.cy)],
-            "label_rect": [_r(v) for v in lab.rect],
-            "label_quad": label_quad(lab),
-            "page": p,
-            "series": None,
-            "index": None,
-            "generated": False,
-            "confidence": 0.85 if info.get("source") != "ai" else 0.7,
-            "source": info.get("source") or "rules",
-            "role": info.get("role"),
-        })
+        items.append(
+            {
+                "key": _key(p, e["cat"], info["designation"], lab.cx, lab.cy),
+                "category": e["cat"],
+                "kind": "line",
+                "designation": info["designation"],
+                "label": info["designation"],
+                "spec": info.get("spec") or lab.text if lab.text != info["designation"] else info.get("spec"),
+                "points": [[_r(run[0]), _r(run[1])], [_r(run[2]), _r(run[3])]],
+                "anchor": [_r(lab.cx), _r(lab.cy)],
+                "label_rect": [_r(v) for v in lab.rect],
+                "label_quad": label_quad(lab),
+                "page": p,
+                "series": None,
+                "index": None,
+                "generated": False,
+                "confidence": 0.85 if info.get("source") != "ai" else 0.7,
+                "source": info.get("source") or "rules",
+                "role": info.get("role"),
+            }
+        )
     # Header / jamb tags placed as counts at the tag; a lone tag with no
     # schedule row is skipped (could be a grid or detail mark).
     tag_seen: dict[str, int] = {}
@@ -3102,25 +3318,27 @@ def take_off_page(
         spec = (specs or {}).get(tag)
         if not spec and tag_seen.get(tag, 0) < 2:
             continue
-        items.append({
-            "key": _key(p, "other", tag, lab.cx, lab.cy),
-            "category": "other",
-            "kind": "count",
-            "designation": tag,
-            "label": tag,
-            "spec": spec,
-            "points": [[_r(lab.cx), _r(lab.cy)]],
-            "anchor": [_r(lab.cx), _r(lab.cy)],
-            "label_rect": [_r(v) for v in lab.rect],
-            "label_quad": label_quad(lab),
-            "page": p,
-            "series": None,
-            "index": None,
-            "generated": False,
-            "confidence": 0.7 if spec else 0.5,
-            "source": info.get("source") or "rules",
-            "role": info.get("role"),
-        })
+        items.append(
+            {
+                "key": _key(p, "other", tag, lab.cx, lab.cy),
+                "category": "other",
+                "kind": "count",
+                "designation": tag,
+                "label": tag,
+                "spec": spec,
+                "points": [[_r(lab.cx), _r(lab.cy)]],
+                "anchor": [_r(lab.cx), _r(lab.cy)],
+                "label_rect": [_r(v) for v in lab.rect],
+                "label_quad": label_quad(lab),
+                "page": p,
+                "series": None,
+                "index": None,
+                "generated": False,
+                "confidence": 0.7 if spec else 0.5,
+                "source": info.get("source") or "rules",
+                "role": info.get("role"),
+            }
+        )
 
     # Joist / truss series and their bays.
     for cat in ("joists", "trusses"):
@@ -3141,44 +3359,48 @@ def take_off_page(
             spec = f"{info['designation']} @ {_fmt_in(spacing)} O.C." if spacing else info["designation"]
             if cat in wanted:
                 for idx, ln in enumerate(lines):
-                    items.append({
-                        "key": f"{series_key}|{idx}",
-                        "category": cat,
-                        "kind": "line",
-                        "designation": info["designation"],
-                        "label": info["designation"],
+                    items.append(
+                        {
+                            "key": f"{series_key}|{idx}",
+                            "category": cat,
+                            "kind": "line",
+                            "designation": info["designation"],
+                            "label": info["designation"],
+                            "spec": spec,
+                            "points": [[_r(ln[0]), _r(ln[1])], [_r(ln[2]), _r(ln[3])]],
+                            "anchor": [_r(lab.cx), _r(lab.cy)],
+                            "label_rect": [_r(v) for v in lab.rect],
+                            "label_quad": label_quad(lab),
+                            "page": p,
+                            "series": series_key,
+                            "index": idx,
+                            "generated": generated,
+                            "confidence": 0.6 if generated else 0.8,
+                            "source": info.get("source") or "rules",
+                            "role": info.get("role"),
+                        }
+                    )
+            if bay and "areas" in wanted:
+                items.append(
+                    {
+                        "key": f"{series_key}|bay",
+                        "category": "areas",
+                        "kind": "area",
+                        "designation": f"{info['designation']} BAY",
+                        "label": spec,
                         "spec": spec,
-                        "points": [[_r(ln[0]), _r(ln[1])], [_r(ln[2]), _r(ln[3])]],
+                        "points": [[_r(x), _r(y)] for x, y in bay],
                         "anchor": [_r(lab.cx), _r(lab.cy)],
                         "label_rect": [_r(v) for v in lab.rect],
                         "label_quad": label_quad(lab),
                         "page": p,
                         "series": series_key,
-                        "index": idx,
+                        "index": None,
                         "generated": generated,
-                        "confidence": 0.6 if generated else 0.8,
+                        "confidence": 0.7,
                         "source": info.get("source") or "rules",
-                        "role": info.get("role"),
-                    })
-            if bay and "areas" in wanted:
-                items.append({
-                    "key": f"{series_key}|bay",
-                    "category": "areas",
-                    "kind": "area",
-                    "designation": f"{info['designation']} BAY",
-                    "label": spec,
-                    "spec": spec,
-                    "points": [[_r(x), _r(y)] for x, y in bay],
-                    "anchor": [_r(lab.cx), _r(lab.cy)],
-                    "label_rect": [_r(v) for v in lab.rect],
-                    "label_quad": label_quad(lab),
-                    "page": p,
-                    "series": series_key,
-                    "index": None,
-                    "generated": generated,
-                    "confidence": 0.7,
-                    "source": info.get("source") or "rules",
-                })
+                    }
+                )
 
     # Metal deck areas (OE-DELIVERY 2026-11-03-auto-takeoff-members).
     if "areas" in wanted:
@@ -3188,26 +3410,28 @@ def take_off_page(
             poly = _deck_region(lab, model)
             if not poly:
                 continue
-            items.append({
-                "key": _key(p, "areas", info["designation"], lab.cx, lab.cy),
-                "category": "areas",
-                "kind": "area",
-                "designation": info["designation"],
-                "label": info["designation"],
-                "spec": lab.text,
-                "points": [[_r(x), _r(y)] for x, y in poly],
-                "anchor": [_r(lab.cx), _r(lab.cy)],
-                "label_rect": [_r(v) for v in lab.rect],
-                "label_quad": label_quad(lab),
-                "page": p,
-                "series": None,
-                "index": None,
-                "generated": False,
-                "confidence": 0.6,
-                "source": info.get("source") or "rules",
-                "role": "Deck",
-                "profile": info.get("deck_type"),
-            })
+            items.append(
+                {
+                    "key": _key(p, "areas", info["designation"], lab.cx, lab.cy),
+                    "category": "areas",
+                    "kind": "area",
+                    "designation": info["designation"],
+                    "label": info["designation"],
+                    "spec": lab.text,
+                    "points": [[_r(x), _r(y)] for x, y in poly],
+                    "anchor": [_r(lab.cx), _r(lab.cy)],
+                    "label_rect": [_r(v) for v in lab.rect],
+                    "label_quad": label_quad(lab),
+                    "page": p,
+                    "series": None,
+                    "index": None,
+                    "generated": False,
+                    "confidence": 0.6,
+                    "source": info.get("source") or "rules",
+                    "role": "Deck",
+                    "profile": info.get("deck_type"),
+                }
+            )
 
     # Walls by tag.
     if "walls" in wanted:
@@ -3235,7 +3459,11 @@ def take_off_page(
             # Shear / strap-braced panels: the hatched stretch at the tag.
             # Wall types (W1..) split their wall among themselves only, so a
             # 'BR-1' stacked over 'W1' does not cut the W1 wall in two.
-            panels = [e for e in wall_entries if e["info"].get("role") in ("Shear Wall", "Strap Braced Wall") or e.get("_twin")]
+            panels = [
+                e
+                for e in wall_entries
+                if e["info"].get("role") in ("Shear Wall", "Strap Braced Wall") or e.get("_twin")
+            ]
             # Wall-type tags already end at the intersecting walls: only two
             # different tags on the very same stretch share it.
             plain = [e for e in wall_entries if e not in panels]
@@ -3263,52 +3491,56 @@ def take_off_page(
             # grid or detail mark than a wall tag.
             if not spec and tag_counts.get(tag, 0) < 2 and info.get("source") != "ai":
                 continue
-            items.append({
-                "key": _key(p, "walls", tag, lab.cx, lab.cy),
-                "category": "walls",
-                "kind": "line",
-                "designation": tag,
-                "label": tag,
-                "spec": spec,
-                "points": [[_r(run[0]), _r(run[1])], [_r(run[2]), _r(run[3])]],
-                "anchor": [_r(lab.cx), _r(lab.cy)],
-                "label_rect": [_r(v) for v in lab.rect],
-                "label_quad": label_quad(lab),
-                "page": p,
-                "series": None,
-                "index": None,
-                "generated": False,
-                "confidence": 0.75 if spec else 0.55,
-                "source": info.get("source") or "rules",
-            })
+            items.append(
+                {
+                    "key": _key(p, "walls", tag, lab.cx, lab.cy),
+                    "category": "walls",
+                    "kind": "line",
+                    "designation": tag,
+                    "label": tag,
+                    "spec": spec,
+                    "points": [[_r(run[0]), _r(run[1])], [_r(run[2]), _r(run[3])]],
+                    "anchor": [_r(lab.cx), _r(lab.cy)],
+                    "label_rect": [_r(v) for v in lab.rect],
+                    "label_quad": label_quad(lab),
+                    "page": p,
+                    "series": None,
+                    "index": None,
+                    "generated": False,
+                    "confidence": 0.75 if spec else 0.55,
+                    "source": info.get("source") or "rules",
+                }
+            )
 
     # Columns: one count markup per column, so a single wrong one can be
     # selected and deleted on its own (OE-DELIVERY 2026-11-02-auto-takeoff-list).
     if "columns" in wanted:
         for c in col_found:
             x, y = c["point"]
-            items.append({
-                "key": _key(p, "columns", c["designation"], x, y),
-                "category": "columns",
-                "kind": "count",
-                "designation": c["designation"],
-                "label": c["label"],
-                "spec": (f"Mark {c['mark']}" if c["mark"] else None),
-                "mark": c["mark"],
-                "mark_quad": label_quad(c["mark_obj"]) if c.get("mark_obj") is not None else None,
-                "label_rect": [_r(v) for v in c["label_rect"]] if c["label_rect"] else None,
-                "label_quad": label_quad(c["label_obj"]) if c.get("label_obj") is not None else None,
-                "points": [[_r(x), _r(y)]],
-                "anchor": [_r(x), _r(y)],
-                "page": p,
-                "series": None,
-                "index": None,
-                "generated": False,
-                "confidence": 0.6 if c.get("zoom") else 0.7,
-                "source": "zoom" if c.get("zoom") else "rules",
-                # Symbol size and turn on the sheet (OE-DELIVERY 2026-11-07-column-shapes).
-                "symbol": _column_symbol(model, x, y),
-            })
+            items.append(
+                {
+                    "key": _key(p, "columns", c["designation"], x, y),
+                    "category": "columns",
+                    "kind": "count",
+                    "designation": c["designation"],
+                    "label": c["label"],
+                    "spec": (f"Mark {c['mark']}" if c["mark"] else None),
+                    "mark": c["mark"],
+                    "mark_quad": label_quad(c["mark_obj"]) if c.get("mark_obj") is not None else None,
+                    "label_rect": [_r(v) for v in c["label_rect"]] if c["label_rect"] else None,
+                    "label_quad": label_quad(c["label_obj"]) if c.get("label_obj") is not None else None,
+                    "points": [[_r(x), _r(y)]],
+                    "anchor": [_r(x), _r(y)],
+                    "page": p,
+                    "series": None,
+                    "index": None,
+                    "generated": False,
+                    "confidence": 0.6 if c.get("zoom") else 0.7,
+                    "source": "zoom" if c.get("zoom") else "rules",
+                    # Symbol size and turn on the sheet (OE-DELIVERY 2026-11-07-column-shapes).
+                    "symbol": _column_symbol(model, x, y),
+                }
+            )
 
     # Rule counts: headers, holdowns, steel braces, base plates, one per tag.
     for lab, info in rule_counts:
@@ -3318,62 +3550,74 @@ def take_off_page(
         # gap, so its width cannot be read reliably (opening_at is kept for
         # plans that do).
         span = None
-        items.append({
-            "key": _key(p, info["category"], tag, lab.cx, lab.cy),
-            "category": info["category"],
-            "kind": "line" if span else "count",
-            "designation": tag,
-            "label": tag,
-            "spec": info.get("spec"),
-            "points": [[_r(span[0]), _r(span[1])], [_r(span[2]), _r(span[3])]] if span else [[_r(at[0]), _r(at[1])]],
-            "anchor": [_r(lab.cx), _r(lab.cy)],
-            "label_rect": [_r(v) for v in lab.rect],
-            "label_quad": label_quad(lab),
-            "page": p,
-            "series": None,
-            "index": None,
-            "generated": False,
-            "confidence": 0.75 if info.get("spec") else 0.6,
-            "source": "rules",
-            "role": info.get("role"),
-            "rule_profile": info.get("rule_profile"),
-            "rule_level": info.get("rule_level"),
-        })
+        items.append(
+            {
+                "key": _key(p, info["category"], tag, lab.cx, lab.cy),
+                "category": info["category"],
+                "kind": "line" if span else "count",
+                "designation": tag,
+                "label": tag,
+                "spec": info.get("spec"),
+                "points": [[_r(span[0]), _r(span[1])], [_r(span[2]), _r(span[3])]]
+                if span
+                else [[_r(at[0]), _r(at[1])]],
+                "anchor": [_r(lab.cx), _r(lab.cy)],
+                "label_rect": [_r(v) for v in lab.rect],
+                "label_quad": label_quad(lab),
+                "page": p,
+                "series": None,
+                "index": None,
+                "generated": False,
+                "confidence": 0.75 if info.get("spec") else 0.6,
+                "source": "rules",
+                "role": info.get("role"),
+                "rule_profile": info.get("rule_profile"),
+                "rule_level": info.get("rule_level"),
+            }
+        )
 
     # Detailed scan for beams: labelled beams with no line yet (curved ones
     # included) and heavy beam lines between columns that carry no size
     # (OE-DELIVERY 2026-11-06-zoom-scan).
     if detail_scan and model.detail is not None and "beams" in wanted:
-        from app.modules.takeoff import detail_scan as Z
+        from app.modules.takeoff import detail_scan as Z  # noqa: N812
 
         try:
             sizes = {(round(c["point"][0], 1), round(c["point"][1], 1)): (c.get("size") or 12.0) for c in col_found}
             col_pts = [(float(x), float(y), float(sz)) for (x, y), sz in sizes.items()]
-            beam_labs = [(lab, info) for lab, info in labels_by_cat.get("beams", []) if id(lab) not in used_by_columns and not info.get("series")]
-            new_beams, beam_stats = Z.scan_beams(model, model.detail, beam_labs, items, col_pts, unlabeled=not rule_on, parts=zparts or None)
+            beam_labs = [
+                (lab, info)
+                for lab, info in labels_by_cat.get("beams", [])
+                if id(lab) not in used_by_columns and not info.get("series")
+            ]
+            new_beams, beam_stats = Z.scan_beams(
+                model, model.detail, beam_labs, items, col_pts, unlabeled=not rule_on, parts=zparts or None
+            )
             for e in new_beams:
                 lab, info = e["label"], e["info"] or {}
                 pts = e["points"]
                 anchor = (lab.cx, lab.cy) if lab is not None else pts[len(pts) // 2]
-                items.append({
-                    "key": _key(p, "beams", e["designation"], anchor[0], anchor[1], "zoom"),
-                    "category": "beams",
-                    "kind": "line",
-                    "designation": e["designation"],
-                    "label": e["designation"] if not e["unlabeled"] else "BEAM (no size on plan)",
-                    "spec": info.get("spec"),
-                    "points": [[_r(x), _r(y)] for x, y in pts],
-                    "anchor": [_r(anchor[0]), _r(anchor[1])],
-                    "label_rect": [_r(v) for v in lab.rect] if lab is not None else None,
-                    "label_quad": label_quad(lab) if lab is not None else None,
-                    "page": p,
-                    "series": None,
-                    "index": None,
-                    "generated": False,
-                    "confidence": 0.7 if not e["unlabeled"] else 0.45,
-                    "source": "zoom",
-                    "role": info.get("role"),
-                })
+                items.append(
+                    {
+                        "key": _key(p, "beams", e["designation"], anchor[0], anchor[1], "zoom"),
+                        "category": "beams",
+                        "kind": "line",
+                        "designation": e["designation"],
+                        "label": e["designation"] if not e["unlabeled"] else "BEAM (no size on plan)",
+                        "spec": info.get("spec"),
+                        "points": [[_r(x), _r(y)] for x, y in pts],
+                        "anchor": [_r(anchor[0]), _r(anchor[1])],
+                        "label_rect": [_r(v) for v in lab.rect] if lab is not None else None,
+                        "label_quad": label_quad(lab) if lab is not None else None,
+                        "page": p,
+                        "series": None,
+                        "index": None,
+                        "generated": False,
+                        "confidence": 0.7 if not e["unlabeled"] else 0.45,
+                        "source": "zoom",
+                        "role": info.get("role"),
+                    }
+                )
             # First-pass "beams" that are really a column callout's leader.
             drop = Z.leader_beams(model, model.detail, items, [tuple(c["point"]) for c in col_found])
             if drop:
@@ -3389,7 +3633,7 @@ def take_off_page(
     # Joist / truss callouts that framed nothing: read zoomed in, line by
     # line at the callout's spacing (OE-DELIVERY 2026-11-06-zoom-scan).
     if detail_scan and model.detail is not None and ("joists" in wanted or "trusses" in wanted):
-        from app.modules.takeoff import detail_scan as Z
+        from app.modules.takeoff import detail_scan as Z  # noqa: N812
 
         try:
             series_labs = [
@@ -3400,7 +3644,11 @@ def take_off_page(
                 if info.get("series")
             ]
             new_series, j_stats = Z.scan_joists(
-                model, model.detail, series_labs, items, zparts or None,
+                model,
+                model.detail,
+                series_labs,
+                items,
+                zparts or None,
                 leader_ends=lambda lab: [tip for _score, tip in leader_tips(lab, model)],
             )
             for e in new_series:
@@ -3410,25 +3658,27 @@ def take_off_page(
                 spacing = info.get("spacing_in")
                 spec = f"{info['designation']} @ {_fmt_in(spacing)} O.C." if spacing else info["designation"]
                 for idx, ln in enumerate(e["lines"]):
-                    items.append({
-                        "key": f"{series_key}|{idx}",
-                        "category": cat,
-                        "kind": "line",
-                        "designation": info["designation"],
-                        "label": info["designation"],
-                        "spec": spec,
-                        "points": [[_r(ln[0]), _r(ln[1])], [_r(ln[2]), _r(ln[3])]],
-                        "anchor": [_r(lab.cx), _r(lab.cy)],
-                        "label_rect": [_r(v) for v in lab.rect],
-                        "label_quad": label_quad(lab),
-                        "page": p,
-                        "series": series_key,
-                        "index": idx,
-                        "generated": False,
-                        "confidence": 0.65,
-                        "source": "zoom",
-                        "role": info.get("role"),
-                    })
+                    items.append(
+                        {
+                            "key": f"{series_key}|{idx}",
+                            "category": cat,
+                            "kind": "line",
+                            "designation": info["designation"],
+                            "label": info["designation"],
+                            "spec": spec,
+                            "points": [[_r(ln[0]), _r(ln[1])], [_r(ln[2]), _r(ln[3])]],
+                            "anchor": [_r(lab.cx), _r(lab.cy)],
+                            "label_rect": [_r(v) for v in lab.rect],
+                            "label_quad": label_quad(lab),
+                            "page": p,
+                            "series": series_key,
+                            "index": idx,
+                            "generated": False,
+                            "confidence": 0.65,
+                            "source": "zoom",
+                            "role": info.get("role"),
+                        }
+                    )
             zoom_stats = zoom_stats or {}
             zoom_stats["joists"] = j_stats
         except Exception:
@@ -3436,7 +3686,7 @@ def take_off_page(
             zoom_stats["joists"] = {"error": True}
     # Deck callouts with no bay: bounded by the beams taken off around them.
     if detail_scan and model.detail is not None and "areas" in wanted:
-        from app.modules.takeoff import detail_scan as Z
+        from app.modules.takeoff import detail_scan as Z  # noqa: N812
 
         try:
             lines = [
@@ -3455,16 +3705,23 @@ def take_off_page(
             if legend_tags:
                 for lab in model.labels:
                     t = "".join(lab.text.split()).upper()
-                    if t in legend_tags and not _in_rects(lab.cx, lab.cy, legend_boxes, 2) and not _in_rects(lab.cx, lab.cy, model.schedule_rects, 4):
+                    if (
+                        t in legend_tags
+                        and not _in_rects(lab.cx, lab.cy, legend_boxes, 2)
+                        and not _in_rects(lab.cx, lab.cy, model.schedule_rects, 4)
+                    ):
                         info = dict(legend_tags[t])
                         info["designation"] = f"{t} - {info['designation']}"
                         deck_labs.append((lab, info))
             zoom_stats = zoom_stats or {}
             zoom_stats["deck_legend"] = sorted(legend_tags)
-            model.schedule_rects = list(model.schedule_rects) + [b for b in legend_boxes if b not in model.schedule_rects]
+            model.schedule_rects = list(model.schedule_rects) + [
+                b for b in legend_boxes if b not in model.schedule_rects
+            ]
             for lab, info in deck_labs:
                 if any(
-                    it.get("kind") == "area" and it.get("role") == "Deck"
+                    it.get("kind") == "area"
+                    and it.get("role") == "Deck"
                     and min(q[0] for q in it["points"]) <= lab.cx <= max(q[0] for q in it["points"])
                     and min(q[1] for q in it["points"]) <= lab.cy <= max(q[1] for q in it["points"])
                     for it in items
@@ -3474,26 +3731,28 @@ def take_off_page(
                 if not poly:
                     continue
                 d_added += 1
-                items.append({
-                    "key": _key(p, "areas", info["designation"], lab.cx, lab.cy, "zoom"),
-                    "category": "areas",
-                    "kind": "area",
-                    "designation": info["designation"],
-                    "label": info["designation"],
-                    "spec": info.get("legend_text") or lab.text,
-                    "points": [[_r(x), _r(y)] for x, y in poly],
-                    "anchor": [_r(lab.cx), _r(lab.cy)],
-                    "label_rect": [_r(v) for v in lab.rect],
-                    "label_quad": label_quad(lab),
-                    "page": p,
-                    "series": None,
-                    "index": None,
-                    "generated": False,
-                    "confidence": 0.55,
-                    "source": "zoom",
-                    "role": "Deck",
-                    "profile": info.get("deck_type"),
-                })
+                items.append(
+                    {
+                        "key": _key(p, "areas", info["designation"], lab.cx, lab.cy, "zoom"),
+                        "category": "areas",
+                        "kind": "area",
+                        "designation": info["designation"],
+                        "label": info["designation"],
+                        "spec": info.get("legend_text") or lab.text,
+                        "points": [[_r(x), _r(y)] for x, y in poly],
+                        "anchor": [_r(lab.cx), _r(lab.cy)],
+                        "label_rect": [_r(v) for v in lab.rect],
+                        "label_quad": label_quad(lab),
+                        "page": p,
+                        "series": None,
+                        "index": None,
+                        "generated": False,
+                        "confidence": 0.55,
+                        "source": "zoom",
+                        "role": "Deck",
+                        "profile": info.get("deck_type"),
+                    }
+                )
             zoom_stats = zoom_stats or {}
             zoom_stats["deck"] = {"added": d_added}
         except Exception:
@@ -3528,9 +3787,7 @@ def take_off_page(
                         it[k] = ri[k]
                 if ri.get("role"):
                     it["role"] = ri["role"]
-                if ri.get("spec") and it.get("series") is None:
-                    it["spec"] = ri["spec"]
-                elif ri.get("spec") and it.get("series"):
+                if ri.get("spec") and it.get("series") is None or ri.get("spec") and it.get("series"):
                     it["spec"] = ri["spec"]
             if not it.get("rule_level") and model.level is not None and model.kind in ("framing", "walls"):
                 it["level"] = FR.ORD_NAME.get(model.level, str(model.level)) + " FLOOR"
@@ -3571,16 +3828,18 @@ def take_off_page(
         missed = []
     if detail_scan and "columns" in wanted:
         for lab in col_unresolved:
-            missed.append({
-                "designation": re.sub(r"\s+", "", lab.text.upper()),
-                "category": "columns",
-                "role": "Column",
-                "at": [_r(lab.cx), _r(lab.cy)],
-                "page": model.page_no,
-                "reason": "Column size with no column symbol where it points (drawn as part of a wall?) - check it on the sheet.",
-            })
+            missed.append(
+                {
+                    "designation": re.sub(r"\s+", "", lab.text.upper()),
+                    "category": "columns",
+                    "role": "Column",
+                    "at": [_r(lab.cx), _r(lab.cy)],
+                    "page": model.page_no,
+                    "reason": "Column size with no column symbol where it points (drawn as part of a wall?) - check it on the sheet.",
+                }
+            )
     if detail_scan and zparts:
-        from app.modules.takeoff import detail_scan as Z
+        from app.modules.takeoff import detail_scan as Z  # noqa: N812
 
         zoom_stats = zoom_stats or {}
         zoom_stats["parts"] = len(zparts)
@@ -3655,7 +3914,7 @@ def _fmt_in(inches: float | None) -> str:
         ft = int(inches // 12)
         rem = inches - ft * 12
         return f"{ft}'-{rem:g}\""
-    return f"{inches:g}\""
+    return f'{inches:g}"'
 
 
 def unknown_label_inventory(model: PageModel, limit: int = 120) -> list[dict[str, Any]]:
@@ -3666,7 +3925,9 @@ def unknown_label_inventory(model: PageModel, limit: int = 120) -> list[dict[str
         if not (1 <= len(compact) <= 16) or not re.search(r"[A-Z]", compact) or not re.search(r"\d", compact):
             continue
         # Loads, areas, dates, phone numbers, sheet refs are never members.
-        if re.search(r"[:/+,()#$%]|PSF|PSI|KSF|MPH|LBS|SF$|SQ|DATE|^\d+$", compact) or re.match(r"^[A-Z]\d?\.\d", compact):
+        if re.search(r"[:/+,()#$%]|PSF|PSI|KSF|MPH|LBS|SF$|SQ|DATE|^\d+$", compact) or re.match(
+            r"^[A-Z]\d?\.\d", compact
+        ):
             continue
         if _DIM_RE.match(lab.text) or _in_rects(lab.cx, lab.cy, model.schedule_rects, 4):
             continue
@@ -3699,7 +3960,7 @@ def _borrow_scales(pdf, models: list[PageModel]) -> None:
     scale of a sheet of the same size in the set that has one (plans of one
     building are drawn alike) - said so in its scale text
     (OE-DELIVERY 2026-11-10-legend-walls)."""
-    from app.modules.takeoff import detail_scan as Z
+    from app.modules.takeoff import detail_scan as Z  # noqa: N812
 
     need = [m for m in models if not m.units_per_foot]
     if not need:
@@ -3752,7 +4013,7 @@ def _borrow_scales(pdf, models: list[PageModel]) -> None:
         if cands:
             votes = [sum(1 for _n2, (u2, _t2) in cands if abs(u2 - u) <= 0.02 * u) for _n, (u, _t) in cands]
             top = max(votes)
-            best = next(c for c, v in zip(cands, votes) if v == top)  # nearest of the most common
+            best = next(c for c, v in zip(cands, votes, strict=False) if v == top)  # nearest of the most common
         if best is not None:
             n, (upf, txt) = best
             m.units_per_foot = upf
@@ -3774,7 +4035,7 @@ def build_models(
     # Framing sheets that tell which walls bear (OE-DELIVERY 2026-11-11-div5-rules).
     if want_specs:
         try:
-            from app.modules.takeoff import bearing_walls as BW
+            from app.modules.takeoff import bearing_walls as BW  # noqa: N812
 
             spec_models.extend(BW.framing_sources(pdf, models, build_page_model))
         except Exception:
@@ -3802,7 +4063,7 @@ def build_models(
 
 def apply_framing_rules(pdf, models: list[PageModel]) -> dict[str, Any]:
     """Sheet kind, level and schedules on each model (framing rules)."""
-    from app.modules.takeoff import framing_rules as FR
+    from app.modules.takeoff import framing_rules as FR  # noqa: N812
 
     doc = FR.document_schedules(pdf, getattr(pdf, "name", None))
     for m in models:
@@ -3848,7 +4109,11 @@ def legend_rects(page, model: PageModel) -> list[tuple[float, float, float, floa
                     best = (area, b)
         if best is None:
             # Box from four lines: nearest long lines around the title.
-            xs0 = [sg for sg in model.segments if abs(sg[1] - sg[3]) < 0.5 and sg[4] > 120 and min(sg[0], sg[2]) - 2 <= cx <= max(sg[0], sg[2]) + 2]
+            xs0 = [
+                sg
+                for sg in model.segments
+                if abs(sg[1] - sg[3]) < 0.5 and sg[4] > 120 and min(sg[0], sg[2]) - 2 <= cx <= max(sg[0], sg[2]) + 2
+            ]
             above = [sg[1] for sg in xs0 if sg[1] <= cy + 2]
             below = [sg[1] for sg in xs0 if sg[1] > cy + 2]
             if above and below:
@@ -3883,13 +4148,19 @@ def _series_from_tip_line(
     dist = merge_run(best, model, max_gap=2.0)
     upf = model.units_per_foot or 9.0
     spacing_units = (info.get("spacing_in") or 24.0) / 12.0 * upf
-    members = [mm for mm in _crossing_members(dist, model, spacing_units) if not _has_partner((*mm, math.hypot(mm[2] - mm[0], mm[3] - mm[1]), 0.0, None), model, 2.0, 6.0)]
+    members = [
+        mm
+        for mm in _crossing_members(dist, model, spacing_units)
+        if not _has_partner((*mm, math.hypot(mm[2] - mm[0], mm[3] - mm[1]), 0.0, None), model, 2.0, 6.0)
+    ]
     if len(members) < 2:
         return None
     # Keep the regular run around the tip (walls end it).
     d_len = math.hypot(dist[2] - dist[0], dist[3] - dist[1]) or 1.0
     ux, uy = (dist[2] - dist[0]) / d_len, (dist[3] - dist[1]) / d_len
-    pos = sorted(((((mm[0] + mm[2]) / 2.0 - dist[0]) * ux + ((mm[1] + mm[3]) / 2.0 - dist[1]) * uy), mm) for mm in members)
+    pos = sorted(
+        ((((mm[0] + mm[2]) / 2.0 - dist[0]) * ux + ((mm[1] + mm[3]) / 2.0 - dist[1]) * uy), mm) for mm in members
+    )
     t_tip = (tip[0] - dist[0]) * ux + (tip[1] - dist[1]) * uy
     i0 = min(range(len(pos)), key=lambda k: abs(pos[k][0] - t_tip))
     lo = hi = i0
@@ -3898,7 +4169,7 @@ def _series_from_tip_line(
         lo -= 1
     while hi < len(pos) - 1 and pos[hi + 1][0] - pos[hi][0] <= lim:
         hi += 1
-    picked = [p[1] for p in pos[lo:hi + 1]]
+    picked = [p[1] for p in pos[lo : hi + 1]]
     if len(picked) < 2:
         return None
     return picked, False, None
@@ -3967,17 +4238,21 @@ def stud_walls(items: list[dict[str, Any]], model: PageModel) -> list[dict[str, 
       24" on centre; one at each end.
     """
     upf = model.units_per_foot or 0.0
-    from app.modules.takeoff import detail_scan as Z
+    from app.modules.takeoff import detail_scan as Z  # noqa: N812
 
     headers = [it for it in items if it.get("kind") == "count" and "Header" in (it.get("role") or "")]
     walls = [
-        k for k, it in enumerate(items)
+        k
+        for k, it in enumerate(items)
         if it.get("category") == "walls" and it.get("kind") == "line" and len(it.get("points") or []) == 2
     ]
     if not walls or not upf:
         for k in walls:
             it = items[k]
-            it.setdefault("stud_spacing_in", stud_spacing_in(" ".join(str(it.get(x) or "") for x in ("spec", "label"))) or DEFAULT_STUD_SPACING_IN)
+            it.setdefault(
+                "stud_spacing_in",
+                stud_spacing_in(" ".join(str(it.get(x) or "") for x in ("spec", "label"))) or DEFAULT_STUD_SPACING_IN,
+            )
             it.setdefault("segment", "wall")
         return items
 
@@ -3998,7 +4273,7 @@ def stud_walls(items: list[dict[str, Any]], model: PageModel) -> list[dict[str, 
     for ii, a in enumerate(walls):
         ia = items[a]
         aa, ax, ay, bx, by = axis(ia)
-        for b in walls[ii + 1:]:
+        for b in walls[ii + 1 :]:
             ib = items[b]
             if ib.get("designation") != ia.get("designation") or ib.get("role") != ia.get("role"):
                 continue
@@ -4006,7 +4281,10 @@ def stud_walls(items: list[dict[str, Any]], model: PageModel) -> list[dict[str, 
             if min(abs(aa - ab), 180 - abs(aa - ab)) > 2.0:
                 continue
             L = math.hypot(bx - ax, by - ay) or 1.0
-            if min(math.hypot(px - qx, py - qy) for px, py in ((ax, ay), (bx, by)) for qx, qy in ((cx, cy), (dx, dy))) > 2.0:
+            if (
+                min(math.hypot(px - qx, py - qy) for px, py in ((ax, ay), (bx, by)) for qx, qy in ((cx, cy), (dx, dy)))
+                > 2.0
+            ):
                 # Or lying over one another on the same line (two tags on
                 # one wall) (OE-DELIVERY 2026-11-11-div5-rules).
                 ex, ey = (bx - ax) / L, (by - ay) / L
@@ -4117,7 +4395,9 @@ def stud_walls(items: list[dict[str, Any]], model: PageModel) -> list[dict[str, 
                 if cov < 0.3 or (cov < 0.45 and getattr(Z.drawn_cover, "max_gap", 0.0) >= 20.0 * upf):
                     replace[k] = []
                     stud_walls.dropped = getattr(stud_walls, "dropped", 0) + 1
-                    stud_walls.log = getattr(stud_walls, "log", []) + [(it.get("designation"), it.get("points"), round(cov, 2))]
+                    stud_walls.log = getattr(stud_walls, "log", []) + [
+                        (it.get("designation"), it.get("points"), round(cov, 2))
+                    ]
                     continue
             # Plain wall of this run: its extent less the openings.
             t = r0
@@ -4152,8 +4432,15 @@ def stud_walls(items: list[dict[str, Any]], model: PageModel) -> list[dict[str, 
                 piece["stud_spacing"] = _r(sp_units)
                 if is_hdr:
                     mx, my = (p0[0] + p1[0]) / 2.0, (p0[1] + p1[1]) / 2.0
-                    near = min(headers, key=lambda h: math.hypot(h["points"][0][0] - mx, h["points"][0][1] - my), default=None)
-                    hdr = near if near is not None and math.hypot(near["points"][0][0] - mx, near["points"][0][1] - my) <= max(4.0 * upf, t1 - t0) else None
+                    near = min(
+                        headers, key=lambda h: math.hypot(h["points"][0][0] - mx, h["points"][0][1] - my), default=None
+                    )
+                    hdr = (
+                        near
+                        if near is not None
+                        and math.hypot(near["points"][0][0] - mx, near["points"][0][1] - my) <= max(4.0 * upf, t1 - t0)
+                        else None
+                    )
                     piece["segment"] = "header"
                     piece["stud_count"] = 0
                     piece["designation"] = f"{it['designation']} HEADER"
@@ -4162,7 +4449,11 @@ def stud_walls(items: list[dict[str, Any]], model: PageModel) -> list[dict[str, 
                     piece["profile"] = (hdr.get("profile") if hdr else None) or profile
                     piece["spec"] = (
                         f"Header area of wall {it['designation']} ({_fmt_in(round((t1 - t0) / upf * 12.0 * 8) / 8)} opening)"
-                        + (f": header {hdr['designation']} - {hdr.get('spec') or hdr.get('profile') or ''}" if hdr else "")
+                        + (
+                            f": header {hdr['designation']} - {hdr.get('spec') or hdr.get('profile') or ''}"
+                            if hdr
+                            else ""
+                        )
                     )
                 else:
                     piece["segment"] = "wall"
@@ -4221,8 +4512,11 @@ def _once_per_foot(out: list[dict[str, Any]], upf: float) -> list[dict[str, Any]
     cut back to what the longer does not cover, so each foot of wall is
     counted once (OE-DELIVERY 2026-11-11-div5-rules)."""
     walls = [
-        i for i, w in enumerate(out)
-        if w.get("category") == "walls" and w.get("kind") == "line" and len(w.get("points") or []) == 2
+        i
+        for i, w in enumerate(out)
+        if w.get("category") == "walls"
+        and w.get("kind") == "line"
+        and len(w.get("points") or []) == 2
         and w.get("segment") in ("wall", "header")
     ]
     walls.sort(key=lambda i: -math.dist(*out[i]["points"]))
@@ -4238,7 +4532,9 @@ def _once_per_foot(out: list[dict[str, Any]], upf: float) -> list[dict[str, Any]
         free = [(0.0, L)]
         for j in kept:
             o = out[j]
-            if o.get("designation") != w.get("designation") and str(o.get("designation", "")).replace(" HEADER", "") != str(w.get("designation", "")).replace(" HEADER", ""):
+            if o.get("designation") != w.get("designation") and str(o.get("designation", "")).replace(
+                " HEADER", ""
+            ) != str(w.get("designation", "")).replace(" HEADER", ""):
                 continue
             (cx, cy), (dx, dy) = o["points"]
             if abs((cx - ax) * -uy + (cy - ay) * ux) > 1.5 or abs((dx - ax) * -uy + (dy - ay) * ux) > 1.5:
@@ -4262,7 +4558,7 @@ def _once_per_foot(out: list[dict[str, Any]], upf: float) -> list[dict[str, Any]
             f0, f1 = max(free, key=lambda f: f[1] - f[0])
             w["points"] = [[_r(ax + ux * f0), _r(ay + uy * f0)], [_r(ax + ux * f1), _r(ay + uy * f1)]]
             if w.get("segment") == "wall" and w.get("stud_spacing"):
-                from app.modules.takeoff import detail_scan as Z
+                from app.modules.takeoff import detail_scan as Z  # noqa: N812
 
                 w["stud_count"] = Z.stud_count(f1 - f0, float(w["stud_spacing"]))
         kept.append(i)
@@ -4273,7 +4569,7 @@ def _drawn_min_w(model: PageModel, geo: dict[str, Any]) -> float:
     """Least line weight that counts as 'drawn as a wall'. On a sheet drawn
     all in hairlines the wall's own faces set it (OE-DELIVERY
     2026-11-11-div5-rules)."""
-    from app.modules.takeoff import detail_scan as Z
+    from app.modules.takeoff import detail_scan as Z  # noqa: N812
 
     hw = Z._heavy_width(model.detail)
     base = max(0.3, 0.5 * hw)
@@ -4313,7 +4609,7 @@ def legend_wall_items(items: list[dict[str, Any]], model: PageModel) -> list[dic
     """Wall markups for walls drawn like a legend sample, where no wall
     markup is yet: full width, header areas apart, studs at the legend's
     spacing (else 24" o.c.)."""
-    from app.modules.takeoff import detail_scan as Z
+    from app.modules.takeoff import detail_scan as Z  # noqa: N812
 
     upf = model.units_per_foot or 0.0
     if not upf or model.detail is None:
@@ -4322,8 +4618,7 @@ def legend_wall_items(items: list[dict[str, Any]], model: PageModel) -> list[dic
     if not found:
         return []
     have = [
-        w for w in items
-        if w.get("category") == "walls" and w.get("kind") == "line" and len(w.get("points") or []) == 2
+        w for w in items if w.get("category") == "walls" and w.get("kind") == "line" and len(w.get("points") or []) == 2
     ]
 
     def covered(a, b) -> float:
@@ -4380,7 +4675,11 @@ def legend_wall_items(items: list[dict[str, Any]], model: PageModel) -> list[dic
                 "label": des,
                 "role": role,
                 "profile": profile or f"{colour.lower()} wall in the legend",
-                "spec": (f"Header area of the {colour.lower()} wall ({_fmt_in(round((t1 - t0) / upf * 12.0 * 8) / 8)} opening). " if is_hdr else "")
+                "spec": (
+                    f"Header area of the {colour.lower()} wall ({_fmt_in(round((t1 - t0) / upf * 12.0 * 8) / 8)} opening). "
+                    if is_hdr
+                    else ""
+                )
                 + f"Legend: {text[:300]}",
                 "points": [[_r(p0[0]), _r(p0[1])], [_r(p1[0]), _r(p1[1])]],
                 "anchor": [_r(mx), _r(my)],
@@ -4426,7 +4725,7 @@ def _fill_uncovered_walls(
     learned_pen_widths: set[float],
     headers: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    from app.modules.takeoff import detail_scan as Z
+    from app.modules.takeoff import detail_scan as Z  # noqa: N812
 
     upf = model.units_per_foot or 9.0
     ds = model.detail
@@ -4440,8 +4739,17 @@ def _fill_uncovered_walls(
         for sg in ds.segs
         if round(float(sg[5] or 0.0), 2) in learned_pen_widths and sg[6] is not None and min(sg[6]) < 12
     }
-    walls = [w for w in out if w.get("category") == "walls" and w.get("kind") == "line" and len(w.get("points") or []) == 2]
-    covered = [((w["points"][0][0], w["points"][0][1]), (w["points"][1][0], w["points"][1][1]), float(w.get("wall_width") or 0.0)) for w in walls]
+    walls = [
+        w for w in out if w.get("category") == "walls" and w.get("kind") == "line" and len(w.get("points") or []) == 2
+    ]
+    covered = [
+        (
+            (w["points"][0][0], w["points"][0][1]),
+            (w["points"][1][0], w["points"][1][1]),
+            float(w.get("wall_width") or 0.0),
+        )
+        for w in walls
+    ]
     # Any common stud-wall thickness counts too (2 1/2" to 12"): a wall type
     # with no tag on the sheet is drawn in the same pen at its own width
     # (OE-DELIVERY 2026-11-10-legend-walls).
@@ -4492,8 +4800,8 @@ def _fill_uncovered_walls(
                 "designation": "WALL",
                 "label": "WALL",
                 "role": "Wall",
-                "profile": f'{_fmt_in(win)} wall (no tag on the plan)',
-                "spec": f'Drawn {_fmt_in(win)} wall with no wall tag - check its type on the plan',
+                "profile": f"{_fmt_in(win)} wall (no tag on the plan)",
+                "spec": f"Drawn {_fmt_in(win)} wall with no wall tag - check its type on the plan",
                 "anchor": [_r((a[0] + b[0]) / 2), _r((a[1] + b[1]) / 2)],
                 "page": model.page_no,
                 "series": None,
@@ -4525,7 +4833,7 @@ def _legend_text_at(lines, k: int) -> str:
     text, bb, _d, _p = lines[k]
     out = [" ".join(text.split())]
     h = bb[3] - bb[1]
-    for text2, bb2, _d2, _p2 in lines[k + 1:k + 5]:
+    for text2, bb2, _d2, _p2 in lines[k + 1 : k + 5]:
         if -0.2 * h <= bb2[1] - bb[3] <= 1.2 * h and abs(bb2[0] - bb[0]) <= 3 * h:
             t2 = " ".join(text2.split())
             if D._SSMA_RE.search(t2) or D._JOIST_RE.search(t2):
@@ -4545,7 +4853,7 @@ def field_joist_items(items: list[dict[str, Any]], model: PageModel) -> list[dic
     field ('JOIST 2') and the legend entry carrying that mark
     ('2x800S162-54 LGS FLOOR BACK TO BACK JOIST 2 @16" O.C'), else from the
     legend sample drawn in the same pen."""
-    from app.modules.takeoff import detail_scan as Z
+    from app.modules.takeoff import detail_scan as Z  # noqa: N812
 
     upf = model.units_per_foot or 0.0
     ds = model.detail
@@ -4555,12 +4863,15 @@ def field_joist_items(items: list[dict[str, Any]], model: PageModel) -> list[dic
     if not fields:
         return []
     have = [
-        it for it in items
-        if it.get("category") in ("joists", "trusses", "beams") and it.get("kind") == "line" and len(it.get("points") or []) >= 2
+        it
+        for it in items
+        if it.get("category") in ("joists", "trusses", "beams")
+        and it.get("kind") == "line"
+        and len(it.get("points") or []) >= 2
     ]
     lines = model.text_lines or []
     boxes = [f["bbox"] for f in fields]
-    from app.modules.takeoff import bearing_walls as BW
+    from app.modules.takeoff import bearing_walls as BW  # noqa: N812
 
     framing_sheet = bool(model.kind in ("framing", "roof")) or any(
         BW.FRAMING_PAGE_RE.search(" ".join(t.upper().split())) for t, *_rest in lines
@@ -4576,6 +4887,7 @@ def field_joist_items(items: list[dict[str, Any]], model: PageModel) -> list[dic
         if (D._SSMA_RE.search(t) or D._JOIST_RE.search(t)) and _MEMBER_WORD_RE.search(t):
             if not in_any_field((bb[0] + bb[2]) / 2.0, (bb[1] + bb[3]) / 2.0):
                 legend.append((k, _legend_text_at(lines, k).upper()))
+
     def owns(f, x: float, y: float) -> float | None:
         """How snugly a field's lines sit round a point (None: not at all)."""
         (a0, b0) = f["lines"][0]
@@ -4679,7 +4991,7 @@ def field_joist_items(items: list[dict[str, Any]], model: PageModel) -> list[dic
             mx, my = (a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0
             for it in have:
                 pts = it["points"]
-                if any(_seg_dist(mx, my, p, q) <= 0.5 * upf for p, q in zip(pts, pts[1:])):
+                if any(_seg_dist(mx, my, p, q) <= 0.5 * upf for p, q in zip(pts, pts[1:], strict=False)):
                     hit += 1
                     break
         if hit >= 0.4 * len(f["lines"]):
@@ -4698,7 +5010,12 @@ def field_joist_items(items: list[dict[str, Any]], model: PageModel) -> list[dic
             best = None
             for k, t in legend:
                 bb = lines[k][1]
-                sx0, sy0, sx1, sy1 = bb[0] - 30 * (bb[3] - bb[1]), bb[1] - 4 * (bb[3] - bb[1]), bb[2] + 30 * (bb[3] - bb[1]), bb[3] + 4 * (bb[3] - bb[1])
+                sx0, sy0, sx1, sy1 = (
+                    bb[0] - 30 * (bb[3] - bb[1]),
+                    bb[1] - 4 * (bb[3] - bb[1]),
+                    bb[2] + 30 * (bb[3] - bb[1]),
+                    bb[3] + 4 * (bb[3] - bb[1]),
+                )
                 n = 0
                 for j in ds.index.near(sx0, sy0, sx1, sy1):
                     s = ds.segs[j]
@@ -4729,10 +5046,15 @@ def field_joist_items(items: list[dict[str, Any]], model: PageModel) -> list[dic
         sp_in = spacing_inches(entry or "") or round(f["pitch"] / upf * 12.0 * 5) / 5
         cat = "trusses" if kind == "TRUSS" else "joists"
         role = (
-            "Steel Joist" if des and D._JOIST_RE.fullmatch(des or "") else
-            "Floor Truss" if kind == "TRUSS" else
-            "Roof Joist" if kind == "RAFTER" or re.search(r"\bROOF\b", words) else
-            "CFS Joist" if des and D._SSMA_RE.search(des) else "Floor Joist"
+            "Steel Joist"
+            if des and D._JOIST_RE.fullmatch(des or "")
+            else "Floor Truss"
+            if kind == "TRUSS"
+            else "Roof Joist"
+            if kind == "RAFTER" or re.search(r"\bROOF\b", words)
+            else "CFS Joist"
+            if des and D._SSMA_RE.search(des)
+            else "Floor Joist"
         )
         label = mark or (profile or kind)
         designation = profile or (mark or kind)
@@ -4741,7 +5063,7 @@ def field_joist_items(items: list[dict[str, Any]], model: PageModel) -> list[dic
         # Supports: heavier lines across the members.
         sup = supports(f)
         idx = 0
-        for a, b in sorted(f["lines"], key=lambda ab: (ab[0][0] * -uy + ab[0][1] * ux)):
+        for a, b in sorted(f["lines"], key=lambda ab: ab[0][0] * -uy + ab[0][1] * ux):
             L = math.dist(a, b)
             cuts = []
             ta = a[0] * ux + a[1] * uy
@@ -4759,29 +5081,31 @@ def field_joist_items(items: list[dict[str, Any]], model: PageModel) -> list[dic
                 ts[-1] = L
             else:
                 ts.append(L)
-            for t0, t1 in zip(ts, ts[1:]):
+            for t0, t1 in zip(ts, ts[1:], strict=False):
                 p0 = (a[0] + ux * t0, a[1] + uy * t0)
                 p1 = (a[0] + ux * t1, a[1] + uy * t1)
-                out.append({
-                    "key": f"{series_key}|{idx}",
-                    "category": cat,
-                    "kind": "line",
-                    "designation": designation,
-                    "label": label,
-                    "spec": spec,
-                    "profile": profile,
-                    "ply": ply,
-                    "points": [[_r(p0[0]), _r(p0[1])], [_r(p1[0]), _r(p1[1])]],
-                    "anchor": [_r((p0[0] + p1[0]) / 2), _r((p0[1] + p1[1]) / 2)],
-                    "page": model.page_no,
-                    "series": series_key,
-                    "index": idx,
-                    "generated": False,
-                    "confidence": 0.65 if entry else 0.45,
-                    "source": "zoom",
-                    "role": role,
-                    "spacing_in": sp_in,
-                })
+                out.append(
+                    {
+                        "key": f"{series_key}|{idx}",
+                        "category": cat,
+                        "kind": "line",
+                        "designation": designation,
+                        "label": label,
+                        "spec": spec,
+                        "profile": profile,
+                        "ply": ply,
+                        "points": [[_r(p0[0]), _r(p0[1])], [_r(p1[0]), _r(p1[1])]],
+                        "anchor": [_r((p0[0] + p1[0]) / 2), _r((p0[1] + p1[1]) / 2)],
+                        "page": model.page_no,
+                        "series": series_key,
+                        "index": idx,
+                        "generated": False,
+                        "confidence": 0.65 if entry else 0.45,
+                        "source": "zoom",
+                        "role": role,
+                        "spacing_in": sp_in,
+                    }
+                )
                 idx += 1
     return out
 
@@ -4789,7 +5113,7 @@ def field_joist_items(items: list[dict[str, Any]], model: PageModel) -> list[dic
 def stair_items(model: PageModel) -> list[dict[str, Any]]:
     """One area markup per stair flight (misc. steel): treads, risers and
     width in its spec, for a steel pan / stringer stair price."""
-    from app.modules.takeoff import detail_scan as Z
+    from app.modules.takeoff import detail_scan as Z  # noqa: N812
 
     out = []
     for n, f in enumerate(Z.stair_flights(model)):
@@ -4801,26 +5125,28 @@ def stair_items(model: PageModel) -> list[dict[str, Any]]:
             f"{_fmt_in(w_in)} wide, {_fmt_in(round(f['going_in'] * 4) / 4)} going, "
             f"run {f['run_ft']:.1f} ft - stringers {2 * f['run_ft'] * 1.25:.0f} LF approx. (check the stair details)"
         )
-        out.append({
-            "key": _key(model.page_no, "other", "STAIR", cx, cy, f"st{n}"),
-            "category": "other",
-            "kind": "area",
-            "designation": "STAIR",
-            "label": f"STAIR {f['treads']}T",
-            "spec": spec,
-            "points": [[_r(x), _r(y)] for x, y in f["rect"]],
-            "anchor": [_r(cx), _r(cy)],
-            "page": model.page_no,
-            "series": None,
-            "index": None,
-            "generated": False,
-            "confidence": 0.5,
-            "source": "zoom",
-            "role": "Stair",
-            "treads": f["treads"],
-            "risers": f["risers"],
-            "stair_width_in": w_in,
-        })
+        out.append(
+            {
+                "key": _key(model.page_no, "other", "STAIR", cx, cy, f"st{n}"),
+                "category": "other",
+                "kind": "area",
+                "designation": "STAIR",
+                "label": f"STAIR {f['treads']}T",
+                "spec": spec,
+                "points": [[_r(x), _r(y)] for x, y in f["rect"]],
+                "anchor": [_r(cx), _r(cy)],
+                "page": model.page_no,
+                "series": None,
+                "index": None,
+                "generated": False,
+                "confidence": 0.5,
+                "source": "zoom",
+                "role": "Stair",
+                "treads": f["treads"],
+                "risers": f["risers"],
+                "stair_width_in": w_in,
+            }
+        )
     return out
 
 
@@ -4834,7 +5160,7 @@ def walls_without_tags(items: list[dict[str, Any]], model: PageModel) -> list[di
     the sheet's wall pen at a stud-wall width (3"-10") is a wall, as a person
     reads a floor plan. Only when nothing else found a wall on the sheet
     (OE-DELIVERY 2026-11-11-div5-rules)."""
-    from app.modules.takeoff import detail_scan as Z
+    from app.modules.takeoff import detail_scan as Z  # noqa: N812
 
     upf = model.units_per_foot or 0.0
     if not upf or model.detail is None:
@@ -4846,7 +5172,7 @@ def walls_without_tags(items: list[dict[str, Any]], model: PageModel) -> list[di
     # sections) - and not on house-rules sheets, whose walls come from tags.
     if model.kind:
         return []
-    from app.modules.takeoff import bearing_walls as BW
+    from app.modules.takeoff import bearing_walls as BW  # noqa: N812
 
     title = BW.title_text(model)
     # One title line names a wall / floor plan or layout, and nothing else.
@@ -4868,10 +5194,7 @@ def walls_without_tags(items: list[dict[str, Any]], model: PageModel) -> list[di
     found = _fill_uncovered_walls([], model, widths, pen_widths, [])
     reg = model.plan_region
     if reg is not None:
-        found = [
-            w for w in found
-            if all(reg[0] <= p[0] <= reg[2] and reg[1] <= p[1] <= reg[3] for p in w["points"])
-        ]
+        found = [w for w in found if all(reg[0] <= p[0] <= reg[2] and reg[1] <= p[1] <= reg[3] for p in w["points"])]
     if len(found) < 8:
         return []
     # A building, not a detail: walls spread 30 ft or more each way.
@@ -4910,10 +5233,15 @@ def default_wall_roles(items: list[dict[str, Any]], model: PageModel) -> int:
     (bearing_walls). Returns how many walls were set."""
     upf = model.units_per_foot or 0.0
     walls = [
-        it for it in items
+        it
+        for it in items
         if it.get("category") == "walls" and it.get("kind") == "line" and len(it.get("points") or []) == 2
     ]
-    todo = [it for it in walls if it.get("role") in (None, "", "Wall", "CFS Wall") and it.get("segment") in (None, "wall", "header")]
+    todo = [
+        it
+        for it in walls
+        if it.get("role") in (None, "", "Wall", "CFS Wall") and it.get("segment") in (None, "wall", "header")
+    ]
     if not upf or not todo:
         return 0
     segs = [((w["points"][0][0], w["points"][0][1]), (w["points"][1][0], w["points"][1][1])) for w in walls]
@@ -5029,7 +5357,7 @@ def default_wall_roles(items: list[dict[str, Any]], model: PageModel) -> int:
             return False
         a, b, members = line_of[k]
         L = math.dist(a, b)
-        if L < 10.0 * upf:
+        if 10.0 * upf > L:
             return False
         # It starts at the outside wall (the corridor end may not be drawn on
         # a structural sheet) and runs into the building.
@@ -5053,15 +5381,29 @@ def default_wall_roles(items: list[dict[str, Any]], model: PageModel) -> int:
     n = 0
     for w in todo:
         if id(w) in ext:
-            role, prof, why = "Load Bearing Wall", DEFAULT_LB_PROFILE, 'exterior wall -> load bearing, 6" studs (typical)'
+            role, prof, why = (
+                "Load Bearing Wall",
+                DEFAULT_LB_PROFILE,
+                'exterior wall -> load bearing, 6" studs (typical)',
+            )
         elif demising(w):
-            role, prof, why = "Load Bearing Wall", DEFAULT_LB_PROFILE, 'demising wall between units -> load bearing, 6" studs (typical)'
+            role, prof, why = (
+                "Load Bearing Wall",
+                DEFAULT_LB_PROFILE,
+                'demising wall between units -> load bearing, 6" studs (typical)',
+            )
         else:
-            role, prof, why = "Non-Load Bearing Wall", DEFAULT_NLB_PROFILE, 'interior wall -> non-load bearing, 3-5/8" studs (typical)'
+            role, prof, why = (
+                "Non-Load Bearing Wall",
+                DEFAULT_NLB_PROFILE,
+                'interior wall -> non-load bearing, 3-5/8" studs (typical)',
+            )
         w["role"] = role
         # The drawing's own stud size (a wall type "6" METAL STUD WALL")
         # stays; the typical size only fills a gap.
-        if not profile_of(w.get("profile")) and not re.search(r"\d\s*(?:\"|IN\.?)\s*(?:CH\s+)?(?:METAL\s+|CFS\s+)?STUD", str(w.get("spec") or ""), re.IGNORECASE):
+        if not profile_of(w.get("profile")) and not re.search(
+            r"\d\s*(?:\"|IN\.?)\s*(?:CH\s+)?(?:METAL\s+|CFS\s+)?STUD", str(w.get("spec") or ""), re.IGNORECASE
+        ):
             w["profile"] = prof
         note = f"Bearing not stated on the drawings: {why}"
         w["role_default"] = note
@@ -5086,10 +5428,7 @@ def _sane_untagged(added: list[dict[str, Any]], walls: list[dict[str, Any]], upf
         ys = [p[1] for w in tagged for p in w["points"]]
         m = max(3.0 * upf, 0.04 * max(max(xs) - min(xs), max(ys) - min(ys)))
         bx0, by0, bx1, by1 = min(xs) - m, min(ys) - m, max(xs) + m, max(ys) + m
-        added = [
-            a for a in added
-            if all(bx0 <= p[0] <= bx1 and by0 <= p[1] <= by1 for p in a["points"])
-        ]
+        added = [a for a in added if all(bx0 <= p[0] <= bx1 and by0 <= p[1] <= by1 for p in a["points"])]
 
     def geom(w):
         (ax, ay), (bx, by) = w["points"]
@@ -5175,7 +5514,7 @@ def generic_missed(
             if min(xs) <= x <= max(xs) and min(ys) <= y <= max(ys):
                 return 0.0
         if len(pts) >= 2:
-            for a, b in zip(pts, pts[1:]):
+            for a, b in zip(pts, pts[1:], strict=False):
                 best = min(best, _pt_seg_dist(x, y, (a[0], a[1], b[0], b[1], 1.0)))
         lr = it.get("label_rect")
         if lr and len(lr) == 4:
@@ -5198,9 +5537,14 @@ def generic_missed(
                 continue  # a title or note about deck, not a callout
             if cat == "beams" and info.get("series"):
                 continue
-            if cat == "beams" and re.match(r"^(HSS(\d+(?:\.\d+)?)X\2X|W\d+X)", re.sub(r"\s+", "", lab.text.upper())) and any(
-                it.get("category") == "columns" and any(math.hypot(q[0] - lab.cx, q[1] - lab.cy) <= near for q in it.get("points") or [])
-                for it in items
+            if (
+                cat == "beams"
+                and re.match(r"^(HSS(\d+(?:\.\d+)?)X\2X|W\d+X)", re.sub(r"\s+", "", lab.text.upper()))
+                and any(
+                    it.get("category") == "columns"
+                    and any(math.hypot(q[0] - lab.cx, q[1] - lab.cy) <= near for q in it.get("points") or [])
+                    for it in items
+                )
             ):
                 continue  # a column size whose column is right there
             des = info["designation"]
@@ -5211,18 +5555,25 @@ def generic_missed(
             seen.add(spot)
             if any(dist(lab.cx, lab.cy, it) <= near for it in by_des.get(key, [])):
                 continue
-            out.append({
-                "designation": des,
-                "category": cat,
-                "role": info.get("role"),
-                "at": [_r(lab.cx), _r(lab.cy)],
-                "page": model.page_no,
-                "reason": "Checked zoomed in: no member of this size could be traced from this callout - check it on the sheet.",
-            })
+            out.append(
+                {
+                    "designation": des,
+                    "category": cat,
+                    "role": info.get("role"),
+                    "at": [_r(lab.cx), _r(lab.cy)],
+                    "page": model.page_no,
+                    "reason": "Checked zoomed in: no member of this size could be traced from this callout - check it on the sheet.",
+                }
+            )
     return out
 
 
-def missed_tags(model: PageModel, items: list[dict[str, Any]], rule_infos: dict[tuple[str, float, float], dict[str, Any]], wanted: set[str]) -> list[dict[str, Any]]:
+def missed_tags(
+    model: PageModel,
+    items: list[dict[str, Any]],
+    rule_infos: dict[tuple[str, float, float], dict[str, Any]],
+    wanted: set[str],
+) -> list[dict[str, Any]]:
     """Tags on the sheet that no markup answers (nothing of that type within
     4 ft of the tag, or at its leader's end): listed for the estimator so
     nothing is skipped silently."""
@@ -5257,14 +5608,16 @@ def missed_tags(model: PageModel, items: list[dict[str, Any]], rule_infos: dict[
         cands = by_des.get(key, [])
         if any(dist(x, y, it) <= near for it in cands):
             continue
-        out.append({
-            "designation": des,
-            "category": info.get("category"),
-            "role": info.get("role"),
-            "at": [_r(x), _r(y)],
-            "page": model.page_no,
-            "reason": "No line, wall or bay could be traced from this tag - check it on the sheet.",
-        })
+        out.append(
+            {
+                "designation": des,
+                "category": info.get("category"),
+                "role": info.get("role"),
+                "at": [_r(x), _r(y)],
+                "page": model.page_no,
+                "reason": "No line, wall or bay could be traced from this tag - check it on the sheet.",
+            }
+        )
     return out
 
 
@@ -5294,32 +5647,46 @@ def run_models(
     results: list[dict[str, Any]] = []
     for model in models:
         if rules_on and not model.kind:
-            results.append({
-                "page": model.page_no,
-                "scale": model.scale_text,
-                "units_per_foot": model.units_per_foot,
-                "paper_in_per_ft": round(model.units_per_foot / 72.0, 5) if model.units_per_foot else None,
-                "detail_sheet": is_detail_sheet(model),
-                "counts": {},
-                "items": [],
-                "note": "Not a framing, shear wall or foundation plan - skipped by the framing rules.",
-                "sheet_kind": None,
-            })
+            results.append(
+                {
+                    "page": model.page_no,
+                    "scale": model.scale_text,
+                    "units_per_foot": model.units_per_foot,
+                    "paper_in_per_ft": round(model.units_per_foot / 72.0, 5) if model.units_per_foot else None,
+                    "detail_sheet": is_detail_sheet(model),
+                    "counts": {},
+                    "items": [],
+                    "note": "Not a framing, shear wall or foundation plan - skipped by the framing rules.",
+                    "sheet_kind": None,
+                }
+            )
             continue
         if is_detail_sheet(model) and not include_details:
-            results.append({
-                "page": model.page_no,
-                "scale": model.scale_text,
-                "units_per_foot": model.units_per_foot,
-                "paper_in_per_ft": round(model.units_per_foot / 72.0, 5) if model.units_per_foot else None,
-                "detail_sheet": True,
-                "counts": {},
-                "items": [],
-                "note": "Detail sheet (large scale) - skipped. Tick 'Include detail sheets' to read it.",
-            })
+            results.append(
+                {
+                    "page": model.page_no,
+                    "scale": model.scale_text,
+                    "units_per_foot": model.units_per_foot,
+                    "paper_in_per_ft": round(model.units_per_foot / 72.0, 5) if model.units_per_foot else None,
+                    "detail_sheet": True,
+                    "counts": {},
+                    "items": [],
+                    "note": "Detail sheet (large scale) - skipped. Tick 'Include detail sheets' to read it.",
+                }
+            )
             continue
         hints = (hints_by_page or {}).get(model.page_no)
-        res = take_off_page(model, cats, hints=hints, specs=specs, skip_spots=spots, col_marks=col_marks, rules=rules_on, detail_scan=detail_scan, zoom_parts=zoom_parts)
+        res = take_off_page(
+            model,
+            cats,
+            hints=hints,
+            specs=specs,
+            skip_spots=spots,
+            col_marks=col_marks,
+            rules=rules_on,
+            detail_scan=detail_scan,
+            zoom_parts=zoom_parts,
+        )
         res["_size"] = (model.width, model.height)
         results.append(res)
     if "columns" in cats:
@@ -5329,7 +5696,7 @@ def run_models(
     # (OE-DELIVERY 2026-11-11-div5-rules).
     if "walls" in cats:
         try:
-            from app.modules.takeoff import bearing_walls as BW
+            from app.modules.takeoff import bearing_walls as BW  # noqa: N812
 
             BW.apply(results, models, [m for m in spec_models if getattr(m, "framing_source", False)])
         except Exception:
@@ -5349,9 +5716,7 @@ def run_models(
         fs = next((m.fsched for m in models if m.fsched), {})
         read["framing_rules"] = True
         read["schedules"] = {k: sorted(v) for k, v in fs.items()}
-        read["sheets"] = [
-            {"page": m.page_no, "kind": m.kind, "level": m.level} for m in models if m.kind
-        ]
+        read["sheets"] = [{"page": m.page_no, "kind": m.kind, "level": m.level} for m in models if m.kind]
     return {"pages": results, "specs": specs, "column_marks": col_marks, "read": read}
 
 

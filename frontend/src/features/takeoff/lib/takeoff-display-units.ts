@@ -148,6 +148,7 @@ function formatWithDisplayUnit(
   system: MeasurementSystem,
   markupUnit?: DispUnit,
   markupAreaUnit?: AreaDispUnit,
+  imperialDenominator?: number,
 ): string {
   const isArea = metricUnit.includes('²') || metricUnit === 'm2';
   const isVol = metricUnit.includes('³') || metricUnit === 'm3';
@@ -158,7 +159,7 @@ function formatWithDisplayUnit(
   }
   if (markupUnit) {
     if (markupUnit === 'ftin') {
-      if (!isArea && !isVol) return formatFeetInches(metricValue);
+      if (!isArea && !isVol) return formatFeetInches(metricValue, undefined, imperialDenominator);
       return formatQuantity(metricValue, metricUnit, 'imperial');
     }
     const per = METRES_PER[markupUnit];
@@ -179,7 +180,7 @@ function formatWithDisplayUnit(
   if (du === 'ftin') {
     // Architectural feet+inches only reads for linear dimensions; area
     // and volume fall back to decimal ft² / ft³.
-    if (!isArea && !isVol) return formatFeetInches(metricValue);
+    if (!isArea && !isVol) return formatFeetInches(metricValue, undefined, imperialDenominator);
     return formatQuantity(metricValue, metricUnit, 'imperial');
   }
   const perMetre = du === 'mm' ? 1000 : du === 'ft' ? 1 / 0.3048 : 1 / 0.0254;
@@ -236,9 +237,14 @@ export function measurementLabel(
   scale: ScaleConfig,
   system: MeasurementSystem,
   areaUnitOverride?: string,
+  /** Feet-inch precision as 1/N inch (user preference); default 1/16". */
+  imperialDenominator?: number,
 ): string {
-  if (m.captions && m.captions.length > 0) return captionValueText(m, scale, system, areaUnitOverride);
-  const fmt = (v: number, u: string) => formatWithDisplayUnit(v, u, scale, system, m.dispUnit, m.dispAreaUnit);
+  if (m.captions && m.captions.length > 0) {
+    return captionValueText(m, scale, system, areaUnitOverride, imperialDenominator);
+  }
+  const fmt = (v: number, u: string) =>
+    formatWithDisplayUnit(v, u, scale, system, m.dispUnit, m.dispAreaUnit, imperialDenominator);
   switch (m.type) {
     case 'distance':
     case 'polyline': {
@@ -304,8 +310,10 @@ export function captionValueText(
   scale: ScaleConfig,
   system: MeasurementSystem,
   areaUnitOverride?: string,
+  imperialDenominator?: number,
 ): string {
-  const fmt = (v: number, u: string) => formatWithDisplayUnit(v, u, scale, system, m.dispUnit, m.dispAreaUnit);
+  const fmt = (v: number, u: string) =>
+    formatWithDisplayUnit(v, u, scale, system, m.dispUnit, m.dispAreaUnit, imperialDenominator);
   const fmtArea = (v: number) =>
     areaUnitOverride && !m.dispAreaUnit ? formatAreaWithUnit(v, 'm²', areaUnitOverride) : fmt(v, 'm²');
   const caps = (m.captions ?? []) as CaptionKey[];
@@ -383,6 +391,6 @@ export function formatMarkupQuantity(
 export function splitQuantityText(text: string): { num: string; unit: string } {
   const t = text.trim();
   if (/['"]/.test(t)) return { num: t, unit: 'ft-in' };
-  const m = t.match(/^(-?[\d.,\s  ']*\d)\s+(.+)$/);
+  const m = t.match(/^(-?[\d.,\s\u00A0\u202F']*\d)\s+(.+)$/);
   return m ? { num: m[1]!.trim(), unit: m[2]!.trim() } : { num: t, unit: '' };
 }

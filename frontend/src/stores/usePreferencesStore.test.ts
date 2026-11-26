@@ -16,8 +16,8 @@ describe('usePreferencesStore', () => {
 
   it('should have correct default values', () => {
     const state = usePreferencesStore.getState();
-    expect(state.currency).toBe('EUR');
-    expect(state.measurementSystem).toBe('metric');
+    expect(state.currency).toBe('USD');
+    expect(state.measurementSystem).toBe('imperial');
     // 'auto' = follow the UI language. See the date-format block below.
     expect(state.dateFormat).toBe('auto');
     // 'auto' = follow the UI language, same as dateFormat above. It used to be
@@ -79,7 +79,7 @@ describe('usePreferencesStore', () => {
   it('should reset to defaults', () => {
     usePreferencesStore.getState().setPreference('currency', 'CHF');
     usePreferencesStore.getState().resetPreferences();
-    expect(usePreferencesStore.getState().currency).toBe('EUR');
+    expect(usePreferencesStore.getState().currency).toBe('USD');
   });
 
   it('should format numbers correctly', () => {
@@ -122,8 +122,8 @@ describe('usePreferencesStore', () => {
       });
       await usePreferencesStore.getState().hydrateFromServer();
       const s = usePreferencesStore.getState();
-      expect(s.measurementSystem).toBe('metric');
-      expect(s.currency).toBe('EUR');
+      expect(s.measurementSystem).toBe('imperial');
+      expect(s.currency).toBe('USD');
     });
 
     it('swallows a server error and leaves the offline cache untouched', async () => {

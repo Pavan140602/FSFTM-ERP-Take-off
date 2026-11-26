@@ -488,9 +488,19 @@ def recompute_measurement_value(
     # the client sent one we preserve it (e.g. for "text" labels that
     # carry a numeric tag for downstream reporting).
     if mtype in {
-        "cloud", "arrow", "text", "rectangle", "highlight", "legend",
+        "cloud",
+        "arrow",
+        "text",
+        "rectangle",
+        "highlight",
+        "legend",
         # OE-DELIVERY: 2026-10-30-fsftm-markup-tools
-        "line", "polygon", "ellipse", "pen", "callout", "stamp",
+        "line",
+        "polygon",
+        "ellipse",
+        "pen",
+        "callout",
+        "stamp",
     }:
         return client_value
 
@@ -1892,6 +1902,68 @@ class TakeoffService:
                     file_path.unlink()
             raise
 
+    async def replace_document_file(self, doc_id: str, content: bytes) -> TakeoffDocument:
+        """Replace a takeoff document's PDF in place (same id, same markups).
+
+        Used by the viewer's page tools (insert blank page, rotate, delete,
+        insert pages...) so an edited drawing stays the SAME document instead
+        of being saved as a copy. The frontend moves / rotates the markups to
+        their new pages itself. The bytes are written to the document's own
+        file; a document that borrows a Project-Files blob gets its own file
+        first, so the shared original is never modified.
+        (OE-DELIVERY 2026-11-25-fsftm-pdf)
+        """
+        doc = await self.repo.get_by_id(uuid.UUID(doc_id))
+        if doc is None:
+            raise HTTPException(status_code=404, detail="Takeoff document not found")
+        if not content or not content.startswith(b"%PDF-"):
+            raise HTTPException(status_code=400, detail="File does not appear to be a valid PDF.")
+        cap = _max_upload_bytes()
+        if cap > 0 and len(content) > cap:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"PDF file is too large ({len(content) / 1024 / 1024:.1f} MB).",
+            )
+        if _is_encrypted_pdf(content):
+            raise HTTPException(status_code=400, detail="This PDF is password-protected.")
+
+        documents_dir = _takeoff_documents_dir()
+        documents_dir.mkdir(parents=True, exist_ok=True)
+        file_path = documents_dir / f"{doc.id}.pdf"
+        tmp_path = documents_dir / f"{doc.id}.pdf.tmp"
+        tmp_path.write_bytes(content)
+        tmp_path.replace(file_path)
+
+        parsed = await _parse_pdf_fast(file_path, filename=doc.filename)
+        tables_pending = parsed is not None and parsed[0] > 0
+        if parsed is None:
+            parsed = await _parse_pdf_isolated(file_path, filename=doc.filename)
+        metadata: dict[str, Any] = dict(doc.metadata_ or {})
+        if parsed is None:
+            metadata["parse_degraded"] = True
+        else:
+            page_count, page_data, _truncated, _reader_error = parsed
+            pages_without_text = [
+                int(pg.get("page", idx + 1))
+                for idx, pg in enumerate(page_data)
+                if not (pg.get("has_text") if "has_text" in pg else bool(str(pg.get("text", "")).strip()))
+            ]
+            doc.pages = page_count
+            doc.page_data = page_data
+            doc.extracted_text = "\n\n".join(pg["text"] for pg in page_data if pg.get("text"))
+            metadata.pop("parse_degraded", None)
+            metadata["pages_without_text"] = len(pages_without_text)
+            metadata["pages_without_text_list"] = pages_without_text
+            if tables_pending:
+                metadata["tables_pending"] = True
+        doc.metadata_ = metadata
+        doc.size_bytes = len(content)
+        doc.file_path = str(file_path)
+        await self.session.flush()
+        if tables_pending:
+            _schedule_full_parse(doc.id, file_path, doc.filename)
+        return doc
+
     async def get_or_create_takeoff_from_source(
         self,
         *,
@@ -2584,6 +2656,68 @@ class TakeoffService:
             "source": "vector_recognize",
             "notes": "no_vector_layer",
         }
+
+    async def find_similar_symbols_all_pages(
+        self,
+        doc_id: str,
+        page: int,
+        seed_x: float,
+        seed_y: float,
+    ) -> dict[str, Any]:
+        """Seeded symbol search across every page of a document (read-only).
+
+        Picks the seed on ``page`` and matches it on all pages. Unlike the
+        single-page search nothing is stored; the frontend shows the hits as
+        suggestions the user accepts per page.
+        """
+        from app.modules.takeoff import recognize as _recognize
+
+        doc = await self.repo.get_by_id(uuid.UUID(doc_id))
+        if doc is None:
+            raise HTTPException(status_code=404, detail="Takeoff document not found")
+        validate_page_for_document(doc, page)
+
+        file_path = _find_existing_takeoff_pdf(doc_id)
+        if file_path is None and doc.file_path:
+            candidate = Path(doc.file_path)
+            if candidate.exists():
+                file_path = candidate
+        if file_path is None:
+            raise HTTPException(
+                status_code=404,
+                detail="The stored PDF for this document is no longer on disk. Re-upload it to search.",
+            )
+
+        try:
+            import pymupdf  # noqa: PLC0415 - base dep; lazy-imported so a broken wheel degrades to a clear 400
+        except ImportError as exc:
+            from app.core.self_upgrade import repair_hint  # noqa: PLC0415
+
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Symbol search could not load its PDF reader (PyMuPDF). It ships with "
+                    "the platform, so this usually means a broken install. "
+                    + repair_hint("Reinstall openconstructionerp.")
+                ),
+            ) from exc
+
+        pages_drawings: dict[int, list[Any]] = {}
+        try:
+            pdf = pymupdf.open(stream=file_path.read_bytes(), filetype="pdf")
+            try:
+                for idx in range(pdf.page_count):
+                    pages_drawings[idx + 1] = pdf[idx].get_drawings()
+            finally:
+                pdf.close()
+        except Exception:
+            logger.exception("takeoff.similar_symbols_all_pages failed to read doc %s", doc_id)
+            raise HTTPException(
+                status_code=422,
+                detail="Could not read this PDF. It may be corrupt or password-protected.",
+            ) from None
+
+        return _recognize.find_similar_symbols_all_pages(pages_drawings, page, seed_x, seed_y)
 
     async def find_similar_symbols(
         self,
