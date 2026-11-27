@@ -78,7 +78,8 @@ const check = (name, ok, detail = '') => {
         studio.s = {
           id: 's1', name: b.name, code: '123-456-789', status: 'active', open_join: !!b.open_join, created_at: new Date().toISOString(), finished_at: null,
           me: { attendee_id: 'a1', role: 'host', status: 'joined' },
-          documents: b.document_ids.map((id) => ({ id, name: `Set ${'?ABC'[Number(id.slice(-1))]}.pdf`, project_id: 'p1', project_name: 'QA project' })),
+          documents: b.document_ids.map((id) => ({ id, name: `Set ${'?ABC'[Number(id.slice(-1))]}.pdf`, project_id: 'p1', project_name: 'QA project', folder: '' })),
+          project_id: 'p1', project_name: 'QA project', folders: [],
           attendees: [
             { id: 'a1', user_id: 'u-me', name: 'Me', email: 'me@example.com', role: 'host', status: 'joined', online: true, document_id: ID(1), page: 1 },
             ...b.invite.map((e, i) => ({ id: `a${i + 2}`, user_id: 'u-ben', name: 'Ben Field', email: e, role: 'attendee', status: 'joined', online: true, document_id: ID(1), page: 3 })),
@@ -87,6 +88,16 @@ const check = (name, ok, detail = '') => {
         return json(r, { ...studio.s, invites: b.invite.map((e) => ({ email: e, status: 'invited' })) });
       }
       if (rest === 's1/' && method === 'GET') return json(r, studio.s);
+      if (rest === 's1/folders/' && method === 'POST') {
+        studio.s = { ...studio.s, folders: [...(studio.s.folders || []), r.request().postDataJSON().path] };
+        return json(r, studio.s);
+      }
+      if (rest === 's1/documents/' && method === 'POST') {
+        const b = r.request().postDataJSON();
+        studio.addedTo = b.folder;
+        studio.s = { ...studio.s, documents: [...studio.s.documents, ...b.document_ids.map((id) => ({ id, name: 'Upload me.pdf', pages: 1, project_id: 'p1', project_name: 'QA project', folder: b.folder }))] };
+        return json(r, studio.s);
+      }
       if (rest === 's1/messages/') {
         if (method === 'POST') studio.msgs.push({ id: `m${studio.msgs.length}`, user_id: 'u-me', name: 'Me', text: r.request().postDataJSON().text, at: new Date().toISOString() });
         return json(r, { messages: studio.msgs });
@@ -96,6 +107,10 @@ const check = (name, ok, detail = '') => {
         studio.s = { ...studio.s, status: 'finished', finished_at: new Date().toISOString() };
         return json(r, { ...studio.s, report: { total: 2, people: [], documents: [] } });
       }
+    }
+    if (/\/takeoff\/documents\/upload\//.test(url)) {
+      studio.uploaded = (studio.uploaded || 0) + 1;
+      return json(r, { id: 'up-1', filename: 'Upload me.pdf', pages: 1, size_bytes: 1 });
     }
     if (/\/takeoff\/people\//.test(url)) {
       return json(r, { people: [{ id: 'u-ana', name: 'Ana Lead', email: 'ana@example.com' }, { id: 'u-ben', name: 'Ben Field', email: 'ben@example.com' }] });
@@ -144,22 +159,28 @@ const check = (name, ok, detail = '') => {
   };
 
   try {
+    await page.addInitScript(() => { try { if (!sessionStorage.getItem('smoke.init')) { localStorage.setItem('takeoff.viewMode', 'window'); sessionStorage.setItem('smoke.init', '1'); } } catch { /* ignore */ } });
     await page.goto(`${BASE}/pdf-workspace-harness.html`, { waitUntil: 'load', timeout: 120000 });
     await page.waitForSelector('[data-viewer-host] canvas', { timeout: 120000 });
     await page.waitForTimeout(2500);
     check('opens a drawing', (await page.locator('[data-testid="viewer-active"] canvas').count()) > 0);
     const toolbarNames = await page.evaluate(() => ['Width', 'Page', 'Ortho', 'Snap', 'Multiply'].every((t) => [...document.querySelectorAll('button span')].some((s) => s.textContent === t)));
     check('toolbar icons have names', toolbarNames);
-    // Top-right Full screen button.
-    const fsBtn = page.locator('[data-testid="fsftm-workspace-toggle"]:visible').first();
-    await fsBtn.click();
-    await page.waitForTimeout(700);
+    // Top-right Workspace button: full screen / full window / normal page.
+    const wsMode = async (mode) => {
+      await page.locator('[data-testid="fsftm-workspace-toggle"]:visible').first().click();
+      await page.locator(`[data-testid="workspace-mode-${mode}"]`).click();
+      await page.waitForTimeout(700);
+    };
+    const wsLabel = (await page.locator('[data-testid="fsftm-workspace-toggle"]:visible').first().innerText().catch(() => '')).trim();
+    await wsMode('fullscreen');
     const fsOn = await page.evaluate(() => !!document.fullscreenElement);
-    const fsLabel = await fsBtn.innerText().catch(() => '');
-    await page.locator('[data-testid="fsftm-workspace-toggle"]:visible').first().click();
-    await page.waitForTimeout(700);
-    const fsOff = await page.evaluate(() => !document.fullscreenElement);
-    check('Full screen button enters and leaves full screen', fsOn && /Exit full screen/.test(fsLabel) && fsOff, `on ${fsOn} label "${fsLabel}" off ${fsOff}`);
+    await wsMode('window');
+    const winOn = await page.evaluate(() => !document.fullscreenElement && localStorage.getItem('takeoff.fsftmWorkspace') === '1');
+    await wsMode('normal');
+    const normalOn = await page.evaluate(() => !document.fullscreenElement && localStorage.getItem('takeoff.fsftmWorkspace') === '0');
+    await wsMode('window');
+    check('Workspace button: Full screen, Full window and Normal page all work', wsLabel === 'Workspace' && fsOn && winOn && normalOn, `label "${wsLabel}" fs ${fsOn} window ${winOn} normal ${normalOn}`);
 
     // ── Draw, label cursor, label rotation, delete ──
     const bb = await drawLength('[data-testid="viewer-active"]', 0.5);
@@ -322,6 +343,7 @@ const check = (name, ok, detail = '') => {
     const tabA = page.locator('[data-testid="doc-tab"]:visible', { hasText: 'Set A' }).first();
     const badge = tabA.locator('[data-testid="doc-tab-people"]');
     check('file tab shows who else has it open (not me)', (await badge.count()) === 1 && (await badge.innerText()).trim() === 'BF', (await badge.count()) ? await badge.innerText() : 'no badge');
+    check('Team panel lists every account as a member', (await page.locator('[data-testid="team-member"]').count()) >= 2);
     check('Team panel shows who is working where', (await page.locator('[data-testid="team-presence"]', { hasText: 'Ana Lead' }).count()) === 1);
     const box2 = page.locator('[data-testid="team-comment-input"]');
     await box2.click();
@@ -329,6 +351,7 @@ const check = (name, ok, detail = '') => {
     await page.waitForTimeout(300);
     const sugg = page.locator('[data-testid="team-mention-list"] button', { hasText: 'Ben Field' });
     check('@ suggests people', (await sugg.count()) === 1);
+    check('@names are highlighted while typing', (await page.locator('[data-testid="team-comment-highlight"] mark').count()) >= 1);
     if (await sugg.count()) await sugg.first().dispatchEvent('mousedown');
     await page.locator('[data-testid="team-comment-send"]').click();
     await page.waitForTimeout(800);
@@ -340,8 +363,11 @@ const check = (name, ok, detail = '') => {
     // ── Studio: start a session, people, chat, report, finish ──
     await page.locator('[data-testid="rail-studio"]:visible').first().click();
     await page.waitForTimeout(600);
+    await page.locator('[data-testid="studio-plus"]').click();
     await page.locator('[data-testid="studio-start-open"]').click();
-    await page.locator('[data-testid="studio-invite-emails"]').fill('ben@example.com');
+    const pickBen = page.locator('[data-testid="studio-people-picker"] label', { hasText: 'Ben Field' });
+    check('Studio: the new-session dialog lists every account', (await page.locator('[data-testid="studio-people-picker"] label').count()) >= 2 && (await pickBen.count()) === 1);
+    await pickBen.locator('input').check();
     await page.locator('[data-testid="studio-start"]').click();
     await page.waitForTimeout(1200);
     check('Studio: a session starts with the open PDF and the invite', !!studio.created && studio.created.document_ids.includes(ID(1)) && studio.created.invite[0] === 'ben@example.com', JSON.stringify(studio.created));
@@ -353,7 +379,9 @@ const check = (name, ok, detail = '') => {
     await page.locator('[data-testid="studio-chat-send"]').click();
     await page.waitForTimeout(700);
     check('Studio: chat message shows', (await page.locator('[data-testid="studio-chat"]', { hasText: 'Grid B is mine' }).count()) === 1);
-    check('Studio: report shows markups per person', (await page.locator('[data-testid="studio-report"]', { hasText: '2 distance' }).count()) === 1);
+    const benRow = page.locator('[data-testid="studio-person"]', { hasText: 'Ben Field' });
+    check('Studio: markups per person show beside each name', (await benRow.locator('span[title="Markups made in this session"]').innerText().catch(() => '')) === '2');
+    await page.locator('[data-testid="studio-actions"]').click();
     const [dl] = await Promise.all([
       page.waitForEvent('download', { timeout: 8000 }).catch(() => null),
       page.locator('[data-testid="studio-report-pdf"]').click(),
@@ -361,6 +389,21 @@ const check = (name, ok, detail = '') => {
     let pdfHead = '';
     if (dl) { const fp = await dl.path(); pdfHead = fs.readFileSync(fp).subarray(0, 5).toString(); }
     check('Studio: report downloads as a PDF', pdfHead === '%PDF-', dl ? `${dl.suggestedFilename()} ${pdfHead}` : 'no download');
+    // Folders: make one, upload a PDF into the session from the computer.
+    await page.locator('[data-testid="studio-add"]').click();
+    await page.locator('[data-testid="studio-new-folder"]').click();
+    await page.locator('[data-testid="studio-folder-name"]').fill('Level 2');
+    await page.locator('[data-testid="studio-folder-ok"]').click();
+    await page.waitForTimeout(600);
+    check('Studio: a folder is created in the session', (await page.locator('[data-testid="studio-folder"]', { hasText: 'Level 2' }).count()) === 1);
+    await page.locator('[data-testid="studio-add"]').click();
+    await page.locator('[data-testid="studio-upload-open"]').click();
+    await page.locator('[data-testid="studio-file-input"]').setInputFiles({ name: 'Upload me.pdf', mimeType: 'application/pdf', buffer: Buffer.from(PDF['2']) });
+    await page.locator('[data-testid="studio-upload-form"] select').selectOption('Level 2');
+    await page.locator('[data-testid="studio-upload-ok"]').click();
+    await page.waitForTimeout(1200);
+    check('Studio: a PDF uploads into the chosen folder', studio.uploaded === 1 && studio.addedTo === 'Level 2' && (await page.locator('[data-testid="studio-doc"]', { hasText: 'Upload me.pdf' }).count()) === 1, `uploaded ${studio.uploaded} folder ${studio.addedTo}`);
+    await page.locator('[data-testid="studio-actions"]').click();
     page.once('dialog', (dlg) => dlg.accept());
     await page.locator('[data-testid="studio-finish"]').click();
     await page.waitForTimeout(1000);

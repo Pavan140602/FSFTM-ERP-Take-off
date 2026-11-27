@@ -70,6 +70,19 @@ def clean_emails(raw: list[str]) -> list[str]:
     return out
 
 
+def normalise_folder(path: str) -> str:
+    """``" a//b /c "`` -> ``"a/b/c"``; no ``..``, at most 8 levels of 80 chars."""
+    parts = [p.strip()[:80] for p in (path or "").replace("\\", "/").split("/")]
+    parts = [p for p in parts if p and p not in {".", ".."}]
+    return "/".join(parts[:8])
+
+
+def with_parents(path: str) -> list[str]:
+    """``"a/b/c"`` -> ``["a", "a/b", "a/b/c"]``."""
+    parts = path.split("/") if path else []
+    return ["/".join(parts[: i + 1]) for i in range(len(parts))]
+
+
 def summarise(rows: list[dict[str, Any]], names: dict[str, dict[str, str]]) -> dict[str, Any]:
     """Who marked up what: per person and per PDF, with counts by markup type.
 
@@ -188,18 +201,19 @@ async def _has_project_access(db: AsyncSession, project_id: uuid.UUID, user_id: 
         return False
 
 
-async def grant_access(db: AsyncSession, att: StudioAttendee, docs: list[TakeoffDocument]) -> None:
-    """Put a joined attendee on every session PDF's project they are not on."""
+async def grant_access(
+    db: AsyncSession, att: StudioAttendee, docs: list[TakeoffDocument], extra_projects: list[Any] | None = None
+) -> None:
+    """Put a joined attendee on every session PDF's project (and the session's
+    own project, where its uploads go) that they are not on."""
     from app.modules.projects.member_schemas import AddProjectMemberRequest
     from app.modules.projects.member_service import add_project_member
 
     if att.user_id is None:
         return
     granted = list(att.granted or [])
-    for d in docs:
-        pid = getattr(d, "project_id", None)
-        if not pid:
-            continue
+    pids = [getattr(d, "project_id", None) for d in docs] + list(extra_projects or [])
+    for pid in dict.fromkeys(str(p) for p in pids if p):
         try:
             puid = uuid.UUID(str(pid))
         except (ValueError, TypeError):
@@ -265,6 +279,7 @@ async def create(
     name: str,
     docs: list[TakeoffDocument],
     open_join: bool,
+    project_id: uuid.UUID | None = None,
 ) -> StudioSession:
     s = None
     for _ in range(8):
@@ -272,7 +287,12 @@ async def create(
         clash = (await db.execute(select(StudioSession.id).where(StudioSession.code == code))).first()
         if clash is None:
             s = StudioSession(
-                name=name.strip() or "Session", code=code, owner_id=uuid.UUID(host_id), open_join=open_join
+                name=name.strip() or "Session",
+                code=code,
+                owner_id=uuid.UUID(host_id),
+                open_join=open_join,
+                project_id=project_id or (docs[0].project_id if docs else None),
+                folders=[],
             )
             break
     if s is None:  # pragma: no cover - 1e9 codes
@@ -413,7 +433,7 @@ async def join(db: AsyncSession, s: StudioSession, user_id: str, email: str) -> 
     att.user_id = uid
     att.status = "joined"
     att.joined_at = datetime.now(UTC)
-    await grant_access(db, att, await _documents(db, await document_ids(db, s)))
+    await grant_access(db, att, await _documents(db, await document_ids(db, s)), [s.project_id])
     await db.flush()
     return att
 
@@ -439,12 +459,21 @@ async def remove_attendee(db: AsyncSession, s: StudioSession, attendee_id: str) 
     await db.flush()
 
 
-async def add_documents(db: AsyncSession, s: StudioSession, user_id: str, docs: list[TakeoffDocument]) -> None:
+async def add_documents(
+    db: AsyncSession, s: StudioSession, user_id: str, docs: list[TakeoffDocument], folder: str = ""
+) -> None:
     require_active(s)
+    folder = normalise_folder(folder)
+    if folder:
+        _add_folder_paths(s, folder)
     have = set(await document_ids(db, s))
     new = [d for d in docs if str(d.id) not in have]
     for d in new:
-        db.add(StudioSessionDocument(session_id=s.id, document_id=str(d.id), added_by=uuid.UUID(user_id)))
+        db.add(
+            StudioSessionDocument(session_id=s.id, document_id=str(d.id), added_by=uuid.UUID(user_id), folder=folder)
+        )
+    if s.project_id is None and new:
+        s.project_id = new[0].project_id
     await db.flush()
     if new:
         joined = (
@@ -455,6 +484,52 @@ async def add_documents(db: AsyncSession, s: StudioSession, user_id: str, docs: 
         for att in joined:
             await grant_access(db, att, new)
         await db.flush()
+
+
+def _add_folder_paths(s: StudioSession, folder: str) -> None:
+    have = list(s.folders or [])
+    for p in with_parents(folder):
+        if p not in have:
+            have.append(p)
+    s.folders = sorted(have, key=str.lower)
+
+
+async def add_folder(db: AsyncSession, s: StudioSession, path: str) -> str:
+    require_active(s)
+    folder = normalise_folder(path)
+    if not folder:
+        raise HTTPException(status_code=400, detail="Give the folder a name")
+    _add_folder_paths(s, folder)
+    await db.flush()
+    return folder
+
+
+async def delete_folder(db: AsyncSession, s: StudioSession, path: str) -> None:
+    """Remove an empty folder (and its empty sub-folders)."""
+    require_active(s)
+    folder = normalise_folder(path)
+    rows = (await db.execute(select(StudioSessionDocument).where(StudioSessionDocument.session_id == s.id))).scalars()
+    if any(r.folder == folder or r.folder.startswith(folder + "/") for r in rows):
+        raise HTTPException(status_code=409, detail="The folder has PDFs in it - move or remove them first")
+    s.folders = [f for f in (s.folders or []) if f != folder and not f.startswith(folder + "/")]
+    await db.flush()
+
+
+async def move_document(db: AsyncSession, s: StudioSession, document_id: str, path: str) -> None:
+    require_active(s)
+    row = (
+        await db.execute(
+            select(StudioSessionDocument).where(
+                StudioSessionDocument.session_id == s.id, StudioSessionDocument.document_id == document_id
+            )
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail="That PDF is not in the session")
+    row.folder = normalise_folder(path)
+    if row.folder:
+        _add_folder_paths(s, row.folder)
+    await db.flush()
 
 
 async def remove_document(db: AsyncSession, s: StudioSession, document_id: str) -> None:
@@ -540,7 +615,11 @@ async def detail(db: AsyncSession, s: StudioSession, me: StudioAttendee) -> dict
     for e in presence.active():
         if e["document_id"] in doc_set and e["user_id"] not in online:
             online[e["user_id"]] = e
-    project_names = await _project_names(db, [d.project_id for d in docs if getattr(d, "project_id", None)])
+    project_names = await _project_names(
+        db, [d.project_id for d in docs if getattr(d, "project_id", None)] + ([s.project_id] if s.project_id else [])
+    )
+    rows = (await db.execute(select(StudioSessionDocument).where(StudioSessionDocument.session_id == s.id))).scalars()
+    folder_of = {r.document_id: r.folder or "" for r in rows}
     return {
         "id": str(s.id),
         "name": s.name,
@@ -550,6 +629,9 @@ async def detail(db: AsyncSession, s: StudioSession, me: StudioAttendee) -> dict
         "created_at": s.created_at.isoformat() if s.created_at else None,
         "finished_at": s.finished_at.isoformat() if s.finished_at else None,
         "me": {"attendee_id": str(me.id), "role": me.role, "status": me.status},
+        "project_id": str(s.project_id) if s.project_id else None,
+        "project_name": project_names.get(str(s.project_id), "") if s.project_id else "",
+        "folders": list(s.folders or []),
         "documents": [
             {
                 "id": str(d.id),
@@ -557,6 +639,7 @@ async def detail(db: AsyncSession, s: StudioSession, me: StudioAttendee) -> dict
                 "pages": getattr(d, "pages", None),
                 "project_id": str(d.project_id) if getattr(d, "project_id", None) else None,
                 "project_name": project_names.get(str(d.project_id), "") if getattr(d, "project_id", None) else "",
+                "folder": folder_of.get(str(d.id), ""),
             }
             for d in docs
         ],

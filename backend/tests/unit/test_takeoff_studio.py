@@ -40,3 +40,12 @@ def test_summarise_counts_per_person_type_and_pdf() -> None:
     assert first["by_type"] == {"distance": 2, "area": 1}
     d1 = next(d for d in out["documents"] if d["document_id"] == "d1")
     assert d1["count"] == 3 and d1["by_user"] == {"u1": 2, "u2": 1}
+
+
+def test_folder_paths_are_cleaned_and_have_parents() -> None:
+    assert studio.normalise_folder(" Drawings // Level 2 / ") == "Drawings/Level 2"
+    assert studio.normalise_folder("../a/./b") == "a/b"
+    assert studio.normalise_folder(r"a\b") == "a/b"
+    assert studio.normalise_folder("/") == ""
+    assert studio.with_parents("a/b/c") == ["a", "a/b", "a/b/c"]
+    assert studio.with_parents("") == []

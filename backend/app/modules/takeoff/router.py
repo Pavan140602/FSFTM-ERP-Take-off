@@ -6819,6 +6819,8 @@ class StudioCreate(BaseModel):
     document_ids: list[str] = Field(default_factory=list, max_length=200)
     invite: list[str] = Field(default_factory=list, max_length=100)
     open_join: bool = False
+    #: Where files uploaded into the session are kept (the host's project).
+    project_id: str | None = Field(None, max_length=64)
 
 
 class StudioInvite(BaseModel):
@@ -6831,6 +6833,11 @@ class StudioJoin(BaseModel):
 
 class StudioDocs(BaseModel):
     document_ids: list[str] = Field(..., min_length=1, max_length=200)
+    folder: str = Field("", max_length=700)
+
+
+class StudioFolder(BaseModel):
+    path: str = Field(..., min_length=1, max_length=700)
 
 
 class StudioMessageIn(BaseModel):
@@ -6886,8 +6893,21 @@ async def studio_create(
 
     email, is_admin = await _studio_me(str(user_id), session)
     docs = await _studio_docs(body.document_ids, str(user_id), service, session)
+    home = None
+    if body.project_id:
+        try:
+            home = _uuid.UUID(body.project_id)
+        except ValueError:
+            raise HTTPException(status_code=404, detail="Project not found") from None
+        await verify_project_access(home, str(user_id), session)
     s = await studio.create(
-        session, host_id=str(user_id), host_email=email, name=body.name, docs=docs, open_join=body.open_join
+        session,
+        host_id=str(user_id),
+        host_email=email,
+        name=body.name,
+        docs=docs,
+        open_join=body.open_join,
+        project_id=home,
     )
     invites: list[dict[str, str]] = []
     if body.invite:
@@ -7008,7 +7028,61 @@ async def studio_add_documents(
     if me.status != "joined":
         raise HTTPException(status_code=403, detail="Join the session first")
     docs = await _studio_docs(body.document_ids, str(user_id), service, session)
-    await studio.add_documents(session, s, str(user_id), docs)
+    await studio.add_documents(session, s, str(user_id), docs, body.folder)
+    return await studio.detail(session, s, me)
+
+
+@router.post("/studio/sessions/{session_id}/folders/", dependencies=[Depends(RequirePermission("takeoff.read"))])
+async def studio_add_folder(
+    session_id: str,
+    body: StudioFolder,
+    user_id: CurrentUserId = None,  # type: ignore[assignment]
+    session: SessionDep = None,  # type: ignore[assignment]
+) -> dict:
+    """New folder (any joined attendee)."""
+    from app.modules.takeoff import studio
+
+    s, me = await studio.load_for_user(session, session_id, str(user_id))
+    if me.status != "joined":
+        raise HTTPException(status_code=403, detail="Join the session first")
+    await studio.add_folder(session, s, body.path)
+    return await studio.detail(session, s, me)
+
+
+@router.delete("/studio/sessions/{session_id}/folders/", dependencies=[Depends(RequirePermission("takeoff.read"))])
+async def studio_delete_folder(
+    session_id: str,
+    path: str = Query(..., min_length=1, max_length=700),
+    user_id: CurrentUserId = None,  # type: ignore[assignment]
+    session: SessionDep = None,  # type: ignore[assignment]
+) -> dict:
+    """Host: remove an empty folder."""
+    from app.modules.takeoff import studio
+
+    s, me = await studio.load_for_user(session, session_id, str(user_id))
+    studio.require_host(me)
+    await studio.delete_folder(session, s, path)
+    return await studio.detail(session, s, me)
+
+
+@router.patch(
+    "/studio/sessions/{session_id}/documents/{document_id}/",
+    dependencies=[Depends(RequirePermission("takeoff.read"))],
+)
+async def studio_move_document(
+    session_id: str,
+    document_id: str,
+    body: StudioFolder,
+    user_id: CurrentUserId = None,  # type: ignore[assignment]
+    session: SessionDep = None,  # type: ignore[assignment]
+) -> dict:
+    """Move a PDF to another folder ("/" = top level)."""
+    from app.modules.takeoff import studio
+
+    s, me = await studio.load_for_user(session, session_id, str(user_id))
+    if me.status != "joined":
+        raise HTTPException(status_code=403, detail="Join the session first")
+    await studio.move_document(session, s, document_id, body.path)
     return await studio.detail(session, s, me)
 
 

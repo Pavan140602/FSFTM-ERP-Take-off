@@ -3287,6 +3287,46 @@ export default function TakeoffViewerModule({
       }
     }, [persistPanelWidth]);
 
+  /* ── Workspace view modes (user request 2026-11-27) ───────────────────
+   * The top-right Workspace button offers three ways to see the viewer:
+   *   fullscreen - the whole screen (no browser bars),
+   *   window     - fills the browser window (the earlier workspace),
+   *   normal     - back to the normal ERP page with its header.
+   * The choice is remembered. Full screen is the default, so after signing
+   * in the viewer goes to full screen on the first click (a browser only
+   * allows full screen after a click or key press). Leaving full screen with
+   * the browser's own keys (hold Esc / F11) switches the choice to window so
+   * the next click does not jump back. */
+  type ViewMode = 'fullscreen' | 'window' | 'normal';
+  const [viewPref, setViewPref] = useState<ViewMode>(() => {
+    try {
+      const v = localStorage.getItem('takeoff.viewMode');
+      return v === 'window' || v === 'normal' ? v : 'fullscreen';
+    } catch {
+      return 'fullscreen';
+    }
+  });
+  const viewPrefRef = useRef(viewPref);
+  viewPrefRef.current = viewPref;
+  const ourFsExitRef = useRef(false);
+  const [workspaceMenu, setWorkspaceMenu] = useState(false);
+  const chooseViewMode = (mode: ViewMode) => {
+    setWorkspaceMenu(false);
+    setViewPref(mode);
+    try { localStorage.setItem('takeoff.viewMode', mode); } catch { /* ignore */ }
+    if (mode === 'fullscreen') {
+      setFSFTMWorkspace(true);
+      if (!document.fullscreenElement) void viewerRootRef.current?.requestFullscreen?.()?.catch?.(() => undefined);
+      return;
+    }
+    if (document.fullscreenElement) {
+      ourFsExitRef.current = true;
+      void document.exitFullscreen?.()?.catch?.(() => undefined);
+    }
+    setFSFTMWorkspace(mode === 'window');
+  };
+  const viewMode: ViewMode = isTakeoffFullscreen ? 'fullscreen' : fsftmWorkspace ? 'window' : 'normal';
+
   /* ── Fullscreen measuring mode ────────────────────────────────────────
    * Expands the whole viewer row (strips + canvas) to the viewport, the
    * same requestFullscreen pattern as the BIM federated viewer. The canvas
@@ -3295,16 +3335,39 @@ export default function TakeoffViewerModule({
     const el = viewerRootRef.current;
     if (!el) return;
     if (document.fullscreenElement) {
+      ourFsExitRef.current = true;
       void document.exitFullscreen?.();
     } else {
       void el.requestFullscreen?.();
     }
   }, []);
+  // Full screen is the chosen mode but not on yet (just signed in / page
+  // reloaded): go full screen on the first click in the viewer.
+  useEffect(() => {
+    if (compact || hidden || !pdfDoc || viewPref !== 'fullscreen' || isTakeoffFullscreen) return;
+    const el = viewerRootRef.current;
+    if (!el) return;
+    const go = () => {
+      if (document.fullscreenElement || viewPrefRef.current !== 'fullscreen') return;
+      setFSFTMWorkspace(true);
+      void el.requestFullscreen?.()?.catch?.(() => undefined);
+    };
+    el.addEventListener('pointerdown', go, { once: true, capture: true });
+    return () => el.removeEventListener('pointerdown', go, { capture: true });
+  }, [compact, hidden, pdfDoc, viewPref, isTakeoffFullscreen]);
 
   useEffect(() => {
     const onFullscreenChange = () => {
       const isFs = document.fullscreenElement === viewerRootRef.current;
       setIsTakeoffFullscreen(isFs);
+      if (!isFs && !document.fullscreenElement) {
+        // Left with the browser's keys: stay in the window workspace.
+        if (!ourFsExitRef.current && viewPrefRef.current === 'fullscreen') {
+          setViewPref('window');
+          try { localStorage.setItem('takeoff.viewMode', 'window'); } catch { /* ignore */ }
+        }
+        ourFsExitRef.current = false;
+      }
       // Step 1: only the function key (F11) should exit fullscreen, not ESC.
       // Browsers reserve ESC to leave fullscreen and it cannot be
       // preventDefault-ed; the Keyboard Lock API (Chromium) lets a fullscreen
@@ -21127,24 +21190,49 @@ export default function TakeoffViewerModule({
           ]}
           right={
             <div className="flex items-center gap-2">
-            {/* Full screen (user request 2026-11-27): the whole workspace
-                fills the screen, no browser bars; click again to leave. */}
-            <button
-              type="button"
-              onClick={() => {
-                if (!isTakeoffFullscreen) setFSFTMWorkspace(true);
-                toggleTakeoffFullscreen();
-              }}
-              className={clsx(
-                'flex items-center gap-1 rounded border px-2 py-0.5 text-[11px] hover:bg-surface-tertiary',
-                isTakeoffFullscreen ? 'border-oe-blue text-oe-blue' : 'border-border text-content-secondary',
+            {/* Workspace (user request 2026-11-27): full screen, full window,
+                or back to the normal ERP page. */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setWorkspaceMenu((v) => !v)}
+                className={clsx(
+                  'flex items-center gap-1 rounded border px-2 py-0.5 text-[11px] hover:bg-surface-tertiary',
+                  viewMode !== 'normal' ? 'border-oe-blue text-oe-blue' : 'border-border text-content-secondary',
+                )}
+                title="Workspace: full screen, full window or the normal page"
+                data-testid="fsftm-workspace-toggle"
+              >
+                Workspace <ChevronDown size={11} />
+              </button>
+              {workspaceMenu && (
+                <>
+                  <div className="fixed inset-0 z-[90]" onClick={() => setWorkspaceMenu(false)} />
+                  <div className="absolute right-0 top-full z-[91] mt-1 w-64 rounded-md border border-border bg-surface-elevated py-1 text-[12px] shadow-2xl" data-testid="workspace-menu">
+                    {([
+                      ['fullscreen', 'Full screen', 'The whole screen, no browser bars', Maximize2],
+                      ['window', 'Full window', 'Fills the browser window', Columns2],
+                      ['normal', 'Normal page', 'Back to the ERP page with its header', Minimize2],
+                    ] as const).map(([mode, title, hint, Icon]) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => chooseViewMode(mode)}
+                        className="flex w-full items-start gap-2 px-3 py-1.5 text-left hover:bg-surface-secondary"
+                        data-testid={`workspace-mode-${mode}`}
+                      >
+                        <Icon size={14} className="mt-0.5 shrink-0" />
+                        <span className="min-w-0 flex-1">
+                          <span className="block font-medium">{title}</span>
+                          <span className="block text-[10px] text-content-tertiary">{hint}</span>
+                        </span>
+                        {viewMode === mode && <span className="text-oe-blue">✓</span>}
+                      </button>
+                    ))}
+                  </div>
+                </>
               )}
-              title={isTakeoffFullscreen ? 'Leave full screen' : 'Full screen: the workspace fills the whole screen'}
-              data-testid="fsftm-workspace-toggle"
-            >
-              {isTakeoffFullscreen ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
-              {isTakeoffFullscreen ? 'Exit full screen' : 'Full screen'}
-            </button>
+            </div>
             </div>
           }
         />
@@ -21836,6 +21924,7 @@ export default function TakeoffViewerModule({
                 <StudioPanel
                   currentDocument={documentId && !documentId.startsWith('temp-') ? { id: documentId, name: fileName || 'Drawing' } : null}
                   openDocuments={(openDocuments ?? []).filter((d) => !d.id.startsWith('local:'))}
+                  projectId={activeProjectId || docProjectId || null}
                   onOpenDocument={(doc) => {
                     if (doc.id === documentId) return;
                     if (onOpenSessionDocument) onOpenSessionDocument(doc);

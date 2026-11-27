@@ -356,6 +356,10 @@ class StudioSession(Base):
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="active", server_default="active")
     #: False: only invited people may join. True: anyone signed in who has the ID.
     open_join: Mapped[bool] = mapped_column(default=False, server_default="0")
+    #: The project new files uploaded into the session are kept in.
+    project_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True)
+    #: Folder paths ("Drawings/Level 2"), also the empty ones.
+    folders: Mapped[list] = mapped_column(JSON, nullable=False, default=list, server_default="[]")  # type: ignore[assignment]
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
@@ -370,6 +374,8 @@ class StudioSessionDocument(Base):
     )
     document_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     added_by: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True)
+    #: Folder path inside the session ("" = top level).
+    folder: Mapped[str] = mapped_column(String(500), nullable=False, default="", server_default="")
 
 
 class StudioAttendee(Base):

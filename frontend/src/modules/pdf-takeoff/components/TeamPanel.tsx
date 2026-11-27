@@ -63,10 +63,10 @@ export function TeamPanel({
     refetchInterval: 15000,
   });
   const people = useQuery({
-    // Only the project's people: a mention links to this drawing, which
-    // someone outside the project could not open.
-    queryKey: ['takeoff-people', projectId],
-    queryFn: () => apiGet<{ people: Person[] }>(`/v1/takeoff/people/${projectId ? `?project_id=${encodeURIComponent(projectId)}` : ''}`),
+    // Every FSFTM account (user request 2026-11-27): all are listed as
+    // members and can be @mentioned.
+    queryKey: ['takeoff-people'],
+    queryFn: () => apiGet<{ people: Person[] }>('/v1/takeoff/people/'),
     staleTime: 5 * 60_000,
   });
   const commentsKey = ['takeoff-comments', documentId];
@@ -92,7 +92,7 @@ export function TeamPanel({
   })();
   const suggestions = atQuery === null
     ? []
-    : (people.data?.people ?? []).filter((p) => p.id !== me && (p.name.toLowerCase().includes(atQuery) || p.email.toLowerCase().includes(atQuery))).slice(0, 6);
+    : (people.data?.people ?? []).filter((p) => p.id !== me && (p.name.toLowerCase().includes(atQuery) || p.email.toLowerCase().includes(atQuery))).slice(0, 50);
   const pick = (p: Person) => {
     const el = boxRef.current;
     const pos = el ? el.selectionStart ?? text.length : text.length;
@@ -132,30 +132,46 @@ export function TeamPanel({
   };
 
   const active = presence.data?.active ?? [];
+  // Members: every account, the ones working now first.
+  const where = new Map<string, PresenceRow>();
+  for (const r of active) if (!where.has(r.user_id)) where.set(r.user_id, r);
+  const members = [...(people.data?.people ?? [])].sort(
+    (a, b) => Number(where.has(b.id)) - Number(where.has(a.id)) || label(a).localeCompare(label(b)),
+  );
+  for (const r of active) if (!members.some((m) => m.id === r.user_id)) members.unshift({ id: r.user_id, name: r.name, email: r.email });
   const flat = (comments.data?.items ?? []).flatMap((c) => [c, ...(c.replies ?? [])]);
   return (
     <div className="flex min-h-0 flex-1 flex-col text-[11px]" data-testid="team-panel">
-      <div className="border-b border-border px-2 py-1.5 text-[11px] font-semibold">Working now</div>
+      <div className="flex items-center border-b border-border px-2 py-1.5 text-[11px] font-semibold">
+        Members ({members.length})
+        <span className="ml-auto font-normal text-content-tertiary">{where.size} working now</span>
+      </div>
       <div className="max-h-[40%] min-h-[60px] overflow-y-auto p-1.5" data-testid="team-presence">
-        {active.length === 0 && <p className="px-1 py-2 text-content-tertiary">Nobody else is in this project right now.</p>}
-        {active.map((r) => (
-          <button
-            key={`${r.user_id}:${r.document_id}`}
-            type="button"
-            onClick={() => onOpenDrawing(r.document_id, r.page)}
-            className="mb-1 flex w-full items-center gap-2 rounded px-1.5 py-1 text-left hover:bg-surface-secondary"
-            title={`Open ${r.document_name} at page ${r.page}`}
-          >
-            <span className={clsx('flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white', r.user_id === me ? 'bg-content-tertiary' : 'bg-oe-blue')}>
-              {initials(r)}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate font-medium text-content-primary">{label(r)}{r.user_id === me ? ' (you)' : ''}</span>
-              <span className="block truncate text-content-tertiary">{r.document_name} · p.{r.page}</span>
-            </span>
-            <span className={clsx('shrink-0 text-[10px]', r.seconds_ago < 30 ? 'text-green-600' : 'text-content-tertiary')}>{ago(r.seconds_ago)}</span>
-          </button>
-        ))}
+        {members.length === 0 && <p className="px-1 py-2 text-content-tertiary">No accounts yet.</p>}
+        {members.map((p) => {
+          const r = where.get(p.id);
+          return (
+            <button
+              key={p.id}
+              type="button"
+              disabled={!r}
+              onClick={() => r && onOpenDrawing(r.document_id, r.page)}
+              className="mb-0.5 flex w-full items-center gap-2 rounded px-1.5 py-1 text-left enabled:hover:bg-surface-secondary"
+              title={r ? `Open ${r.document_name} at page ${r.page}` : `${label(p)} - not working on a drawing now`}
+              data-testid="team-member"
+            >
+              <span className={clsx('relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white', p.id === me ? 'bg-content-tertiary' : 'bg-oe-blue')}>
+                {initials(p)}
+                <span className={clsx('absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface-primary', r && r.seconds_ago < 90 ? 'bg-emerald-500' : 'bg-neutral-400')} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-medium text-content-primary">{label(p)}{p.id === me ? ' (you)' : ''}</span>
+                <span className="block truncate text-content-tertiary">{r ? `${r.document_name} · p.${r.page}` : p.email}</span>
+              </span>
+              {r && <span className={clsx('shrink-0 text-[10px]', r.seconds_ago < 30 ? 'text-green-600' : 'text-content-tertiary')}>{ago(r.seconds_ago)}</span>}
+            </button>
+          );
+        })}
       </div>
       <div className="border-y border-border px-2 py-1.5 text-[11px] font-semibold">Comments on this drawing</div>
       <div className="min-h-0 flex-1 overflow-y-auto p-1.5" data-testid="team-comments">
@@ -181,16 +197,29 @@ export function TeamPanel({
       </div>
       <div className="relative border-t border-border p-1.5">
         {suggestions.length > 0 && (
-          <div className="absolute bottom-full left-1.5 right-1.5 z-10 mb-1 rounded border border-border bg-surface-primary shadow-lg" data-testid="team-mention-list">
+          <div className="absolute bottom-full left-1.5 right-1.5 z-10 mb-1 max-h-56 overflow-y-auto rounded border border-border bg-surface-primary shadow-lg" data-testid="team-mention-list">
             {suggestions.map((p) => (
               <button key={p.id} type="button" onMouseDown={(e) => { e.preventDefault(); pick(p); }} className="flex w-full items-center gap-2 px-2 py-1 text-left hover:bg-surface-secondary">
                 <span className="flex h-5 w-5 items-center justify-center rounded-full bg-oe-blue text-[9px] font-bold text-white">{initials(p)}</span>
-                <span className="min-w-0 flex-1 truncate">{label(p)}</span>
+                <span className="min-w-0 flex-1 truncate font-semibold text-oe-blue">{label(p)}</span>
                 <span className="truncate text-[10px] text-content-tertiary">{p.email}</span>
               </button>
             ))}
           </div>
         )}
+        <div className="relative">
+        {/* Mentions are highlighted while typing: a copy of the text sits
+            behind the (transparent) box with the @names marked. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words rounded border border-transparent bg-surface-secondary px-1.5 py-1 text-[11px] text-transparent"
+          data-testid="team-comment-highlight"
+        >
+          {text.split(/(@[^\s@]+(?:@[^\s@]+)?)/g).map((part, i) =>
+            part.startsWith('@') ? <mark key={i} className="rounded bg-oe-blue/30 text-transparent">{part}</mark> : <span key={i}>{part}</span>,
+          )}
+          {'​'}
+        </div>
         <textarea
           ref={boxRef}
           value={text}
@@ -202,9 +231,14 @@ export function TeamPanel({
           }}
           rows={3}
           placeholder="Write a comment… type @ to mention (Ctrl+Enter sends)"
-          className="w-full resize-none rounded border border-border bg-surface-secondary px-1.5 py-1 text-[11px] focus:border-oe-blue focus:outline-none"
+          onScroll={(e) => {
+            const hl = e.currentTarget.previousElementSibling as HTMLElement | null;
+            if (hl) hl.scrollTop = e.currentTarget.scrollTop;
+          }}
+          className="relative w-full resize-none rounded border border-border bg-transparent px-1.5 py-1 text-[11px] focus:border-oe-blue focus:outline-none"
           data-testid="team-comment-input"
         />
+        </div>
         <button
           type="button"
           disabled={!text.trim() || sending || !documentId}
