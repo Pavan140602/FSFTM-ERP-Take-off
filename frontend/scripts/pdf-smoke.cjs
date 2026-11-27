@@ -159,28 +159,26 @@ const check = (name, ok, detail = '') => {
   };
 
   try {
-    await page.addInitScript(() => { try { if (!sessionStorage.getItem('smoke.init')) { localStorage.setItem('takeoff.viewMode', 'window'); sessionStorage.setItem('smoke.init', '1'); } } catch { /* ignore */ } });
+    await page.addInitScript(() => { try { if (!sessionStorage.getItem('smoke.init')) { localStorage.setItem('takeoff.viewMode', 'normal'); sessionStorage.setItem('smoke.init', '1'); } } catch { /* ignore */ } });
     await page.goto(`${BASE}/pdf-workspace-harness.html`, { waitUntil: 'load', timeout: 120000 });
     await page.waitForSelector('[data-viewer-host] canvas', { timeout: 120000 });
     await page.waitForTimeout(2500);
     check('opens a drawing', (await page.locator('[data-testid="viewer-active"] canvas').count()) > 0);
     const toolbarNames = await page.evaluate(() => ['Width', 'Page', 'Ortho', 'Snap', 'Multiply'].every((t) => [...document.querySelectorAll('button span')].some((s) => s.textContent === t)));
     check('toolbar icons have names', toolbarNames);
-    // Top-right Workspace button: full screen / full window / normal page.
-    const wsMode = async (mode) => {
-      await page.locator('[data-testid="fsftm-workspace-toggle"]:visible').first().click();
-      await page.locator(`[data-testid="workspace-mode-${mode}"]`).click();
-      await page.waitForTimeout(700);
-    };
-    const wsLabel = (await page.locator('[data-testid="fsftm-workspace-toggle"]:visible').first().innerText().catch(() => '')).trim();
-    await wsMode('fullscreen');
+    // Top-right Workspace button: one click normal page <-> full screen.
+    const wsBtn = () => page.locator('[data-testid="fsftm-workspace-toggle"]:visible').first();
+    const wsLabel = (await wsBtn().innerText().catch(() => '')).trim();
+    if ((await wsBtn().getAttribute('aria-pressed')) === 'true') { await wsBtn().click(); await page.waitForTimeout(600); }
+    const startNormal = await page.evaluate(() => !document.fullscreenElement);
+    await wsBtn().click();
+    await page.waitForTimeout(700);
     const fsOn = await page.evaluate(() => !!document.fullscreenElement);
-    await wsMode('window');
-    const winOn = await page.evaluate(() => !document.fullscreenElement && localStorage.getItem('takeoff.fsftmWorkspace') === '1');
-    await wsMode('normal');
-    const normalOn = await page.evaluate(() => !document.fullscreenElement && localStorage.getItem('takeoff.fsftmWorkspace') === '0');
-    await wsMode('window');
-    check('Workspace button: Full screen, Full window and Normal page all work', wsLabel === 'Workspace' && fsOn && winOn && normalOn, `label "${wsLabel}" fs ${fsOn} window ${winOn} normal ${normalOn}`);
+    const noPopup = (await page.locator('[data-testid="workspace-menu"]').count()) === 0;
+    await wsBtn().click();
+    await page.waitForTimeout(700);
+    const backNormal = await page.evaluate(() => !document.fullscreenElement && localStorage.getItem('takeoff.viewMode') === 'normal');
+    check('Workspace: one click to full screen, one click back to normal (no pop-up)', wsLabel === 'Workspace' && startNormal && fsOn && noPopup && backNormal, `label "${wsLabel}" fs ${fsOn} popup ${!noPopup} back ${backNormal}`);
 
     // ── Draw, label cursor, label rotation, delete ──
     const bb = await drawLength('[data-testid="viewer-active"]', 0.5);
@@ -363,8 +361,8 @@ const check = (name, ok, detail = '') => {
     // ── Studio: start a session, people, chat, report, finish ──
     await page.locator('[data-testid="rail-studio"]:visible').first().click();
     await page.waitForTimeout(600);
-    await page.locator('[data-testid="studio-plus"]').click();
-    await page.locator('[data-testid="studio-start-open"]').click();
+    check('Studio: New session and Join buttons are in view', (await page.locator('[data-testid="studio-new-btn"]:visible').count()) === 1 && (await page.locator('[data-testid="studio-join-btn"]:visible').count()) === 1);
+    await page.locator('[data-testid="studio-new-btn"]').click();
     const pickBen = page.locator('[data-testid="studio-people-picker"] label', { hasText: 'Ben Field' });
     check('Studio: the new-session dialog lists every account', (await page.locator('[data-testid="studio-people-picker"] label').count()) >= 2 && (await pickBen.count()) === 1);
     await pickBen.locator('input').check();
@@ -372,6 +370,7 @@ const check = (name, ok, detail = '') => {
     await page.waitForTimeout(1200);
     check('Studio: a session starts with the open PDF and the invite', !!studio.created && studio.created.document_ids.includes(ID(1)) && studio.created.invite[0] === 'ben@example.com', JSON.stringify(studio.created));
     check('Studio: the session ID is shown', (await page.locator('[data-testid="studio-code-shown"]').innerText().catch(() => '')) === '123-456-789');
+    check('Studio: says who can see the session', (await page.locator('[data-testid="studio-visibility-note"]', { hasText: 'Only the people added here' }).count()) === 1);
     check('Studio: people in the session are listed', (await page.locator('[data-testid="studio-person"]', { hasText: 'Ben Field' }).count()) === 1);
     check('Studio: the viewer knows which PDFs are in the session (faster live sync)', (await S('studio.active'))?.docIds?.includes(ID(1)) === true);
     await shot('studio_live');

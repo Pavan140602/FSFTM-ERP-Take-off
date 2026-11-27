@@ -294,7 +294,8 @@ export function StudioPanel({
   const [busy, setBusy] = useState(false);
   const [search, setSearch] = useState('');
   const [menu, setMenu] = useState<'plus' | 'add' | 'actions' | null>(null);
-  const [dialog, setDialog] = useState<'new' | 'join' | 'invite' | 'upload' | 'folder' | null>(null);
+  const [dialog, setDialog] = useState<'new' | 'join' | 'invite' | 'upload' | 'folder' | 'project' | null>(null);
+  const [projPicked, setProjPicked] = useState<Set<string>>(new Set());
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [dropFolder, setDropFolder] = useState<string | null>(null);
   const [showChat, setShowChat] = useState(true);
@@ -498,6 +499,17 @@ export function StudioPanel({
   const moveDoc = (docId: string, folder: string) =>
     run(async () => {
       refresh(await apiPatch<SessionDetail>(`/v1/takeoff/studio/sessions/${activeId}/documents/${docId}/`, { path: folder || '/' }));
+    });
+  const projectDocs = useQuery({
+    queryKey: ['studio-project-docs', projectId],
+    queryFn: () => apiGet<{ id: string; filename: string; pages?: number }[]>(`/v1/takeoff/documents/?project_id=${encodeURIComponent(projectId!)}`),
+    enabled: dialog === 'project' && !!projectId,
+  });
+  const addFromProject = () =>
+    run(async () => {
+      if (!projPicked.size) throw new Error('Pick one or more PDFs');
+      refresh(await apiPost<SessionDetail>(`/v1/takeoff/studio/sessions/${activeId}/documents/`, { document_ids: Array.from(projPicked), folder: uploadTo }));
+      setDialog(null);
     });
   const addCurrent = () =>
     run(async () => {
@@ -716,6 +728,19 @@ export function StudioPanel({
         <span className="text-[13px] font-semibold">Studio</span>
         <span className="ml-auto max-w-[55%] truncate text-[11px] text-content-secondary" title="Signed in as">{myEmail || ''}</span>
       </div>
+      {(sessions.error as { status?: number } | null)?.status === 404 || /not found/i.test(String((sessions.error as Error | null)?.message ?? '')) ? (
+        <div className="m-2 rounded border border-amber-500/50 bg-amber-500/10 p-2 text-[11px]" data-testid="studio-server-old">
+          Studio is not on the server yet. Restart the backend (it was started before Studio was added), then press refresh.
+        </div>
+      ) : null}
+      <div className="flex gap-1.5 px-2 pt-2">
+        <button type="button" className={clsx(btn, 'flex flex-1 items-center justify-center gap-1 bg-oe-blue py-1.5 text-white')} onClick={openNew} data-testid="studio-new-btn">
+          <FolderPlus size={13} /> New session
+        </button>
+        <button type="button" className={clsx(btn, 'flex flex-1 items-center justify-center gap-1 border border-border py-1.5')} onClick={() => setDialog('join')} data-testid="studio-join-btn">
+          <LogIn size={13} /> Join with ID
+        </button>
+      </div>
       <div className="flex items-center gap-1 px-2 pb-1 pt-1.5">
         <span className="text-[12px] font-semibold">All sessions</span>
         <div className="relative ml-auto">
@@ -794,6 +819,7 @@ export function StudioPanel({
                                 <button type="button" className={menuItem} onClick={() => { setMenu(null); setUploadTo(''); folderPick.current?.click(); }}><FolderUp size={13} /> Upload folder…</button>
                                 <button type="button" className={menuItem} onClick={() => { setMenu(null); setUploadTo(''); setNewFolder(''); setDialog('folder'); }} data-testid="studio-new-folder"><FolderPlus size={13} /> New folder</button>
                                 <button type="button" className={menuItem} disabled={!canAddCurrent} onClick={() => { setMenu(null); addCurrent(); }} data-testid="studio-add-current"><FilePlus size={13} /> Add the open PDF</button>
+                                <button type="button" className={menuItem} disabled={!projectId} onClick={() => { setMenu(null); setProjPicked(new Set()); setDialog('project'); }} data-testid="studio-add-project"><FolderOpen size={13} /> Add PDFs from the project…</button>
                                 <div className="my-1 h-px bg-border" />
                                 <button type="button" className={menuItem} onClick={() => { setMenu(null); setWho(new Set()); setExtraEmails(''); setPeopleFilter(''); setDialog('invite'); }} data-testid="studio-invite-open"><UserPlus size={13} /> Invite people…</button>
                               </>
@@ -857,6 +883,9 @@ export function StudioPanel({
                   <div className="flex items-center px-2 pb-0.5 pt-2 text-[10px] font-semibold uppercase tracking-wide text-content-tertiary">
                     People
                     <span className="ml-auto normal-case tracking-normal">{d.attendees.filter((a) => a.online).length} online</span>
+                  </div>
+                  <div className="px-2 pb-1 text-[10px] text-content-tertiary" data-testid="studio-visibility-note">
+                    {d.open_join ? 'Anyone signed in who has the session ID can join.' : 'Only the people added here can see this session and its PDFs.'}
                   </div>
                   {peopleRows.att.map((a) => (
                     <div key={a.id} className="group flex items-center gap-2 px-2 py-0.5" data-testid="studio-person">
@@ -954,7 +983,7 @@ export function StudioPanel({
               </label>
             ))}
           </div>
-          <div className="text-[11px] text-content-secondary">People</div>
+          <div className="text-[11px] text-content-secondary">People - only the people you add can see the session</div>
           {peoplePicker(new Set())}
           <label className="flex items-center gap-1.5 text-[11px] text-content-secondary">
             <input type="checkbox" checked={openJoin} onChange={(e) => setOpenJoin(e.target.checked)} /> Anyone signed in who has the session ID may join
@@ -965,6 +994,36 @@ export function StudioPanel({
           <button type="button" className={clsx(btn, 'bg-oe-blue text-white')} disabled={busy || (!picked.size && !projectId)} onClick={start} data-testid="studio-start" title={!picked.size && !projectId ? 'Open a project or pick a PDF first' : ''}>Start</button>
         </>,
         'studio-start-form',
+      )}
+      {dialog === 'project' && d && modal(
+        'Add PDFs from the project',
+        <>
+          <div className="max-h-60 overflow-y-auto rounded border border-border" data-testid="studio-project-docs">
+            {projectDocs.isLoading && <div className="px-2 py-1.5 text-[11px] text-content-tertiary">Loading…</div>}
+            {(projectDocs.data ?? []).filter((x) => !d.documents.some((y) => y.id === x.id)).map((x) => (
+              <label key={x.id} className="flex cursor-pointer items-center gap-2 px-2 py-1 hover:bg-surface-secondary">
+                <input type="checkbox" checked={projPicked.has(x.id)} onChange={(e) => setProjPicked((p) => { const n = new Set(p); if (e.target.checked) n.add(x.id); else n.delete(x.id); return n; })} />
+                <Thumb id={x.id} />
+                <span className="min-w-0 flex-1 truncate">{x.filename}</span>
+              </label>
+            ))}
+            {projectDocs.data && projectDocs.data.filter((x) => !d.documents.some((y) => y.id === x.id)).length === 0 && (
+              <div className="px-2 py-1.5 text-[11px] text-content-tertiary">All of the project's PDFs are already in the session.</div>
+            )}
+          </div>
+          <label className="flex items-center gap-2 text-[11px] text-content-secondary">
+            Into
+            <select className={input} value={uploadTo} onChange={(e) => setUploadTo(e.target.value)}>
+              <option value="">(top level)</option>
+              {folders.map((f) => <option key={f} value={f}>{f}</option>)}
+            </select>
+          </label>
+        </>,
+        <>
+          <button type="button" className={clsx(btn, 'border border-border')} onClick={() => setDialog(null)}>Cancel</button>
+          <button type="button" className={clsx(btn, 'bg-oe-blue text-white')} disabled={busy || !projPicked.size} onClick={addFromProject} data-testid="studio-project-ok">Add</button>
+        </>,
+        'studio-project-form',
       )}
       {dialog === 'join' && modal(
         'Join a session',

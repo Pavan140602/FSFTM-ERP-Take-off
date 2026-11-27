@@ -3288,10 +3288,11 @@ export default function TakeoffViewerModule({
     }, [persistPanelWidth]);
 
   /* ── Workspace view modes (user request 2026-11-27) ───────────────────
-   * The top-right Workspace button offers three ways to see the viewer:
-   *   fullscreen - the whole screen (no browser bars),
-   *   window     - fills the browser window (the earlier workspace),
-   *   normal     - back to the normal ERP page with its header.
+   * The top-right Workspace button switches with one click between
+   *   normal     - the normal ERP page with its header, and
+   *   fullscreen - the whole screen (no browser bars).
+   * ('window', filling the browser window, is still used by the View
+   * menu's Full-window Workspace item.)
    * The choice is remembered. Full screen is the default, so after signing
    * in the viewer goes to full screen on the first click (a browser only
    * allows full screen after a click or key press). Leaving full screen with
@@ -3301,7 +3302,7 @@ export default function TakeoffViewerModule({
   const [viewPref, setViewPref] = useState<ViewMode>(() => {
     try {
       const v = localStorage.getItem('takeoff.viewMode');
-      return v === 'window' || v === 'normal' ? v : 'fullscreen';
+      return v === 'normal' ? 'normal' : 'fullscreen';
     } catch {
       return 'fullscreen';
     }
@@ -3309,9 +3310,7 @@ export default function TakeoffViewerModule({
   const viewPrefRef = useRef(viewPref);
   viewPrefRef.current = viewPref;
   const ourFsExitRef = useRef(false);
-  const [workspaceMenu, setWorkspaceMenu] = useState(false);
   const chooseViewMode = (mode: ViewMode) => {
-    setWorkspaceMenu(false);
     setViewPref(mode);
     try { localStorage.setItem('takeoff.viewMode', mode); } catch { /* ignore */ }
     if (mode === 'fullscreen') {
@@ -3361,10 +3360,12 @@ export default function TakeoffViewerModule({
       const isFs = document.fullscreenElement === viewerRootRef.current;
       setIsTakeoffFullscreen(isFs);
       if (!isFs && !document.fullscreenElement) {
-        // Left with the browser's keys: stay in the window workspace.
+        // Left with the browser's keys (hold Esc / F11): back to the
+        // normal page, so the next click does not jump into full screen.
         if (!ourFsExitRef.current && viewPrefRef.current === 'fullscreen') {
-          setViewPref('window');
-          try { localStorage.setItem('takeoff.viewMode', 'window'); } catch { /* ignore */ }
+          setViewPref('normal');
+          setFSFTMWorkspace(false);
+          try { localStorage.setItem('takeoff.viewMode', 'normal'); } catch { /* ignore */ }
         }
         ourFsExitRef.current = false;
       }
@@ -21190,49 +21191,22 @@ export default function TakeoffViewerModule({
           ]}
           right={
             <div className="flex items-center gap-2">
-            {/* Workspace (user request 2026-11-27): full screen, full window,
-                or back to the normal ERP page. */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setWorkspaceMenu((v) => !v)}
-                className={clsx(
-                  'flex items-center gap-1 rounded border px-2 py-0.5 text-[11px] hover:bg-surface-tertiary',
-                  viewMode !== 'normal' ? 'border-oe-blue text-oe-blue' : 'border-border text-content-secondary',
-                )}
-                title="Workspace: full screen, full window or the normal page"
-                data-testid="fsftm-workspace-toggle"
-              >
-                Workspace <ChevronDown size={11} />
-              </button>
-              {workspaceMenu && (
-                <>
-                  <div className="fixed inset-0 z-[90]" onClick={() => setWorkspaceMenu(false)} />
-                  <div className="absolute right-0 top-full z-[91] mt-1 w-64 rounded-md border border-border bg-surface-elevated py-1 text-[12px] shadow-2xl" data-testid="workspace-menu">
-                    {([
-                      ['fullscreen', 'Full screen', 'The whole screen, no browser bars', Maximize2],
-                      ['window', 'Full window', 'Fills the browser window', Columns2],
-                      ['normal', 'Normal page', 'Back to the ERP page with its header', Minimize2],
-                    ] as const).map(([mode, title, hint, Icon]) => (
-                      <button
-                        key={mode}
-                        type="button"
-                        onClick={() => chooseViewMode(mode)}
-                        className="flex w-full items-start gap-2 px-3 py-1.5 text-left hover:bg-surface-secondary"
-                        data-testid={`workspace-mode-${mode}`}
-                      >
-                        <Icon size={14} className="mt-0.5 shrink-0" />
-                        <span className="min-w-0 flex-1">
-                          <span className="block font-medium">{title}</span>
-                          <span className="block text-[10px] text-content-tertiary">{hint}</span>
-                        </span>
-                        {viewMode === mode && <span className="text-oe-blue">✓</span>}
-                      </button>
-                    ))}
-                  </div>
-                </>
+            {/* Workspace (user request 2026-11-27): one click switches between
+                the normal ERP page and full screen. */}
+            <button
+              type="button"
+              onClick={() => chooseViewMode(viewMode === 'normal' ? 'fullscreen' : 'normal')}
+              className={clsx(
+                'flex items-center gap-1 rounded border px-2 py-0.5 text-[11px] hover:bg-surface-tertiary',
+                viewMode !== 'normal' ? 'border-oe-blue bg-oe-blue/10 text-oe-blue' : 'border-border text-content-secondary',
               )}
-            </div>
+              title={viewMode === 'normal' ? 'Workspace: full screen' : 'Back to the normal page'}
+              aria-pressed={viewMode !== 'normal'}
+              data-testid="fsftm-workspace-toggle"
+            >
+              {viewMode === 'normal' ? <Maximize2 size={12} /> : <Minimize2 size={12} />}
+              Workspace
+            </button>
             </div>
           }
         />

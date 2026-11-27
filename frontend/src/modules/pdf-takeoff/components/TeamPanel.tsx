@@ -147,7 +147,10 @@ export function TeamPanel({
         <span className="ml-auto font-normal text-content-tertiary">{where.size} working now</span>
       </div>
       <div className="max-h-[40%] min-h-[60px] overflow-y-auto p-1.5" data-testid="team-presence">
-        {members.length === 0 && <p className="px-1 py-2 text-content-tertiary">No accounts yet.</p>}
+        {people.isError && (
+          <p className="px-1 py-2 text-amber-500" data-testid="team-server-old">The member list is not on the server yet. Restart the backend (it was started before this was added).</p>
+        )}
+        {!people.isError && members.length === 0 && <p className="px-1 py-2 text-content-tertiary">{people.isLoading ? 'Loading…' : 'No accounts yet.'}</p>}
         {members.map((p) => {
           const r = where.get(p.id);
           return (
