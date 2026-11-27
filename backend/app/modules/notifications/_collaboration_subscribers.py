@@ -125,6 +125,10 @@ async def _on_collaboration_comment_created(event: Event) -> None:
                 if owner_id:
                     recipients.add(owner_id)
 
+            for mid in data.get("mentioned_user_ids") or []:
+                if mid:
+                    recipients.add(str(mid))
+
             # Never notify the author about their own comment.
             if author_id:
                 recipients.discard(author_id)
@@ -138,6 +142,8 @@ async def _on_collaboration_comment_created(event: Event) -> None:
             # project route; everything else uses the generic entity query.
             if entity_type == "project":
                 action_url = f"/projects/{entity_id}"
+            elif entity_type == "takeoff_document":
+                action_url = f"/takeoff?tab=measurements&doc={entity_id}"
             else:
                 action_url = f"/discussions?entity_type={entity_type}&entity_id={entity_id}"
 

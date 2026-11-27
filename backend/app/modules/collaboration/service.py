@@ -149,6 +149,11 @@ class CollaborationService:
                 "parent_comment_id": (str(data.parent_comment_id) if data.parent_comment_id else None),
                 "comment_type": data.comment_type,
                 "body_excerpt": (data.text or "")[:160],
+                # People @mentioned with a notify mention are told too
+                # (OE-DELIVERY 2026-11-27-fsftm-pdf).
+                "mentioned_user_ids": [
+                    str(m.mentioned_user_id) for m in (data.mentions or []) if m.mention_type == "at_notify"
+                ],
             },
         )
         return comment

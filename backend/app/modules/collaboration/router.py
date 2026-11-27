@@ -61,6 +61,8 @@ _ALLOWED_ENTITY_TYPES: frozenset[str] = frozenset(
         "meeting",
         "transmittal",
         "bcf_topic",
+        # PDF Measurements drawing (OE-DELIVERY 2026-11-27-fsftm-pdf).
+        "takeoff_document",
     }
 )
 
@@ -109,6 +111,12 @@ async def _resolve_entity_project_id(
             from app.modules.boq.models import BOQ
 
             return (await session.execute(select(BOQ.project_id).where(BOQ.id == eid))).scalar_one_or_none()
+        if entity_type == "takeoff_document":
+            from app.modules.takeoff.models import TakeoffDocument
+
+            return (
+                await session.execute(select(TakeoffDocument.project_id).where(TakeoffDocument.id == eid))
+            ).scalar_one_or_none()
         if entity_type == "document":
             from app.modules.documents.models import Document
 

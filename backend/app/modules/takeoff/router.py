@@ -5513,6 +5513,88 @@ async def put_auto_takeoff_rejected(
     return {"rejected": clean}
 
 
+class PresenceReport(BaseModel):
+    """The drawing (and page) a viewer has open."""
+
+    document_id: str = Field(..., min_length=1, max_length=64)
+    page: int = Field(1, ge=1, le=100000)
+    leaving: bool = False
+
+
+@router.post(
+    "/presence/",
+    dependencies=[Depends(RequirePermission("takeoff.read"))],
+)
+async def report_presence(
+    body: PresenceReport,
+    user_id: CurrentUserId = None,  # type: ignore[assignment]
+    service: TakeoffService = Depends(_get_service),
+    session: SessionDep = None,  # type: ignore[assignment]
+) -> dict:
+    """I have this drawing open (sent every few seconds by the viewer).
+
+    Returns who else is working in the same project right now
+    (OE-DELIVERY 2026-11-27-fsftm-pdf).
+    """
+    from app.modules.takeoff import presence
+    from app.modules.users.models import User
+
+    uid = str(user_id) if user_id else ""
+    if not uid:
+        raise HTTPException(status_code=401, detail="Not signed in")
+    doc = await _doc_intel_document(body.document_id, uid, service, session)
+    project_id = str(doc.project_id) if getattr(doc, "project_id", None) else ""
+    if body.leaving:
+        presence.leave(uid, str(doc.id))
+    else:
+        user = await session.get(User, _uuid.UUID(uid))
+        presence.report(
+            presence.Presence(
+                user_id=uid,
+                name=(user.full_name or "").strip() if user else "",
+                email=user.email if user else "",
+                document_id=str(doc.id),
+                document_name=doc.filename,
+                project_id=project_id,
+                page=body.page,
+                at=_time.time(),
+            )
+        )
+    return {"active": presence.active(project_id or None)}
+
+
+@router.get(
+    "/presence/",
+    dependencies=[Depends(RequirePermission("takeoff.read"))],
+)
+async def list_presence(
+    project_id: str | None = Query(None, max_length=64),
+) -> dict:
+    """Who is working on which drawing right now (optionally one project)."""
+    from app.modules.takeoff import presence
+
+    return {"active": presence.active(project_id)}
+
+
+@router.get(
+    "/people/",
+    dependencies=[Depends(RequirePermission("takeoff.read"))],
+)
+async def list_people(
+    session: SessionDep = None,  # type: ignore[assignment]
+    q: str = Query("", max_length=100),
+) -> dict:
+    """Active users, for @mentions in drawing comments."""
+    from app.modules.users.models import User
+
+    stmt = select(User.id, User.full_name, User.email).where(User.is_active.is_(True))
+    if q.strip():
+        like = f"%{q.strip()}%"
+        stmt = stmt.where((User.full_name.ilike(like)) | (User.email.ilike(like)))
+    rows = (await session.execute(stmt.order_by(User.full_name).limit(200))).all()
+    return {"people": [{"id": str(r.id), "name": r.full_name or "", "email": r.email} for r in rows]}
+
+
 @router.get(
     "/documents/{doc_id}/snapshot-imported/",
     dependencies=[Depends(RequirePermission("takeoff.read"))],

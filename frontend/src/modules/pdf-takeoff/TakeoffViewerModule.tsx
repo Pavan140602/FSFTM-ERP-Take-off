@@ -205,7 +205,7 @@ import {
   countConfidenceBands,
   type ConfidenceThresholds,
 } from '../../features/takeoff/lib/confidenceBand';
-import { apiGet, apiPut, getAuthToken } from '../../shared/lib/api';
+import { apiGet, apiPost, apiPut, getAuthToken } from '../../shared/lib/api';
 import AiAssistantPanel from './AiAssistantPanel';
 // Detect tab removed at the user's request; Auto Takeoff replaces it (OE-DELIVERY 2026-11-02-remove-detect).
 // Auto Takeoff (OE-DELIVERY 2026-11-02-auto-takeoff).
@@ -531,6 +531,8 @@ import { createPortal } from 'react-dom';
 import { retainPdf, releasePdf as releasePooledPdf } from './data/pdf-doc-pool';
 import { useSharedState, getShared, setShared, clearShared } from './data/shared-state';
 import { useSmoothProgress } from './data/smooth-progress';
+import { TeamPanel } from './components/TeamPanel';
+import { Users as TeamIcon } from 'lucide-react';
 import { canSplit, layoutRects, leaf, leaves, removeLeaf, resizeAt, splitLeaf, nodeAt, type LayoutNode, type SplitDir } from './data/split-layout';
 import {
   TAB_DND_MIME,
@@ -5166,10 +5168,10 @@ export default function TakeoffViewerModule({
   }, [measurements, ledgerDocKey]);
 
   /* ── FSFTM left panel, sheet index, overlay, sync, units, text (OE-DELIVERY 2026-11-02-fsftm-left-panel) ── */
-  const [leftTab, setLeftTab] = useSharedState<'thumbs' | 'index' | 'layers' | 'side' | 'measure' | 'scale'>('ui.leftTab', () => {
+  const [leftTab, setLeftTab] = useSharedState<'thumbs' | 'index' | 'layers' | 'side' | 'measure' | 'scale' | 'team'>('ui.leftTab', () => {
     try {
       const v = localStorage.getItem('takeoff.leftTab');
-      return v === 'index' || v === 'layers' || v === 'side' || v === 'measure' || v === 'scale' ? v : 'thumbs';
+      return v === 'index' || v === 'layers' || v === 'side' || v === 'measure' || v === 'scale' || v === 'team' ? v : 'thumbs';
     } catch {
       return 'thumbs';
     }
@@ -5212,8 +5214,8 @@ export default function TakeoffViewerModule({
   const sideLeftOpen = panelSide === 'left' && showThumbnails && leftTab === 'side' && showSidebar;
   const sideVisible = panelSide === 'left' ? sideLeftOpen : showSidebar;
   const openFSFTMPanel = useCallback(
-    (key: 'thumbs' | 'index' | 'layers' | 'measure' | 'scale' | 'properties' | 'tools' | 'colours' | 'ai' | 'auto') => {
-      const isSide = key !== 'thumbs' && key !== 'index' && key !== 'layers' && key !== 'measure' && key !== 'scale';
+    (key: 'thumbs' | 'index' | 'layers' | 'measure' | 'scale' | 'team' | 'properties' | 'tools' | 'colours' | 'ai' | 'auto') => {
+      const isSide = key !== 'thumbs' && key !== 'index' && key !== 'layers' && key !== 'measure' && key !== 'scale' && key !== 'team';
       const isActive = isSide
         ? (panelSide === 'left' ? leftTab === 'side' && showThumbnails && showSidebar : showSidebar) && sidebarTab === key
         : leftTab === key && showThumbnails;
@@ -7084,6 +7086,21 @@ export default function TakeoffViewerModule({
       restoreViewRef.current = null;
     }));
   }, [pdfDoc, renderNonce, zoom, currentPage]);
+  /* Who is working where (OE-DELIVERY 2026-11-27-fsftm-pdf): an open editor
+   * reports its drawing and page every 20 s (and right away on a page
+   * change); the Team panel lists everyone active in the project. */
+  useEffect(() => {
+    if (hidden || mirror || !documentId || !pdfDoc || documentId.startsWith('temp-')) return;
+    const id = documentId;
+    const send = (leaving = false) =>
+      apiPost('/v1/takeoff/presence/', { document_id: id, page: currentPageRef.current, leaving }).catch(() => undefined);
+    void send();
+    const t = window.setInterval(() => void send(), 20000);
+    return () => {
+      window.clearInterval(t);
+      void send(true);
+    };
+  }, [hidden, mirror, documentId, pdfDoc, currentPage]);
   // Live markups of this drawing for split panes that mirror it.
   useEffect(() => {
     if (documentId) setShared(`doc.m.${documentId}`, orderedMeasurements);
@@ -21136,12 +21153,13 @@ export default function TakeoffViewerModule({
               ['sep', '', null],
               ['ai', 'AI Assistant', RvAiIcon],
               ['auto', 'Auto Takeoff', WandSparkles],
+              ['team', 'Team: who is working where, and comments with @mentions', TeamIcon],
               ['sep2', '', null],
               ['search', 'Search (Ctrl+F)', RvSearchIcon],
             ] as const).map(([key, label, Icon]) => {
               if (key === 'sep' || key === 'sep2' || !Icon) return <span key={key} className="my-0.5 h-px w-5 bg-border" aria-hidden="true" />;
               // Caption under each icon so every tab reads at a glance.
-              const caption = ({ thumbs: 'Thumbs', index: 'Index', measure: 'Measure', tools: 'Tools', scale: 'Scale', ai: 'AI', auto: 'Auto', search: 'Search' } as Record<string, string>)[key] ?? '';
+              const caption = ({ thumbs: 'Thumbs', index: 'Index', measure: 'Measure', tools: 'Tools', scale: 'Scale', ai: 'AI', auto: 'Auto', team: 'Team', search: 'Search' } as Record<string, string>)[key] ?? '';
               if (key === 'search') {
                 const on = searchOpen;
                 return (
@@ -21163,7 +21181,7 @@ export default function TakeoffViewerModule({
                   </button>
                 );
               }
-              const isSide = key !== 'thumbs' && key !== 'index' && key !== 'measure' && key !== 'scale';
+              const isSide = key !== 'thumbs' && key !== 'index' && key !== 'measure' && key !== 'scale' && key !== 'team';
               const active = isSide
                 ? sideVisible && sidebarTab === key
                 : showThumbnails && leftTab === key;
@@ -21746,6 +21764,20 @@ export default function TakeoffViewerModule({
                   </div>
 
                 </div>
+              )}
+              {leftTab === 'team' && (
+                <TeamPanel
+                  projectId={activeProjectId || docProjectId}
+                  documentId={documentId}
+                  onOpenDrawing={(id, pg) => {
+                    if (id === documentId) {
+                      goToPage(pg);
+                      return;
+                    }
+                    splitSwapHandoff = { mainDocId: id, main: { page: pg, zoom: zoomRef.current } };
+                    onSwitchDocument?.(id);
+                  }}
+                />
               )}
               {leftTab === 'index' && (
                 <div className="min-h-0 flex-1 overflow-y-auto p-1.5 text-[11px]" data-testid="page-index">

@@ -54,9 +54,27 @@ const check = (name, ok, detail = '') => {
   };
   const browser = await chromium.launch({ channel: 'chrome', headless: !HEADED });
   const page = await browser.newPage({ viewport: { width: 1900, height: 1000 } });
+  const posted = [];
+  const json = (r, body) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
   await page.route('**/api/**', (r) => {
-    const m = r.request().url().match(/documents\/aaaaaaaa-0000-0000-0000-00000000000(\d)\/download/);
+    const url = r.request().url();
+    const m = url.match(/documents\/aaaaaaaa-0000-0000-0000-00000000000(\d)\/download/);
     if (m) return r.fulfill({ status: 200, contentType: 'application/pdf', body: PDF[m[1]] });
+    // Team panel: someone else at work, the people list, comments.
+    if (/\/takeoff\/presence\//.test(url)) {
+      return json(r, { active: [{ user_id: 'u-ana', name: 'Ana Lead', email: 'ana@example.com', document_id: ID(2), document_name: 'Set B.pdf', project_id: '', page: 2, seconds_ago: 5 }] });
+    }
+    if (/\/takeoff\/people\//.test(url)) {
+      return json(r, { people: [{ id: 'u-ana', name: 'Ana Lead', email: 'ana@example.com' }, { id: 'u-ben', name: 'Ben Field', email: 'ben@example.com' }] });
+    }
+    if (/\/collaboration\/comments\//.test(url)) {
+      if (r.request().method() === 'POST') {
+        const body = r.request().postDataJSON();
+        posted.push(body);
+        return json(r, { id: 'c1', author_id: 'u-me', text: body.text, created_at: new Date().toISOString(), mentions: [] });
+      }
+      return json(r, { items: posted.map((b, i) => ({ id: `c${i}`, author_id: 'u-me', text: b.text, created_at: new Date().toISOString(), replies: [] })), total: posted.length });
+    }
     return r.fulfill({ status: 404, contentType: 'application/json', body: '{"detail":"smoke"}' });
   });
   const errors = [];
@@ -211,6 +229,25 @@ const check = (name, ok, detail = '') => {
     check('overlay of another PDF shows', (await page.locator('[data-testid="overlay-page-img"]').count()) === 1);
     check('overlay explains different sheet sizes', (await page.locator('[data-testid="overlay-size-note"]').count()) === 1);
     await shot('overlay');
+
+    // ── Team: who is working where, comments with @mentions ──
+    await page.keyboard.press('Escape');
+    await page.locator('[data-testid="rail-team"]').first().click();
+    await page.waitForTimeout(1200);
+    check('Team panel shows who is working where', (await page.locator('[data-testid="team-presence"]', { hasText: 'Ana Lead' }).count()) === 1);
+    const box2 = page.locator('[data-testid="team-comment-input"]');
+    await box2.click();
+    await box2.type('Please check the beams @Ben');
+    await page.waitForTimeout(300);
+    const sugg = page.locator('[data-testid="team-mention-list"] button', { hasText: 'Ben Field' });
+    check('@ suggests people', (await sugg.count()) === 1);
+    if (await sugg.count()) await sugg.first().dispatchEvent('mousedown');
+    await page.locator('[data-testid="team-comment-send"]').click();
+    await page.waitForTimeout(800);
+    const sent = posted[0];
+    check('comment is sent with the @mention', !!sent && sent.entity_type === 'takeoff_document' && (sent.mentions || []).some((x) => x.mentioned_user_id === 'u-ben'), sent ? JSON.stringify(sent.mentions) : 'nothing posted');
+    check('the comment shows in the thread', (await page.locator('[data-testid="team-comments"]', { hasText: 'Please check the beams' }).count()) === 1);
+    await shot('team');
   } catch (e) {
     check('smoke run finished', false, e.message.slice(0, 200));
   }
