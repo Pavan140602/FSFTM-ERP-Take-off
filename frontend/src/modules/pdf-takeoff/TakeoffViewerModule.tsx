@@ -3337,7 +3337,6 @@ export default function TakeoffViewerModule({
     }
     setFSFTMWorkspace(mode === 'window');
   };
-  const viewMode: ViewMode = isTakeoffFullscreen ? 'fullscreen' : fsftmWorkspace ? 'window' : 'normal';
 
   /* ── Fullscreen measuring mode ────────────────────────────────────────
    * Expands the whole viewer row (strips + canvas) to the viewport, the
