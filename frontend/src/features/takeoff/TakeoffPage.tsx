@@ -1324,7 +1324,8 @@ export function TakeoffPage() {
   }, [openTabsKey]);
   useEffect(() => {
     if (openTabsLoadedRef.current !== openTabsKey) return;
-    try { localStorage.setItem(openTabsKey, JSON.stringify(openDocs)); } catch { /* ignore */ }
+    // Unsaved documents (local:) live only in this session.
+    try { localStorage.setItem(openTabsKey, JSON.stringify(openDocs.filter((d) => !d.id.startsWith('local:')))); } catch { /* ignore */ }
   }, [openDocs, openTabsKey]);
   const addOpenDoc = useCallback((d: OpenDoc) => {
     setOpenDocs((prev) => (prev.some((x) => x.id === d.id) ? prev.map((x) => (x.id === d.id ? { ...x, name: d.name, url: d.url } : x)) : [...prev, d]));
@@ -1392,6 +1393,12 @@ export function TakeoffPage() {
   /** Loading progress per drawing, for the "Opening …" chip. */
   const [viewerLoadPct, setViewerLoadPct] = useState<Record<string, number | null>>({});
   const switchToTab = (d: OpenDoc) => {
+    if (d.id.startsWith('local:')) {
+      // An unsaved document (e.g. a new Overlay): no server id, no URL.
+      setViewerDoc(d);
+      setActiveTab('measurements');
+      return;
+    }
     setActiveDocId(d.id);
     setViewerDoc(d);
     setActiveTab('measurements');
@@ -1407,7 +1414,50 @@ export function TakeoffPage() {
       { replace: true },
     );
   };
+  /* Unsaved documents made in PDF Measurements (Overlay Pages): they open as
+   * a tab at once and ask to be saved to the project; closing one unsaved
+   * asks again (OE-DELIVERY 2026-11-27-fsftm-pdf). */
+  const localFilesRef = useRef(new Map<string, { file: File; url: string }>());
+  const [localSave, setLocalSave] = useState<{ id: string; name: string; closing?: boolean } | null>(null);
+  const openGeneratedPdf = (file: File) => {
+    const id = `local:${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    const url = URL.createObjectURL(file);
+    localFilesRef.current.set(id, { file, url });
+    const doc = { id, name: `${file.name.replace(/\.pdf$/i, '')} (unsaved)`, url };
+    setOpenDocs((prev) => [...prev, doc]);
+    switchToTab(doc);
+    setLocalSave({ id, name: file.name });
+  };
+  const forgetLocal = (id: string) => {
+    const it = localFilesRef.current.get(id);
+    if (it) URL.revokeObjectURL(it.url);
+    localFilesRef.current.delete(id);
+  };
+  const saveLocalToProject = (id: string) => {
+    const it = localFilesRef.current.get(id);
+    setLocalSave(null);
+    if (!it) return;
+    // Uploads like any PDF (and opens the saved copy); the unsaved tab goes.
+    handleFilesSelected([it.file]);
+    closeTabNow(id);
+    forgetLocal(id);
+  };
+  const downloadLocal = (id: string) => {
+    const it = localFilesRef.current.get(id);
+    if (!it) return;
+    const a = document.createElement('a');
+    a.href = it.url;
+    a.download = it.file.name;
+    a.click();
+  };
   const closeTab = (id: string) => {
+    if (id.startsWith('local:') && localFilesRef.current.has(id)) {
+      setLocalSave({ id, name: localFilesRef.current.get(id)!.file.name, closing: true });
+      return;
+    }
+    closeTabNow(id);
+  };
+  const closeTabNow = (id: string) => {
     const idx = openDocs.findIndex((x) => x.id === id);
     const rest = openDocs.filter((x) => x.id !== id);
     setOpenDocs(rest);
@@ -1603,7 +1653,7 @@ export function TakeoffPage() {
    * opened document is remembered per project and reopened automatically,
    * so the drawing stays open until the user deletes it. */
   useEffect(() => {
-    if (!viewerDoc) return;
+    if (!viewerDoc || viewerDoc.id.startsWith('local:')) return;
     try {
       localStorage.setItem(`takeoff.lastOpenDoc.${selectedProjectId || 'noproject'}`, viewerDoc.id);
     } catch { /* ignore */ }
@@ -1618,7 +1668,7 @@ export function TakeoffPage() {
     } catch { return []; }
   });
   useEffect(() => {
-    if (!viewerDoc) return;
+    if (!viewerDoc || viewerDoc.id.startsWith('local:')) return;
     setRecentIds((prev) => {
       const next = [viewerDoc.id, ...prev.filter((x) => x !== viewerDoc.id)].slice(0, 12);
       try { localStorage.setItem(recentKey, JSON.stringify(next)); } catch { /* ignore */ }
@@ -2420,7 +2470,8 @@ export function TakeoffPage() {
       onDocumentReady={vd && !mirror ? () => markViewerReady(vd.id) : undefined}
       initialPdfUrl={vd?.url}
       initialPdfName={vd?.name}
-      initialDocumentId={vd?.id}
+      initialDocumentId={vd?.id?.startsWith('local:') ? null : vd?.id}
+      onOpenGeneratedPdf={openGeneratedPdf}
       initialMeasurementId={active ? initialMeasurementId : null}
       // Scoped to the document deep-linked at mount only - the
       // viewer remounts (new `key`) on document switch, so an
@@ -2982,6 +3033,27 @@ export function TakeoffPage() {
                 )}
               </Suspense>
               </>
+            )}
+            {localSave && (
+              <div className="fixed inset-0 z-[96] flex items-center justify-center bg-black/40" data-testid="local-save-dialog">
+                <div className="w-[440px] rounded-md border border-white/10 bg-[#2b2b2b] p-4 text-[13px] text-white shadow-2xl">
+                  <div className="mb-1 font-semibold">{localSave.closing ? 'Save before closing?' : 'New document created'}</div>
+                  <p className="mb-4 text-white/75">
+                    {localSave.closing
+                      ? `"${localSave.name}" has not been saved. Save it to the project before closing?`
+                      : `"${localSave.name}" is open as a new document. Do you want to save it to the project?`}
+                  </p>
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <button type="button" onClick={() => saveLocalToProject(localSave.id)} className="rounded bg-[#1f6fd1] px-4 py-1.5 font-semibold" data-testid="local-save-yes">Save to project</button>
+                    <button type="button" onClick={() => downloadLocal(localSave.id)} className="rounded border border-white/20 px-3 py-1.5 hover:bg-white/10">Download</button>
+                    {localSave.closing ? (
+                      <button type="button" onClick={() => { const id = localSave.id; setLocalSave(null); closeTabNow(id); forgetLocal(id); }} className="rounded border border-white/20 px-3 py-1.5 hover:bg-white/10" data-testid="local-save-discard">Close without saving</button>
+                    ) : (
+                      <button type="button" onClick={() => setLocalSave(null)} className="rounded border border-white/20 px-3 py-1.5 hover:bg-white/10" data-testid="local-save-later">Not now</button>
+                    )}
+                  </div>
+                </div>
+              </div>
             )}
             {/* Cross-module open in flight: the server is preparing the
              * drawing (a first open parses the PDF, which takes a while for

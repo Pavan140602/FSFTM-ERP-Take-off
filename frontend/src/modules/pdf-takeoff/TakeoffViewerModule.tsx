@@ -532,6 +532,7 @@ import { retainPdf, releasePdf as releasePooledPdf } from './data/pdf-doc-pool';
 import { useSharedState, getShared, setShared, clearShared } from './data/shared-state';
 import { useSmoothProgress } from './data/smooth-progress';
 import { TeamPanel } from './components/TeamPanel';
+import { OverlayPagesDialog } from './components/OverlayPagesDialog';
 import { Users as TeamIcon } from 'lucide-react';
 import { canSplit, layoutRects, leaf, leaves, removeLeaf, resizeAt, splitLeaf, nodeAt, type LayoutNode, type SplitDir } from './data/split-layout';
 import {
@@ -1715,6 +1716,8 @@ interface TakeoffViewerModuleProps {
   mirror?: boolean;
   /** Which editor this is, for keyboard focus (defaults to the drawing id). */
   instanceKey?: string;
+  /** A PDF made here (Overlay Pages): open it as a new, unsaved document. */
+  onOpenGeneratedPdf?: (file: File) => void;
   /** Optional 1-based page to restore once a server-loaded document finishes
    *  loading (issue #386 - reopening a document should land on the page it
    *  was left on, not always page 1). Clamped to the loaded document's page
@@ -2783,6 +2786,7 @@ export default function TakeoffViewerModule({
   onTabDrop,
   mirror = false,
   instanceKey,
+  onOpenGeneratedPdf,
 }: TakeoffViewerModuleProps = {}) {
   const { t, i18n } = useTranslation();
   // Keyboard goes to ONE viewer: the visible one, and among the editors on
@@ -5930,6 +5934,8 @@ export default function TakeoffViewerModule({
     }
   };
   const [overlayPanelOpen, setOverlayPanelOpen] = useState(false);
+  /** Overlay Pages dialog: layers in colour -> a new Overlay PDF. */
+  const [overlayDlgOpen, setOverlayDlgOpen] = useState(false);
   const [overlayImg, setOverlayImg] = useState<{ url: string; w: number; h: number } | null>(null);
   /** The source drawing of the overlay (loaded once, shared with panes). */
   const [overlaySrcDoc, setOverlaySrcDoc] = useState<PDFDocumentProxy | null>(null);
@@ -20987,7 +20993,7 @@ export default function TakeoffViewerModule({
                 { label: 'Calibrate (two clicks)…', onClick: () => handleStartCalibration() },
                 { label: 'Viewports…', checked: showViewportPanel, onClick: () => setShowViewportPanel((x) => !x) },
                 { separator: true },
-                { label: 'Overlay Pages…', checked: Boolean(overlayCfg), onClick: () => setOverlayPanelOpen(true), testId: 'fsftm-doc-overlay' },
+                { label: 'Overlay Pages…', checked: false, onClick: () => setOverlayDlgOpen(true), testId: 'fsftm-doc-overlay' },
                 {
                   // Old vs new revision side by side (OE-DELIVERY 2026-11-25-fsftm-pdf).
                   label: 'Compare Revisions…',
@@ -26558,6 +26564,43 @@ export default function TakeoffViewerModule({
         </div>
       )}
 
+      {overlayDlgOpen && pdfDoc && (
+        <OverlayPagesDialog
+          selfId={documentId ?? '__self'}
+          selfDoc={pdfDoc}
+          currentPage={currentPage}
+          selectedPages={[...thumbSel].sort((a, b) => a - b)}
+          sources={(() => {
+            const out: { id: string; name: string }[] = [{ id: documentId ?? '__self', name: fileName ?? 'This drawing' }];
+            const seen = new Set(out.map((x) => x.id));
+            const add = (id: string, name: string) => {
+              if (!id || seen.has(id) || id.startsWith('file:') || id.startsWith('temp-') || id.startsWith('local:')) return;
+              seen.add(id);
+              out.push({ id, name });
+            };
+            for (const d of openDocuments ?? []) add(d.id, d.name);
+            for (const t of splitTabs) add(t.id, t.name);
+            for (const xp of extraPanes) for (const t of xp.tabs) add(t.id, t.name);
+            for (const d of recentDocuments ?? []) add(d.id, d.filename);
+            return out;
+          })()}
+          loadDoc={async (id, name) => (await fetchPaneDocRef.current?.(id, name))?.doc ?? null}
+          releaseDoc={releasePooledPdf}
+          onCreate={(file) => {
+            setOverlayDlgOpen(false);
+            if (onOpenGeneratedPdf) {
+              onOpenGeneratedPdf(file);
+              return;
+            }
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(file);
+            a.download = file.name;
+            a.click();
+            window.setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+          }}
+          onClose={() => setOverlayDlgOpen(false)}
+        />
+      )}
       {splitError && (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40" onClick={() => setSplitError(null)} data-testid="split-error">
           <div className="w-[420px] max-w-[92vw] rounded-md border border-border bg-[#2b2b2b] text-white shadow-2xl" onClick={(e) => e.stopPropagation()} role="alertdialog" aria-label="Error">

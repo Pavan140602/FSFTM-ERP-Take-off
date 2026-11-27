@@ -227,19 +227,37 @@ const check = (name, ok, detail = '') => {
     const tabs = await page.evaluate(() => window.__tabs);
     check('dragging a tab into a pane moves it', !tabs.includes('Set C.pdf'), `main tabs ${tabs.join(', ')}`);
 
-    // ── Overlay a different-size PDF, page for page ──
+    // ── Overlay Pages: layers in colour -> a new Overlay document ──
     await page.mouse.click(bb.x + 15, bb.y + 15);
     await page.locator('text=Document').first().click();
     await page.locator('[data-testid="fsftm-doc-overlay"]').first().click();
-    await page.locator('[data-testid="overlay-source-select"]').selectOption(ID(2));
+    await page.waitForTimeout(800);
+    check('overlay asks for at least 2 layers', (await page.locator('[data-testid="overlay-warn-layers"]').count()) === 1 && (await page.locator('[data-testid="overlay-ok"]').isDisabled()));
+    await page.locator('[data-testid="overlay-add"]').click();
+    await page.locator('[data-testid="overlay-add-menu"] button', { hasText: 'Set B' }).first().click();
     await page.waitForTimeout(2500);
-    check('overlay of another PDF shows', (await page.locator('[data-testid="overlay-page-img"]').count()) === 1);
-    check('overlay explains different sheet sizes', (await page.locator('[data-testid="overlay-size-note"]').count()) === 1);
+    check('overlay adds a second PDF as a layer', (await page.locator('[data-testid="overlay-layer"]').count()) === 2);
+    check('overlay warns when page counts differ', (await page.locator('[data-testid="overlay-warn-pages"]').count()) === 1);
+    const pv = await page.locator('[data-testid="overlay-preview"]').evaluate((c) => c.width);
+    check('overlay preview is drawn', pv > 100, `width ${pv}`);
+    await page.locator('[data-testid="overlay-ok"]').click();
+    await page.waitForFunction(() => window.__generated && window.__generated.pages > 0, null, { timeout: 120000 }).catch(() => {});
+    const gen = await page.evaluate(() => window.__generated);
+    check('OK creates a new Overlay PDF (one page per page of the longest layer)', !!gen && gen.name === 'Overlay.pdf' && gen.pages === 3, gen ? `${gen.pages} pages, ${Math.round(gen.size / 1024)} KB` : 'nothing created');
+    await page.waitForTimeout(3000);
+    check('the Overlay document opens as a new tab', (await page.locator('[data-testid="doc-tab"]:visible', { hasText: 'Overlay.pdf (unsaved)' }).count()) >= 1);
     await shot('overlay');
 
     // ── Team: who is working where, comments with @mentions ──
+    // (comments need a saved drawing: back to Set A first)
+    await page.locator('[data-testid="doc-tab"]:visible', { hasText: 'Set A' }).first().locator('button').first().click();
+    await page.waitForTimeout(2500);
     await page.keyboard.press('Escape');
-    await page.locator('[data-testid="rail-team"]').first().click();
+    if (process.env.PDF_SMOKE_DEBUG) {
+      console.log('   debug rail-team', await page.locator('[data-testid="rail-team"]').count(), 'visible', await page.locator('[data-testid="rail-team"]:visible').count(), 'focus', await focus());
+      await shot('before_team');
+    }
+    await page.locator('[data-testid="rail-team"]:visible').first().click();
     await page.waitForTimeout(1200);
     check('Team panel shows who is working where', (await page.locator('[data-testid="team-presence"]', { hasText: 'Ana Lead' }).count()) === 1);
     const box2 = page.locator('[data-testid="team-comment-input"]');
@@ -256,7 +274,7 @@ const check = (name, ok, detail = '') => {
     check('the comment shows in the thread', (await page.locator('[data-testid="team-comments"]', { hasText: 'Please check the beams' }).count()) === 1);
     await shot('team');
   } catch (e) {
-    check('smoke run finished', false, e.message.slice(0, 200));
+    check('smoke run finished', false, e.message.slice(0, process.env.PDF_SMOKE_DEBUG ? 1500 : 200));
   }
   check('no browser errors', errors.length === 0, errors.slice(0, 2).join(' | '));
   await browser.close();

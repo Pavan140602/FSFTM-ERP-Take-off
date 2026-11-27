@@ -15,6 +15,7 @@ import { initialLocaleReady } from '../app/i18n';
 import '../index.css';
 import { ViewerWorkspace, type WorkspaceDoc } from '../features/takeoff/components/ViewerWorkspace';
 import { getShared } from '../modules/pdf-takeoff/data/shared-state';
+import { PDFDocument } from 'pdf-lib';
 import { WS_API_KEY, type WorkspaceApi } from '../modules/pdf-takeoff/data/workspace';
 
 const Viewer = lazy(() => import('../modules/pdf-takeoff/TakeoffViewerModule'));
@@ -58,7 +59,14 @@ function Harness() {
               compact={!!pane}
               initialPdfUrl={doc.url}
               initialPdfName={doc.name}
-              initialDocumentId={doc.id}
+              initialDocumentId={doc.id.startsWith('local:') ? null : doc.id}
+              onOpenGeneratedPdf={(file) => {
+                // A new unsaved document opens as a tab (TakeoffPage also asks to save).
+                const gen = { name: file.name, size: file.size, pages: 0 };
+                w.__generated = gen;
+                void file.arrayBuffer().then((b) => PDFDocument.load(b)).then((d) => { gen.pages = d.getPageCount(); });
+                open({ id: `local:${Date.now()}`, name: `${file.name} (unsaved)`, url: URL.createObjectURL(file) });
+              }}
               recentDocuments={DOCS.map((d) => ({ id: d.id, filename: d.name, pages: 1, size_bytes: 1, uploaded_at: null }))}
               openDocuments={tabs.map((d) => ({ id: d.id, name: d.name }))}
               onSwitchDocument={(id) => open(DOCS.find((d) => d.id === id)!)}
