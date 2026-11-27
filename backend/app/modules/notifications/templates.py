@@ -110,6 +110,9 @@ _TEMPLATES: dict[str, str] = {
     "notifications.file_comments.mention.title": "You were mentioned in a comment",
     "notifications.file_comments.mention.body": '"{excerpt}"',
     # ── Project discussions (collaboration comments, issue #279) ──────
+    # FSFTM Studio sessions (OE-DELIVERY 2026-11-27-fsftm-pdf)
+    "notifications.takeoff.studio_invite.title": "{inviter} invited you to a session",
+    "notifications.takeoff.studio_invite.body": 'Session "{session}" - ID {code}',
     "notifications.collaboration.comment_added.title": "New comment in a discussion",
     "notifications.collaboration.comment_added.body": 'On {entity_type}: "{excerpt}"',
     # ── Clash coordination ───────────────────────────────────────────
@@ -186,6 +189,7 @@ _TYPE_TO_ICON: dict[str, str] = {
     # File comment mention (Epic B / B1)
     "file_comment_mention": "info",
     # Project discussion comment (issue #279) - neutral inbound activity
+    "studio_invite": "info",
     "comment_added": "info",
     # Clash coordination - a serious interference needs attention
     "clash_high_severity": "warning",

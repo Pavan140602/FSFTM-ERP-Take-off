@@ -333,3 +333,73 @@ class AiTakeoffRun(Base):
 
     def __repr__(self) -> str:
         return f"<AiTakeoffRun {self.status} mode={self.mode} page={self.page}>"
+
+
+# ── FSFTM Studio sessions (OE-DELIVERY 2026-11-27-fsftm-pdf) ─────────────────
+# A session gathers PDFs (from any projects) and people. Everyone in it marks
+# up the same PDFs live, chats, and at the end the host finishes it with a
+# report of who did what. Attendees who are not on a PDF's project get a
+# temporary project membership while the session runs (``granted``), which
+# is taken away again when they are removed or the session is finished.
+
+
+class StudioSession(Base):
+    """One working session over a set of PDFs."""
+
+    __tablename__ = "oe_takeoff_studio_session"
+
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    #: What people type to join, ``123-456-789``.
+    code: Mapped[str] = mapped_column(String(16), nullable=False, unique=True, index=True)
+    owner_id: Mapped[uuid.UUID] = mapped_column(GUID(), nullable=False, index=True)
+    #: active | finished
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="active", server_default="active")
+    #: False: only invited people may join. True: anyone signed in who has the ID.
+    open_join: Mapped[bool] = mapped_column(default=False, server_default="0")
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class StudioSessionDocument(Base):
+    """A PDF in a session."""
+
+    __tablename__ = "oe_takeoff_studio_document"
+    __table_args__ = (Index("ix_studio_doc_session_doc", "session_id", "document_id", unique=True),)
+
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("oe_takeoff_studio_session.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    document_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    added_by: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True)
+
+
+class StudioAttendee(Base):
+    """A person in a session (invited, joined or left)."""
+
+    __tablename__ = "oe_takeoff_studio_attendee"
+    __table_args__ = (Index("ix_studio_att_session_email", "session_id", "email", unique=True),)
+
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("oe_takeoff_studio_session.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    #: None while the invitee has no account yet (matched by email on join).
+    user_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True, index=True)
+    email: Mapped[str] = mapped_column(String(255), nullable=False)
+    #: host | attendee
+    role: Mapped[str] = mapped_column(String(16), nullable=False, default="attendee")
+    #: invited | joined | left
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="invited")
+    joined_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    #: Project ids this session added the person to (removed again at the end).
+    granted: Mapped[list] = mapped_column(JSON, nullable=False, default=list, server_default="[]")  # type: ignore[assignment]
+
+
+class StudioMessage(Base):
+    """A chat line in a session."""
+
+    __tablename__ = "oe_takeoff_studio_message"
+
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("oe_takeoff_studio_session.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(GUID(), nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)

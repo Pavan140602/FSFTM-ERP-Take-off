@@ -6791,3 +6791,322 @@ async def create_boq_position_from_measurement(
         quantity=quantity,
         measurement=_measurement_to_response(existing),
     )
+
+
+# ── FSFTM Studio sessions (OE-DELIVERY 2026-11-27-fsftm-pdf) ────────────────
+# See ``app.modules.takeoff.studio`` for how sessions, invites and the
+# temporary project access work.
+
+
+class StudioCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=200)
+    document_ids: list[str] = Field(default_factory=list, max_length=200)
+    invite: list[str] = Field(default_factory=list, max_length=100)
+    open_join: bool = False
+
+
+class StudioInvite(BaseModel):
+    emails: list[str] = Field(..., min_length=1, max_length=100)
+
+
+class StudioJoin(BaseModel):
+    code: str = Field(..., min_length=9, max_length=20)
+
+
+class StudioDocs(BaseModel):
+    document_ids: list[str] = Field(..., min_length=1, max_length=200)
+
+
+class StudioMessageIn(BaseModel):
+    text: str = Field(..., min_length=1, max_length=4000)
+
+
+class StudioSettings(BaseModel):
+    name: str | None = Field(None, min_length=1, max_length=200)
+    open_join: bool | None = None
+
+
+async def _studio_me(user_id: str, session: Any) -> tuple[str, bool]:
+    """The caller's email and whether they are an admin."""
+    from app.modules.users.models import User
+
+    user = await session.get(User, _uuid.UUID(str(user_id)))
+    if user is None:
+        raise HTTPException(status_code=401, detail="Not signed in")
+    return user.email, getattr(user, "role", "") == "admin"
+
+
+async def _studio_docs(ids: list[str], user_id: str, service: TakeoffService, session: Any) -> list:
+    """Load PDFs the caller may open (404 on any they may not)."""
+    return [await _doc_intel_document(i, str(user_id), service, session) for i in dict.fromkeys(ids)]
+
+
+def _frontend_url() -> str:
+    from app.config import get_settings
+
+    return get_settings().resolved_frontend_url.rstrip("/")
+
+
+@router.get("/studio/sessions/", dependencies=[Depends(RequirePermission("takeoff.read"))])
+async def studio_list(
+    user_id: CurrentUserId = None,  # type: ignore[assignment]
+    session: SessionDep = None,  # type: ignore[assignment]
+) -> dict:
+    """Sessions I host or was invited to (newest first)."""
+    from app.modules.takeoff import studio
+
+    return {"sessions": await studio.my_sessions(session, str(user_id))}
+
+
+@router.post("/studio/sessions/", status_code=201, dependencies=[Depends(RequirePermission("takeoff.read"))])
+async def studio_create(
+    body: StudioCreate,
+    user_id: CurrentUserId = None,  # type: ignore[assignment]
+    service: TakeoffService = Depends(_get_service),
+    session: SessionDep = None,  # type: ignore[assignment]
+) -> dict:
+    """Start a session with some PDFs and invite people to it."""
+    from app.modules.takeoff import studio
+
+    email, is_admin = await _studio_me(str(user_id), session)
+    docs = await _studio_docs(body.document_ids, str(user_id), service, session)
+    s = await studio.create(
+        session, host_id=str(user_id), host_email=email, name=body.name, docs=docs, open_join=body.open_join
+    )
+    invites: list[dict[str, str]] = []
+    if body.invite:
+        invites = await studio.invite(
+            session, s, str(user_id), body.invite, inviter_is_admin=is_admin, frontend_url=_frontend_url()
+        )
+    _s, me = await studio.load_for_user(session, str(s.id), str(user_id))
+    return {**(await studio.detail(session, s, me)), "invites": invites}
+
+
+@router.post("/studio/sessions/join/", dependencies=[Depends(RequirePermission("takeoff.read"))])
+async def studio_join_by_code(
+    body: StudioJoin,
+    user_id: CurrentUserId = None,  # type: ignore[assignment]
+    session: SessionDep = None,  # type: ignore[assignment]
+) -> dict:
+    """Join a session by its ID (``123-456-789``)."""
+    from app.modules.takeoff import studio
+    from app.modules.takeoff.models import StudioSession
+
+    code = studio.normalise_code(body.code)
+    s = None
+    if code:
+        s = (await session.execute(select(StudioSession).where(StudioSession.code == code))).scalar_one_or_none()
+    if s is None:
+        raise HTTPException(status_code=404, detail="No session with that ID")
+    email, _admin = await _studio_me(str(user_id), session)
+    me = await studio.join(session, s, str(user_id), email)
+    return await studio.detail(session, s, me)
+
+
+@router.get("/studio/sessions/{session_id}/", dependencies=[Depends(RequirePermission("takeoff.read"))])
+async def studio_get(
+    session_id: str,
+    user_id: CurrentUserId = None,  # type: ignore[assignment]
+    session: SessionDep = None,  # type: ignore[assignment]
+) -> dict:
+    """The session: PDFs, people (and who is online where), my role."""
+    from app.modules.takeoff import studio
+
+    s, me = await studio.load_for_user(session, session_id, str(user_id))
+    return await studio.detail(session, s, me)
+
+
+@router.patch("/studio/sessions/{session_id}/", dependencies=[Depends(RequirePermission("takeoff.read"))])
+async def studio_settings(
+    session_id: str,
+    body: StudioSettings,
+    user_id: CurrentUserId = None,  # type: ignore[assignment]
+    session: SessionDep = None,  # type: ignore[assignment]
+) -> dict:
+    """Host: rename, or let anyone with the ID join."""
+    from app.modules.takeoff import studio
+
+    s, me = await studio.load_for_user(session, session_id, str(user_id))
+    studio.require_host(me)
+    if body.name is not None:
+        s.name = body.name.strip()
+    if body.open_join is not None:
+        s.open_join = body.open_join
+    await session.flush()
+    return await studio.detail(session, s, me)
+
+
+@router.post("/studio/sessions/{session_id}/join/", dependencies=[Depends(RequirePermission("takeoff.read"))])
+async def studio_join(
+    session_id: str,
+    user_id: CurrentUserId = None,  # type: ignore[assignment]
+    session: SessionDep = None,  # type: ignore[assignment]
+) -> dict:
+    """Accept an invite (from the notification link)."""
+    from app.modules.takeoff import studio
+    from app.modules.takeoff.models import StudioSession
+
+    try:
+        s = await session.get(StudioSession, _uuid.UUID(session_id))
+    except (ValueError, TypeError):
+        s = None
+    if s is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    email, _admin = await _studio_me(str(user_id), session)
+    me = await studio.join(session, s, str(user_id), email)
+    return await studio.detail(session, s, me)
+
+
+@router.post("/studio/sessions/{session_id}/invite/", dependencies=[Depends(RequirePermission("takeoff.read"))])
+async def studio_invite(
+    session_id: str,
+    body: StudioInvite,
+    user_id: CurrentUserId = None,  # type: ignore[assignment]
+    session: SessionDep = None,  # type: ignore[assignment]
+) -> dict:
+    """Invite more people (any attendee who has joined may invite)."""
+    from app.modules.takeoff import studio
+
+    s, me = await studio.load_for_user(session, session_id, str(user_id))
+    if me.status != "joined":
+        raise HTTPException(status_code=403, detail="Join the session first")
+    _email, is_admin = await _studio_me(str(user_id), session)
+    results = await studio.invite(
+        session, s, str(user_id), body.emails, inviter_is_admin=is_admin, frontend_url=_frontend_url()
+    )
+    return {"invites": results, **(await studio.detail(session, s, me))}
+
+
+@router.post("/studio/sessions/{session_id}/documents/", dependencies=[Depends(RequirePermission("takeoff.read"))])
+async def studio_add_documents(
+    session_id: str,
+    body: StudioDocs,
+    user_id: CurrentUserId = None,  # type: ignore[assignment]
+    service: TakeoffService = Depends(_get_service),
+    session: SessionDep = None,  # type: ignore[assignment]
+) -> dict:
+    """Add PDFs you can open to the session (any joined attendee)."""
+    from app.modules.takeoff import studio
+
+    s, me = await studio.load_for_user(session, session_id, str(user_id))
+    if me.status != "joined":
+        raise HTTPException(status_code=403, detail="Join the session first")
+    docs = await _studio_docs(body.document_ids, str(user_id), service, session)
+    await studio.add_documents(session, s, str(user_id), docs)
+    return await studio.detail(session, s, me)
+
+
+@router.delete(
+    "/studio/sessions/{session_id}/documents/{document_id}/",
+    dependencies=[Depends(RequirePermission("takeoff.read"))],
+)
+async def studio_remove_document(
+    session_id: str,
+    document_id: str,
+    user_id: CurrentUserId = None,  # type: ignore[assignment]
+    session: SessionDep = None,  # type: ignore[assignment]
+) -> dict:
+    """Host: take a PDF out of the session."""
+    from app.modules.takeoff import studio
+
+    s, me = await studio.load_for_user(session, session_id, str(user_id))
+    studio.require_host(me)
+    await studio.remove_document(session, s, document_id)
+    return await studio.detail(session, s, me)
+
+
+@router.delete(
+    "/studio/sessions/{session_id}/attendees/{attendee_id}/",
+    dependencies=[Depends(RequirePermission("takeoff.read"))],
+)
+async def studio_remove_attendee(
+    session_id: str,
+    attendee_id: str,
+    user_id: CurrentUserId = None,  # type: ignore[assignment]
+    session: SessionDep = None,  # type: ignore[assignment]
+) -> dict:
+    """Host: remove someone (their session-only access goes with them)."""
+    from app.modules.takeoff import studio
+
+    s, me = await studio.load_for_user(session, session_id, str(user_id))
+    studio.require_host(me)
+    await studio.remove_attendee(session, s, attendee_id)
+    return await studio.detail(session, s, me)
+
+
+@router.post("/studio/sessions/{session_id}/leave/", dependencies=[Depends(RequirePermission("takeoff.read"))])
+async def studio_leave(
+    session_id: str,
+    user_id: CurrentUserId = None,  # type: ignore[assignment]
+    session: SessionDep = None,  # type: ignore[assignment]
+) -> dict:
+    """Leave the session (you can join again while it runs)."""
+    from app.modules.takeoff import studio
+
+    _s, me = await studio.load_for_user(session, session_id, str(user_id))
+    if me.role == "host":
+        raise HTTPException(status_code=400, detail="The host finishes the session instead of leaving it")
+    await studio.leave(session, me)
+    return {"ok": True}
+
+
+@router.post("/studio/sessions/{session_id}/finish/", dependencies=[Depends(RequirePermission("takeoff.read"))])
+async def studio_finish(
+    session_id: str,
+    user_id: CurrentUserId = None,  # type: ignore[assignment]
+    session: SessionDep = None,  # type: ignore[assignment]
+) -> dict:
+    """Host: end the session for everyone; returns the report."""
+    from app.modules.takeoff import studio
+
+    s, me = await studio.load_for_user(session, session_id, str(user_id))
+    studio.require_host(me)
+    await studio.finish(session, s)
+    return {"report": await studio.report(session, s), **(await studio.detail(session, s, me))}
+
+
+@router.get("/studio/sessions/{session_id}/report/", dependencies=[Depends(RequirePermission("takeoff.read"))])
+async def studio_report(
+    session_id: str,
+    user_id: CurrentUserId = None,  # type: ignore[assignment]
+    session: SessionDep = None,  # type: ignore[assignment]
+) -> dict:
+    """Who marked up what in the session's PDFs since it started."""
+    from app.modules.takeoff import studio
+
+    s, _me = await studio.load_for_user(session, session_id, str(user_id))
+    return await studio.report(session, s)
+
+
+@router.get("/studio/sessions/{session_id}/messages/", dependencies=[Depends(RequirePermission("takeoff.read"))])
+async def studio_messages(
+    session_id: str,
+    user_id: CurrentUserId = None,  # type: ignore[assignment]
+    session: SessionDep = None,  # type: ignore[assignment]
+) -> dict:
+    """Session chat (latest 200 lines, oldest first)."""
+    from app.modules.takeoff import studio
+
+    s, _me = await studio.load_for_user(session, session_id, str(user_id))
+    return {"messages": await studio.messages(session, s)}
+
+
+@router.post(
+    "/studio/sessions/{session_id}/messages/",
+    status_code=201,
+    dependencies=[Depends(RequirePermission("takeoff.read"))],
+)
+async def studio_post_message(
+    session_id: str,
+    body: StudioMessageIn,
+    user_id: CurrentUserId = None,  # type: ignore[assignment]
+    session: SessionDep = None,  # type: ignore[assignment]
+) -> dict:
+    """Say something in the session chat."""
+    from app.modules.takeoff import studio
+
+    s, me = await studio.load_for_user(session, session_id, str(user_id))
+    if me.status != "joined":
+        raise HTTPException(status_code=403, detail="Join the session first")
+    await studio.post_message(session, s, str(user_id), body.text)
+    return {"messages": await studio.messages(session, s)}

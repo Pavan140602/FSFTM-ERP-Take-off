@@ -5,7 +5,8 @@ import { useTranslation } from 'react-i18next';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { getShared } from '@/modules/pdf-takeoff/data/shared-state';
+import { getShared, setShared } from '@/modules/pdf-takeoff/data/shared-state';
+import { setStudioActive } from '@/modules/pdf-takeoff/components/StudioPanel';
 import { WS_API_KEY, type TabDragPayload, type WorkspaceApi } from '@/modules/pdf-takeoff/data/workspace';
 import { ViewerWorkspace } from './components/ViewerWorkspace';
 import {
@@ -1414,6 +1415,46 @@ export function TakeoffPage() {
       { replace: true },
     );
   };
+  /* Studio sessions (OE-DELIVERY 2026-11-27-fsftm-pdf): a session PDF can
+   * belong to another project. Opening it switches the header project first
+   * (so markups are saved under the PDF's own project) and opens it as a tab
+   * there. */
+  const openSessionDocument = (d: { id: string; name: string; project_id: string | null; project_name: string }) => {
+    const od: OpenDoc = { id: d.id, name: d.name, url: `/api/v1/takeoff/documents/${d.id}/download/` };
+    if (d.project_id && d.project_id !== selectedProjectId) {
+      const key = `takeoff.openTabs.${d.project_id}`;
+      try {
+        const prev = JSON.parse(localStorage.getItem(key) || '[]') as OpenDoc[];
+        if (!prev.some((x) => x.id === od.id)) localStorage.setItem(key, JSON.stringify([...prev, od]));
+      } catch { /* ignore */ }
+      useProjectContextStore.getState().setActiveProject(d.project_id, d.project_name || '');
+    } else {
+      setOpenDocs((prev) => (prev.some((x) => x.id === od.id) ? prev : [...prev, od]));
+    }
+    switchToTab(od);
+  };
+  // Invite link: /takeoff?tab=measurements&studio=<session id> - join it,
+  // open the Studio panel and the session's first PDF.
+  useEffect(() => {
+    const sid = searchParams.get('studio');
+    if (!sid) return;
+    setSearchParams((prev) => { const n = new URLSearchParams(prev); n.delete('studio'); return n; }, { replace: true });
+    void (async () => {
+      try {
+        const s = await apiPost<{ id: string; documents: { id: string; name: string; project_id: string | null; project_name: string }[] }>(
+          `/v1/takeoff/studio/sessions/${encodeURIComponent(sid)}/join/`,
+        );
+        setStudioActive({ id: s.id, docIds: s.documents.map((x) => x.id) });
+        try { localStorage.setItem('takeoff.leftTab', 'studio'); } catch { /* ignore */ }
+        setShared('ui.leftTab', () => 'studio');
+        if (s.documents[0]) openSessionDocument(s.documents[0]);
+      } catch (e) {
+        setUploadErrorToast(e instanceof Error ? e.message : 'Could not join the session');
+        setTimeout(() => setUploadErrorToast(null), 5000);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
   /* Unsaved documents made in PDF Measurements (Overlay Pages): they open as
    * a tab at once and ask to be saved to the project; closing one unsaved
    * asks again (OE-DELIVERY 2026-11-27-fsftm-pdf). */
@@ -2472,6 +2513,7 @@ export function TakeoffPage() {
       initialPdfName={vd?.name}
       initialDocumentId={vd?.id?.startsWith('local:') ? null : vd?.id}
       onOpenGeneratedPdf={openGeneratedPdf}
+      onOpenSessionDocument={openSessionDocument}
       initialMeasurementId={active ? initialMeasurementId : null}
       // Scoped to the document deep-linked at mount only - the
       // viewer remounts (new `key`) on document switch, so an

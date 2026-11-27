@@ -55,6 +55,7 @@ const check = (name, ok, detail = '') => {
   const browser = await chromium.launch({ channel: 'chrome', headless: !HEADED });
   const page = await browser.newPage({ viewport: { width: 1900, height: 1000 } });
   const posted = [];
+  const studio = { s: null, msgs: [], created: null };
   const json = (r, body) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
   await page.route('**/api/**', (r) => {
     const url = r.request().url();
@@ -63,6 +64,37 @@ const check = (name, ok, detail = '') => {
     // Team panel: someone else at work, the people list, comments.
     if (/\/takeoff\/presence\//.test(url)) {
       return json(r, { active: [{ user_id: 'u-ana', name: 'Ana Lead', email: 'ana@example.com', document_id: ID(2), document_name: 'Set B.pdf', project_id: '', page: 2, seconds_ago: 5 }, { user_id: 'u-ben', name: 'Ben Field', email: 'ben@example.com', document_id: ID(1), document_name: 'Set A.pdf', project_id: '', page: 1, seconds_ago: 3 }, { user_id: 'u-me', name: 'Me', email: 'me@example.com', document_id: ID(1), document_name: 'Set A.pdf', project_id: '', page: 1, seconds_ago: 0 }], me: 'u-me' });
+    }
+    // Studio sessions (a tiny in-memory server).
+    const st = url.match(/\/takeoff\/studio\/sessions\/(.*)$/);
+    if (st) {
+      const rest = st[1].split('?')[0];
+      const method = r.request().method();
+      if (rest === '' && method === 'GET') return json(r, { sessions: studio.s ? [{ id: 's1', name: studio.s.name, code: studio.s.code, status: studio.s.status, role: 'host', my_status: 'joined', created_at: new Date().toISOString() }] : [] });
+      if (rest === '' && method === 'POST') {
+        const b = r.request().postDataJSON();
+        studio.created = b;
+        studio.s = {
+          id: 's1', name: b.name, code: '123-456-789', status: 'active', open_join: !!b.open_join, created_at: new Date().toISOString(), finished_at: null,
+          me: { attendee_id: 'a1', role: 'host', status: 'joined' },
+          documents: b.document_ids.map((id) => ({ id, name: `Set ${'?ABC'[Number(id.slice(-1))]}.pdf`, project_id: 'p1', project_name: 'QA project' })),
+          attendees: [
+            { id: 'a1', user_id: 'u-me', name: 'Me', email: 'me@example.com', role: 'host', status: 'joined', online: true, document_id: ID(1), page: 1 },
+            ...b.invite.map((e, i) => ({ id: `a${i + 2}`, user_id: 'u-ben', name: 'Ben Field', email: e, role: 'attendee', status: 'joined', online: true, document_id: ID(1), page: 3 })),
+          ],
+        };
+        return json(r, { ...studio.s, invites: b.invite.map((e) => ({ email: e, status: 'invited' })) });
+      }
+      if (rest === 's1/' && method === 'GET') return json(r, studio.s);
+      if (rest === 's1/messages/') {
+        if (method === 'POST') studio.msgs.push({ id: `m${studio.msgs.length}`, user_id: 'u-me', name: 'Me', text: r.request().postDataJSON().text, at: new Date().toISOString() });
+        return json(r, { messages: studio.msgs });
+      }
+      if (rest === 's1/report/') return json(r, { total: 2, people: [{ user_id: 'u-ben', name: 'Ben Field', email: 'ben@example.com', count: 2, by_type: { distance: 2 } }], documents: [] });
+      if (rest === 's1/finish/') {
+        studio.s = { ...studio.s, status: 'finished', finished_at: new Date().toISOString() };
+        return json(r, { ...studio.s, report: { total: 2, people: [], documents: [] } });
+      }
     }
     if (/\/takeoff\/people\//.test(url)) {
       return json(r, { people: [{ id: 'u-ana', name: 'Ana Lead', email: 'ana@example.com' }, { id: 'u-ben', name: 'Ben Field', email: 'ben@example.com' }] });
@@ -276,6 +308,29 @@ const check = (name, ok, detail = '') => {
     check('comment is sent with the @mention', !!sent && sent.entity_type === 'takeoff_document' && (sent.mentions || []).some((x) => x.mentioned_user_id === 'u-ben'), sent ? JSON.stringify(sent.mentions) : 'nothing posted');
     check('the comment shows in the thread', (await page.locator('[data-testid="team-comments"]', { hasText: 'Please check the beams' }).count()) === 1);
     await shot('team');
+
+    // ── Studio: start a session, people, chat, report, finish ──
+    await page.locator('[data-testid="rail-studio"]:visible').first().click();
+    await page.waitForTimeout(600);
+    await page.locator('[data-testid="studio-start-open"]').click();
+    await page.locator('[data-testid="studio-invite-emails"]').fill('ben@example.com');
+    await page.locator('[data-testid="studio-start"]').click();
+    await page.waitForTimeout(1200);
+    check('Studio: a session starts with the open PDF and the invite', !!studio.created && studio.created.document_ids.includes(ID(1)) && studio.created.invite[0] === 'ben@example.com', JSON.stringify(studio.created));
+    check('Studio: the session ID is shown', (await page.locator('[data-testid="studio-code-shown"]').innerText().catch(() => '')) === '123-456-789');
+    check('Studio: people in the session are listed', (await page.locator('[data-testid="studio-person"]', { hasText: 'Ben Field' }).count()) === 1);
+    check('Studio: the viewer knows which PDFs are in the session (faster live sync)', (await S('studio.active'))?.docIds?.includes(ID(1)) === true);
+    await shot('studio_live');
+    await page.locator('[data-testid="studio-chat-input"]').fill('Grid B is mine');
+    await page.locator('[data-testid="studio-chat-send"]').click();
+    await page.waitForTimeout(700);
+    check('Studio: chat message shows', (await page.locator('[data-testid="studio-chat"]', { hasText: 'Grid B is mine' }).count()) === 1);
+    check('Studio: report shows markups per person', (await page.locator('[data-testid="studio-report"]', { hasText: '2 distance' }).count()) === 1);
+    page.once('dialog', (dlg) => dlg.accept());
+    await page.locator('[data-testid="studio-finish"]').click();
+    await page.waitForTimeout(1000);
+    check('Studio: the host can finish the session', studio.s.status === 'finished' && (await page.locator('[data-testid="studio-chat-input"]').count()) === 0);
+    await shot('studio');
   } catch (e) {
     check('smoke run finished', false, e.message.slice(0, process.env.PDF_SMOKE_DEBUG ? 1500 : 200));
   }

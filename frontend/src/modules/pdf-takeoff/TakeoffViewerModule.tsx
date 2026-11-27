@@ -532,6 +532,8 @@ import { retainPdf, releasePdf as releasePooledPdf } from './data/pdf-doc-pool';
 import { useSharedState, getShared, setShared, clearShared } from './data/shared-state';
 import { useSmoothProgress } from './data/smooth-progress';
 import { TeamPanel } from './components/TeamPanel';
+import { StudioPanel, STUDIO_ACTIVE_KEY, readStoredStudio, type StudioActive, type StudioDoc } from './components/StudioPanel';
+import { RadioTower as StudioIcon } from 'lucide-react';
 import { OverlayPagesDialog } from './components/OverlayPagesDialog';
 import { Users as TeamIcon } from 'lucide-react';
 import { canSplit, layoutRects, leaf, leaves, removeLeaf, resizeAt, splitLeaf, nodeAt, type LayoutNode, type SplitDir } from './data/split-layout';
@@ -1718,6 +1720,8 @@ interface TakeoffViewerModuleProps {
   instanceKey?: string;
   /** A PDF made here (Overlay Pages): open it as a new, unsaved document. */
   onOpenGeneratedPdf?: (file: File) => void;
+  /** Open a PDF of a Studio session (it may belong to another project). */
+  onOpenSessionDocument?: (doc: StudioDoc) => void;
   /** Optional 1-based page to restore once a server-loaded document finishes
    *  loading (issue #386 - reopening a document should land on the page it
    *  was left on, not always page 1). Clamped to the loaded document's page
@@ -2787,6 +2791,7 @@ export default function TakeoffViewerModule({
   mirror = false,
   instanceKey,
   onOpenGeneratedPdf,
+  onOpenSessionDocument,
 }: TakeoffViewerModuleProps = {}) {
   const { t, i18n } = useTranslation();
   // Keyboard goes to ONE viewer: the visible one, and among the editors on
@@ -5172,10 +5177,10 @@ export default function TakeoffViewerModule({
   }, [measurements, ledgerDocKey]);
 
   /* ── FSFTM left panel, sheet index, overlay, sync, units, text (OE-DELIVERY 2026-11-02-fsftm-left-panel) ── */
-  const [leftTab, setLeftTab] = useSharedState<'thumbs' | 'index' | 'layers' | 'side' | 'measure' | 'scale' | 'team'>('ui.leftTab', () => {
+  const [leftTab, setLeftTab] = useSharedState<'thumbs' | 'index' | 'layers' | 'side' | 'measure' | 'scale' | 'team' | 'studio'>('ui.leftTab', () => {
     try {
       const v = localStorage.getItem('takeoff.leftTab');
-      return v === 'index' || v === 'layers' || v === 'side' || v === 'measure' || v === 'scale' || v === 'team' ? v : 'thumbs';
+      return v === 'index' || v === 'layers' || v === 'side' || v === 'measure' || v === 'scale' || v === 'team' || v === 'studio' ? v : 'thumbs';
     } catch {
       return 'thumbs';
     }
@@ -5218,8 +5223,8 @@ export default function TakeoffViewerModule({
   const sideLeftOpen = panelSide === 'left' && showThumbnails && leftTab === 'side' && showSidebar;
   const sideVisible = panelSide === 'left' ? sideLeftOpen : showSidebar;
   const openFSFTMPanel = useCallback(
-    (key: 'thumbs' | 'index' | 'layers' | 'measure' | 'scale' | 'team' | 'properties' | 'tools' | 'colours' | 'ai' | 'auto') => {
-      const isSide = key !== 'thumbs' && key !== 'index' && key !== 'layers' && key !== 'measure' && key !== 'scale' && key !== 'team';
+    (key: 'thumbs' | 'index' | 'layers' | 'measure' | 'scale' | 'team' | 'studio' | 'properties' | 'tools' | 'colours' | 'ai' | 'auto') => {
+      const isSide = key !== 'thumbs' && key !== 'index' && key !== 'layers' && key !== 'measure' && key !== 'scale' && key !== 'team' && key !== 'studio';
       const isActive = isSide
         ? (panelSide === 'left' ? leftTab === 'side' && showThumbnails && showSidebar : showSidebar) && sidebarTab === key
         : leftTab === key && showThumbnails;
@@ -6212,10 +6217,12 @@ export default function TakeoffViewerModule({
    * other people's markups (OE-DELIVERY 2026-11-27-fsftm-pdf). */
   const [othersByDoc, setOthersByDoc] = useState<Record<string, { name: string; email: string }[]>>({});
   const othersHere = (documentId && othersByDoc[documentId]?.length) || 0;
+  const [studioActive] = useSharedState<StudioActive>(STUDIO_ACTIVE_KEY, readStoredStudio, hidden);
+  const inStudio = !!documentId && !!studioActive?.docIds.includes(documentId);
   const { saveNow, clearPersisted, syncing, registerDeletion: registerOwnDeletion, hasUnsavedChanges, storageInfo } = useMeasurementPersistence({
     // Someone else on this drawing: their markups arrive within ~4 s;
     // otherwise a slow check still catches changes made since it opened.
-    liveSyncMs: hidden || mirror ? 0 : othersHere > 0 ? 4000 : 30000,
+    liveSyncMs: hidden || mirror ? 0 : inStudio ? 3000 : othersHere > 0 ? 4000 : 30000,
     // A mirror never loads or saves: the drawing's first editor does.
     fileName: mirror ? null : fileName,
     // Stable document UUID drives both the localStorage key and server sync
@@ -21190,12 +21197,13 @@ export default function TakeoffViewerModule({
               ['ai', 'AI Assistant', RvAiIcon],
               ['auto', 'Auto Takeoff', WandSparkles],
               ['team', 'Team: who is working where, and comments with @mentions', TeamIcon],
+              ['studio', 'Studio: sessions - work on the same PDFs with other people live', StudioIcon],
               ['sep2', '', null],
               ['search', 'Search (Ctrl+F)', RvSearchIcon],
             ] as const).map(([key, label, Icon]) => {
               if (key === 'sep' || key === 'sep2' || !Icon) return <span key={key} className="my-0.5 h-px w-5 bg-border" aria-hidden="true" />;
               // Caption under each icon so every tab reads at a glance.
-              const caption = ({ thumbs: 'Thumbs', index: 'Index', measure: 'Measure', tools: 'Tools', scale: 'Scale', ai: 'AI', auto: 'Auto', team: 'Team', search: 'Search' } as Record<string, string>)[key] ?? '';
+              const caption = ({ thumbs: 'Thumbs', index: 'Index', measure: 'Measure', tools: 'Tools', scale: 'Scale', ai: 'AI', auto: 'Auto', team: 'Team', studio: 'Studio', search: 'Search' } as Record<string, string>)[key] ?? '';
               if (key === 'search') {
                 const on = searchOpen;
                 return (
@@ -21217,7 +21225,7 @@ export default function TakeoffViewerModule({
                   </button>
                 );
               }
-              const isSide = key !== 'thumbs' && key !== 'index' && key !== 'measure' && key !== 'scale' && key !== 'team';
+              const isSide = key !== 'thumbs' && key !== 'index' && key !== 'measure' && key !== 'scale' && key !== 'team' && key !== 'studio';
               const active = isSide
                 ? sideVisible && sidebarTab === key
                 : showThumbnails && leftTab === key;
@@ -21800,6 +21808,17 @@ export default function TakeoffViewerModule({
                   </div>
 
                 </div>
+              )}
+              {leftTab === 'studio' && (
+                <StudioPanel
+                  currentDocument={documentId && !documentId.startsWith('temp-') ? { id: documentId, name: fileName || 'Drawing' } : null}
+                  openDocuments={(openDocuments ?? []).filter((d) => !d.id.startsWith('local:'))}
+                  onOpenDocument={(doc) => {
+                    if (doc.id === documentId) return;
+                    if (onOpenSessionDocument) onOpenSessionDocument(doc);
+                    else onSwitchDocument?.(doc.id);
+                  }}
+                />
               )}
               {leftTab === 'team' && (
                 <TeamPanel
