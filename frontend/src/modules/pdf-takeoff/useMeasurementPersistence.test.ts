@@ -819,6 +819,54 @@ describe('useMeasurementPersistence', () => {
     vi.useRealTimers();
   });
 
+  // ── A markup deleted while its create is still in flight ──
+  it('deletes on the server a markup removed while its create was on the way', async () => {
+    vi.useFakeTimers();
+    const { takeoffApi } = await import('@/features/takeoff/api');
+    let resolveCreate: (v: unknown) => void = () => undefined;
+    (takeoffApi.bulkCreate as unknown as ReturnType<typeof vi.fn>).mockImplementationOnce(
+      () => new Promise((r) => { resolveCreate = r; }),
+    );
+    let rows: ReturnType<typeof makeMeasurement>[] = [makeMeasurement('m1', 1)];
+    const setM = vi.fn((u: unknown) => {
+      rows = typeof u === 'function' ? (u as (p: typeof rows) => typeof rows)(rows) : (u as typeof rows);
+    });
+    const { rerender } = renderHook(() =>
+      useMeasurementPersistence({
+        fileName: 'race.pdf',
+        documentId: DOC,
+        measurements: rows,
+        setMeasurements: setM,
+        pageScales: basePageScales,
+        setPageScales: vi.fn(),
+        scale: defaultScale,
+        projectId: PROJECT,
+      }),
+    );
+    // The create goes out ...
+    await act(async () => {
+      vi.advanceTimersByTime(3500);
+      await Promise.resolve();
+    });
+    expect(takeoffApi.bulkCreate).toHaveBeenCalled();
+    // ... the user deletes the markup before the server answers ...
+    rows = [];
+    rerender();
+    // ... and then the server confirms the create.
+    await act(async () => {
+      resolveCreate([{ id: 'srv-9', metadata: { frontend_id: 'm1' } }]);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(3500);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(takeoffApi.delete).toHaveBeenCalledWith('srv-9');
+    vi.useRealTimers();
+  });
+
   // ── #282 A: a deleted synced row does NOT resurrect on the next load ──
   it('does not resurrect a locally-deleted row when the server still returns it (issue #282)', async () => {
     const { takeoffApi } = await import('@/features/takeoff/api');

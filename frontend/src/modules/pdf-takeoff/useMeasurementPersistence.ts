@@ -1494,13 +1494,28 @@ export function useMeasurementPersistence({
         // stale ``measurementsRef`` snapshot would discard any user edit that
         // landed while bulkCreate was in flight. Only the serverId is written;
         // every other field is preserved from ``prev``.
-        setMeasurementsRef.current((prev) =>
-          prev.map((m) => {
+        setMeasurementsRef.current((prev) => {
+          // A markup deleted WHILE its create was on the way exists on the
+          // server now but no longer here: delete it there too, or it comes
+          // back on the next load (OE-DELIVERY 2026-11-27-fsftm-pdf).
+          const stillHere = new Set(prev.map((m) => m.id));
+          let orphaned = false;
+          for (const [fid, sid] of newIdByFrontendId) {
+            if (fid && sid && !stillHere.has(fid)) {
+              pendingDeletesRef.current.add(sid);
+              orphaned = true;
+            }
+          }
+          if (orphaned) {
+            writePendingDeletes(localKeyRef.current, pendingDeletesRef.current);
+            syncAgainRef.current = true;
+          }
+          return prev.map((m) => {
             if (m.serverId) return m;
             const newId = newIdByFrontendId.get(m.id);
             return newId ? { ...m, serverId: newId } : m;
-          }),
-        );
+          });
+        });
         // Surface the new measurements in the unified Markups hub.
         qc?.invalidateQueries({ queryKey: ['unified-markups'] });
       }

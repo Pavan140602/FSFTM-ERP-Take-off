@@ -3985,7 +3985,12 @@ export default function TakeoffViewerModule({
   const dropUnscaledPending = () => {
     const ids = new Set(unscaledPendingRef.current);
     unscaledPendingRef.current = [];
-    if (ids.size) setMeasurements((prev) => prev.filter((m) => !ids.has(m.id)));
+    if (ids.size) {
+      setMeasurements((prev) => {
+        for (const m of prev) if (ids.has(m.id) && m.serverId) registerDeletionRef.current?.(m.serverId);
+        return prev.filter((m) => !ids.has(m.id));
+      });
+    }
   };
   /** Pages a running calibration applies to (picked in Set Scale). */
   const calibratePagesRef = useRef<number[] | null>(null);
@@ -6185,6 +6190,8 @@ export default function TakeoffViewerModule({
     },
     [mirror, registerOwnDeletion],
   );
+  const registerDeletionRef = useRef(registerDeletion);
+  registerDeletionRef.current = registerDeletion;
 
   /* ── Seed default-label counters from hydrated measurements (issue #384) ─
    * The per-type counters (annotationCounterRef) reset to 0 on every load path
@@ -19012,7 +19019,12 @@ export default function TakeoffViewerModule({
       case 'add_count_point':
         if (op.wasNew) {
           // The count measurement was freshly created — remove it entirely
-          setMeasurements((prev) => prev.filter((m) => m.id !== op.measurementId));
+          // (and from the server, if it was saved already).
+          setMeasurements((prev) => {
+            const live = prev.find((m) => m.id === op.measurementId);
+            if (live?.serverId) registerDeletion(live.serverId);
+            return prev.filter((m) => m.id !== op.measurementId);
+          });
         } else {
           // Restore the count measurement to its state before the last point was added
           setMeasurements((prev) =>
