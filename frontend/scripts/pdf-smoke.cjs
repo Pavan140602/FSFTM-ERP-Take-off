@@ -163,6 +163,13 @@ const check = (name, ok, detail = '') => {
     check('Sync on a single view does not split', (await S('split.mode')) === 'off' && (await page.locator('[data-testid="split-pane"]').count()) === 0);
     await page.locator('[data-testid="status-sync"]').first().click();
 
+    // ── Closing a pane's only drawing closes the pane (no copy left behind) ──
+    await page.locator('[data-testid="viewmode-split-vertical"]').first().click();
+    await page.waitForTimeout(2000);
+    await page.locator('[data-testid="split-tab-close"]').first().click();
+    await page.waitForTimeout(800);
+    check("closing the pane's only drawing closes the pane", (await page.locator('[data-testid="split-pane"]').count()) === 0 && (await S('split.mode')) === 'off');
+
     // ── Split, the new pane shows the same drawing, one-click focus ──
     await page.locator('[data-testid="viewmode-split-vertical"]').first().click();
     await page.waitForTimeout(2500);

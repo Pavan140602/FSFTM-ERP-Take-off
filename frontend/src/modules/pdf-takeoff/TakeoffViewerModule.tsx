@@ -5475,10 +5475,16 @@ export default function TakeoffViewerModule({
     const rest = splitTabsRef.current.filter((x) => x.id !== id);
     setSplitTabs((prev) => prev.filter((x) => x.id !== id));
     splitViewMemRef.current.delete(id);
+    // The pane's last drawing closed: the pane closes with it (it must not
+    // fall back to a picture of the main drawing - OE-DELIVERY 2026-11-27-fsftm-pdf).
+    if (rest.length === 0) {
+      setSplitTabId('self');
+      dropFromLayoutRef.current?.('p2');
+      return;
+    }
     if (splitTabId === id) {
       const next = rest[rest.length - 1];
       if (next) activateSplitTab(next.id, next.doc.numPages);
-      else activateSplitTab('self', Math.max(1, totalPagesRef.current));
     }
   };
   const loadCompareDoc = async (id: string, name: string) => {
@@ -5814,12 +5820,14 @@ export default function TakeoffViewerModule({
     }
     setSplitTree(next);
   };
+  const dropFromLayoutRef = useRef<(key: string) => void>(() => undefined);
   const closeExtraPane = (key: string) => {
     const xp = extraPanesRef.current.find((x) => x.key === key);
     for (const x of xp?.tabs ?? []) releasePooledPdf(x.doc);
     setExtraPanes((prev) => prev.filter((x) => x.key !== key));
     dropFromLayout(key);
   };
+  dropFromLayoutRef.current = dropFromLayout;
   const closeAllPanes = () => {
     for (const xp of extraPanesRef.current) for (const x of xp.tabs) releasePooledPdf(x.doc);
     setExtraPanes([]);
@@ -5865,8 +5873,11 @@ export default function TakeoffViewerModule({
     if (tab) putIntoPane(key, tab);
   };
   const closeExtraTab = (key: string, id: string) => {
+    const left = extraPanesRef.current.find((x) => x.key === key)?.tabs.filter((t) => t.id !== id).length ?? 0;
     const tab = takeFromPane(key, id);
     releasePooledPdf(tab?.doc);
+    // Its last drawing closed: the pane closes too.
+    if (left === 0) closeExtraPane(key);
   };
   /** Swap the two panes; each side keeps its page, zoom and centre. */
   const swapSplitPanes = () => {
