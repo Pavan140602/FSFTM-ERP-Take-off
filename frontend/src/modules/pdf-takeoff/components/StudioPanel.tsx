@@ -47,6 +47,7 @@ import { apiDelete, apiGet, apiPatch, apiPost } from '@/shared/lib/api';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useToastStore } from '@/stores/useToastStore';
 import { setShared, useSharedState } from '../data/shared-state';
+import { highlightMentions, mentionedIn, personLabel, useMentionComposer } from './mentions';
 
 /** Shared key: the session this browser is working in ({ id, docIds }). */
 export const STUDIO_ACTIVE_KEY = 'studio.active';
@@ -282,8 +283,9 @@ export function StudioPanel({
   openDocuments: { id: string; name: string }[];
   /** The project open in PDF Measurements: new sessions keep uploads there. */
   projectId?: string | null;
-  /** Open a session PDF (switches project when it belongs to another one). */
-  onOpenDocument: (doc: StudioDoc) => void;
+  /** Open a session PDF (switches project when it belongs to another one).
+   *  ``again`` re-opens the PDF already open (its project changed). */
+  onOpenDocument: (doc: StudioDoc, again?: boolean) => void;
 }) {
   const me = useAuthStore((s) => s.userId);
   const myEmail = useAuthStore((s) => s.userEmail);
@@ -350,6 +352,12 @@ export function StudioPanel({
     if (!activeId || !d || d.status !== 'active') return;
     if ((active?.docIds ?? []).join(',') !== docKey) setStudioActive({ id: activeId, docIds: docKey ? docKey.split(',') : [] });
   }, [activeId, d, docKey, active]);
+  useEffect(() => {
+    if (!d || !currentDocument) return;
+    const cur = d.documents.find((x) => x.id === currentDocument.id);
+    if (cur?.project_id && cur.project_id !== projectId) onOpenDocument(cur, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [d?.documents, currentDocument?.id, projectId]);
   useEffect(() => {
     if (activeId && detail.isError) {
       setStudioActive(null);
@@ -500,10 +508,11 @@ export function StudioPanel({
     run(async () => {
       refresh(await apiPatch<SessionDetail>(`/v1/takeoff/studio/sessions/${activeId}/documents/${docId}/`, { path: folder || '/' }));
     });
+  const listProject = projectId || d?.project_id || null;
   const projectDocs = useQuery({
-    queryKey: ['studio-project-docs', projectId],
-    queryFn: () => apiGet<{ id: string; filename: string; pages?: number }[]>(`/v1/takeoff/documents/?project_id=${encodeURIComponent(projectId!)}`),
-    enabled: dialog === 'project' && !!projectId,
+    queryKey: ['studio-project-docs', listProject],
+    queryFn: () => apiGet<{ id: string; filename: string; pages?: number }[]>(`/v1/takeoff/documents/?project_id=${encodeURIComponent(listProject!)}`),
+    enabled: dialog === 'project' && !!listProject,
   });
   const addFromProject = () =>
     run(async () => {
@@ -546,16 +555,19 @@ export function StudioPanel({
     });
   const toggleOpen = () =>
     run(async () => refresh(await apiPatch<SessionDetail>(`/v1/takeoff/studio/sessions/${activeId}/`, { open_join: !d?.open_join })));
-  const [chat, setChat] = useState('');
+  const chatComposer = useMentionComposer(people.data?.people ?? [], me);
+  const chat = chatComposer.text;
   const chatEnd = useRef<HTMLDivElement | null>(null);
   useEffect(() => { chatEnd.current?.scrollIntoView({ block: 'nearest' }); }, [messages.data?.messages.length]);
   const send = () =>
     run(async () => {
       const text = chat.trim();
       if (!text) return;
-      const r = await apiPost<{ messages: Message[] }>(`/v1/takeoff/studio/sessions/${activeId}/messages/`, { text });
+      const mentions = mentionedIn(text, chatComposer.others).map((p) => p.id);
+      const r = await apiPost<{ messages: Message[] }>(`/v1/takeoff/studio/sessions/${activeId}/messages/`, { text, mentions });
       qc.setQueryData(['studio-messages', activeId], r);
-      setChat('');
+      chatComposer.reset();
+      if (mentions.length) addToast({ type: 'success', title: `${mentions.length} ${mentions.length === 1 ? 'person' : 'people'} notified` });
     });
   const leave = () =>
     run(async () => {
@@ -588,6 +600,11 @@ export function StudioPanel({
       const bytes = await reportPdf(d, report.data);
       save(new Blob([bytes as unknown as BlobPart], { type: 'application/pdf' }), 'pdf');
     });
+  const shareId = () => {
+    if (!d) return;
+    const msg = `Join my PDF Measurements session "${d.name}": open PDF Measurements > Studio > Join with ID, and enter ${d.code}`;
+    void navigator.clipboard?.writeText(msg).then(() => addToast({ type: 'success', title: 'Invite text copied', message: msg }), () => undefined);
+  };
   const copyId = () => {
     if (!d) return;
     void navigator.clipboard?.writeText(d.code).then(() => addToast({ type: 'success', title: `Session ID ${d.code} copied` }), () => undefined);
@@ -771,8 +788,11 @@ export function StudioPanel({
       <div className="min-h-0 flex-1 overflow-y-auto">
         {rows.length === 0 && (
           <div className="px-3 py-4 text-center text-[11px] text-content-tertiary">
-            {sessions.isLoading ? 'Loading…' : 'No sessions yet. Use + to start one or join with an ID.'}
+            {sessions.isLoading ? 'Loading…' : 'No sessions yet. Start one with New session, or Join with ID.'}
           </div>
+        )}
+        {rows.length > 0 && !activeId && (
+          <div className="px-2 pb-1 text-[10px] text-content-tertiary">Click a session to open it - its PDFs, people and chat open right here.</div>
         )}
         {rows.map((r) => {
           const isOpen = r.id === activeId;
@@ -826,6 +846,7 @@ export function StudioPanel({
                             ) : (
                               <>
                                 <button type="button" className={menuItem} onClick={() => { setMenu(null); copyId(); }}><Copy size={13} /> Copy session ID</button>
+                                <button type="button" className={menuItem} onClick={() => { setMenu(null); shareId(); }} data-testid="studio-share-id"><Send size={13} /> Copy invite text (ID + how to join)</button>
                                 <button type="button" className={menuItem} disabled={!report.data} onClick={() => { setMenu(null); downloadReportPdf(); }} data-testid="studio-report-pdf"><FileText size={13} /> Report (PDF)</button>
                                 <button type="button" className={menuItem} disabled={!report.data} onClick={() => { setMenu(null); downloadReport(); }} data-testid="studio-report-csv"><FileText size={13} /> Report (CSV)</button>
                                 {live && host && (
@@ -844,6 +865,26 @@ export function StudioPanel({
                     </div>
                   </div>
 
+                  <div className="mx-2 mb-1 rounded border border-oe-blue/40 bg-oe-blue/5 px-2 py-1.5 text-[11px]" data-testid="studio-id-card">
+                    <div className="flex items-center gap-1">
+                      Session ID <span className="font-mono text-[13px] font-semibold text-content-primary">{d.code}</span>
+                      <button type="button" onClick={copyId} className="ml-auto flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-[10px] hover:bg-surface-secondary"><Copy size={10} /> Copy</button>
+                    </div>
+                    <div className="text-[10px] text-content-tertiary">Others join with Studio &gt; Join with ID. People you invite also get it by notification and email.</div>
+                  </div>
+                  {live && (
+                    <div className="flex gap-1 px-2 pb-1.5">
+                      <button type="button" className={clsx(btn, 'flex flex-1 items-center justify-center gap-1 bg-oe-blue py-1.5 text-white')} onClick={() => openUpload('')} data-testid="studio-add-pdf-big">
+                        <Upload size={12} /> Add PDF from computer
+                      </button>
+                      <button type="button" className={clsx(btn, 'flex flex-1 items-center justify-center gap-1 border border-oe-blue py-1.5 text-oe-blue')} disabled={!projectId && !d.project_id} onClick={() => { setUploadTo(''); setProjPicked(new Set()); setDialog('project'); }} data-testid="studio-add-project-big">
+                        <FolderOpen size={12} /> From project
+                      </button>
+                      <button type="button" className={clsx(btn, 'flex items-center justify-center gap-1 border border-border py-1.5')} onClick={() => { setWho(new Set()); setExtraEmails(''); setPeopleFilter(''); setDialog('invite'); }} title="Invite people" data-testid="studio-invite-big">
+                        <UserPlus size={12} />
+                      </button>
+                    </div>
+                  )}
                   {/* files: folders and PDFs, drop files from the computer anywhere here */}
                   <div
                     className={clsx('min-h-[56px] pb-1', dropFolder === '' && 'bg-oe-blue/10 ring-1 ring-inset ring-oe-blue')}
@@ -934,14 +975,34 @@ export function StudioPanel({
                               <span className="font-semibold text-content-secondary">{m.user_id === me ? 'You' : m.name || 'Someone'}</span>
                               <span>{timeOf(m.at)}</span>
                             </div>
-                            <div className="whitespace-pre-wrap break-words">{m.text}</div>
+                            <div className="whitespace-pre-wrap break-words">{highlightMentions(m.text, people.data?.people ?? [], 'rounded bg-oe-blue/15 px-0.5 font-semibold text-oe-blue')}</div>
                           </div>
                         ))}
                         <div ref={chatEnd} />
                       </div>
                       {live && (
-                        <div className="flex gap-1.5 p-2">
-                          <input className={input} value={chat} onChange={(e) => setChat(e.target.value)} placeholder="Message everyone…" onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); send(); } }} data-testid="studio-chat-input" />
+                        <div className="relative flex gap-1.5 p-2">
+                          {chatComposer.suggestions.length > 0 && (
+                            <div className="absolute bottom-full left-2 right-2 z-10 max-h-48 overflow-y-auto rounded border border-border bg-surface-elevated shadow-lg" data-testid="studio-mention-list">
+                              {chatComposer.suggestions.map((p) => (
+                                <button key={p.id} type="button" onMouseDown={(e) => { e.preventDefault(); chatComposer.pick(p); }} className="flex w-full items-center gap-2 px-2 py-1 text-left hover:bg-surface-secondary">
+                                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-oe-blue text-[9px] font-bold text-white">{initials(p)}</span>
+                                  <span className="min-w-0 flex-1 truncate font-semibold text-oe-blue">{personLabel(p)}</span>
+                                  <span className="truncate text-[10px] text-content-tertiary">{p.email}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          <input
+                            ref={(el) => { chatComposer.boxRef.current = el; }}
+                            className={input}
+                            value={chat}
+                            onChange={(e) => chatComposer.onChange(e.target.value, e.target.selectionStart)}
+                            onSelect={(e) => chatComposer.setCaret(e.currentTarget.selectionStart ?? chat.length)}
+                            placeholder="Message everyone… type @ to mention"
+                            onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter' && !chatComposer.suggestions.length) { e.preventDefault(); send(); } }}
+                            data-testid="studio-chat-input"
+                          />
                           <button type="button" className={clsx(btn, 'bg-oe-blue text-white')} onClick={send} disabled={busy || !chat.trim()} data-testid="studio-chat-send" aria-label="Send"><Send size={12} /></button>
                         </div>
                       )}

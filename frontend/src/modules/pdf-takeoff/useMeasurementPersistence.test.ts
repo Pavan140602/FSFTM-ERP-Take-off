@@ -653,6 +653,23 @@ describe('useMeasurementPersistence', () => {
     expect(rows.map((r) => r.serverId)).toEqual(['a', 'b', 'c']);
   });
 
+  it('carries over browser-only markups when a project-less PDF gets a project (Studio)', async () => {
+    localStorage.setItem('oe_takeoff_local__Loose_plan.pdf', JSON.stringify({ measurements: [makeMeasurement('loose-1')], savedAt: '2026-11-27T00:00:00Z' }));
+    const setM = vi.fn();
+    renderHook(() =>
+      useMeasurementPersistence({
+        fileName: 'Loose plan.pdf', documentId: DOC, measurements: [],
+        setMeasurements: setM, pageScales: basePageScales, setPageScales: vi.fn(),
+        scale: defaultScale, projectId: PROJECT,
+      }),
+    );
+    await waitFor(() => expect(setM).toHaveBeenCalled());
+    const rows = setM.mock.calls.at(-1)![0] as { id: string }[];
+    expect(rows.map((r) => r.id)).toEqual(['loose-1']);
+    // Now kept under the project + document key too.
+    expect(localStorage.getItem(compositeKey)).toContain('loose-1');
+  });
+
   // ── Live collaboration: other people's markups arrive while it is open ───
   it('merges markups other people added, changed and deleted (live sync)', async () => {
     const { takeoffApi } = await import('@/features/takeoff/api');

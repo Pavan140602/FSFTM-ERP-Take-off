@@ -8,12 +8,13 @@
  * itself); comments use the shared collaboration comments
  * (entity_type "takeoff_document").
  */
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { Send } from 'lucide-react';
 import { apiGet, apiPost } from '@/shared/lib/api';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { highlightMentions, mentionedIn, useMentionComposer } from './mentions';
 import { useToastStore } from '@/stores/useToastStore';
 
 type PresenceRow = {
@@ -79,39 +80,15 @@ export function TeamPanel({
   });
   const byId = useMemo(() => new Map((people.data?.people ?? []).map((p) => [p.id, p])), [people.data]);
 
-  // ── composer with @mention suggestions ──
-  const [text, setText] = useState('');
-  const [picked, setPicked] = useState<Person[]>([]);
+  // ── composer with @mention suggestions (first name, last name or email) ──
+  const composer = useMentionComposer(people.data?.people ?? [], me);
+  const { text, suggestions, pick } = composer;
   const [sending, setSending] = useState(false);
-  const boxRef = useRef<HTMLTextAreaElement>(null);
-  const atQuery = (() => {
-    const el = boxRef.current;
-    const upto = text.slice(0, el ? el.selectionStart ?? text.length : text.length);
-    const m = /(^|\s)@([^\s@]{0,40})$/.exec(upto);
-    return m ? m[2]!.toLowerCase() : null;
-  })();
-  const suggestions = atQuery === null
-    ? []
-    : (people.data?.people ?? []).filter((p) => p.id !== me && (p.name.toLowerCase().includes(atQuery) || p.email.toLowerCase().includes(atQuery))).slice(0, 50);
-  const pick = (p: Person) => {
-    const el = boxRef.current;
-    const pos = el ? el.selectionStart ?? text.length : text.length;
-    const before = text.slice(0, pos).replace(/@([^\s@]{0,40})$/, `@${label(p).replace(/\s+/g, '_')} `);
-    setText(before + text.slice(pos));
-    setPicked((prev) => (prev.some((x) => x.id === p.id) ? prev : [...prev, p]));
-    requestAnimationFrame(() => el?.focus());
-  };
   const send = async () => {
     const body = text.trim();
     if (!body || !documentId) return;
-    // Mentions: people picked from the list and still named in the text,
-    // plus anyone typed as @their.email.
-    const mentions = new Map<string, Person>();
-    for (const p of picked) if (body.includes(`@${label(p).replace(/\s+/g, '_')}`)) mentions.set(p.id, p);
-    for (const m of body.matchAll(/@([^\s@]+@[^\s@]+\.[^\s@]+)/g)) {
-      const hit = (people.data?.people ?? []).find((p) => p.email.toLowerCase() === m[1]!.toLowerCase());
-      if (hit) mentions.set(hit.id, hit);
-    }
+    // Mentions: "@Full Name", "@email" or a unique "@FirstName".
+    const mentions = new Map(mentionedIn(body, composer.others).map((p) => [p.id, p]));
     setSending(true);
     try {
       await apiPost('/v1/collaboration/comments/', {
@@ -120,8 +97,7 @@ export function TeamPanel({
         text: body,
         mentions: [...mentions.keys()].map((id) => ({ mentioned_user_id: id, mention_type: 'at_notify' })),
       });
-      setText('');
-      setPicked([]);
+      composer.reset();
       await qc.invalidateQueries({ queryKey: commentsKey });
       if (mentions.size) addToast({ type: 'success', title: `Sent - ${mentions.size} ${mentions.size === 1 ? 'person' : 'people'} notified` });
     } catch (e) {
@@ -190,9 +166,7 @@ export function TeamPanel({
                 <span className="ml-auto text-[10px] text-content-tertiary">{timeOf(c.created_at)}</span>
               </div>
               <p className="whitespace-pre-wrap break-words">
-                {c.text.split(/(@[^\s]+)/g).map((part, i) =>
-                  part.startsWith('@') ? <span key={i} className="font-semibold text-oe-blue">{part}</span> : <span key={i}>{part}</span>,
-                )}
+                {highlightMentions(c.text, people.data?.people ?? [], 'rounded bg-oe-blue/15 px-0.5 font-semibold text-oe-blue')}
               </p>
             </div>
           );
@@ -218,16 +192,15 @@ export function TeamPanel({
           className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words rounded border border-transparent bg-surface-secondary px-1.5 py-1 text-[11px] text-transparent"
           data-testid="team-comment-highlight"
         >
-          {text.split(/(@[^\s@]+(?:@[^\s@]+)?)/g).map((part, i) =>
-            part.startsWith('@') ? <mark key={i} className="rounded bg-oe-blue/30 text-transparent">{part}</mark> : <span key={i}>{part}</span>,
-          )}
+          {highlightMentions(text, people.data?.people ?? [], 'rounded bg-oe-blue/30 text-transparent')}
           {'​'}
         </div>
         <textarea
-          ref={boxRef}
+          ref={(el) => { composer.boxRef.current = el; }}
           value={text}
           disabled={!documentId}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => composer.onChange(e.target.value, e.target.selectionStart)}
+          onSelect={(e) => composer.setCaret(e.currentTarget.selectionStart ?? text.length)}
           onKeyDown={(e) => {
             e.stopPropagation();
             if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) void send();

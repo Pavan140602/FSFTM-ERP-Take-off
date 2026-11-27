@@ -494,6 +494,45 @@ def _add_folder_paths(s: StudioSession, folder: str) -> None:
     s.folders = sorted(have, key=str.lower)
 
 
+async def ensure_project(db: AsyncSession, s: StudioSession) -> bool:
+    """Give the session's project-less PDFs a project.
+
+    A PDF uploaded with no project selected is visible to its owner only and
+    its markups are kept in that browser only - nobody else in the session
+    could open it or see the markups. Such PDFs go into the session's
+    project (created as "Studio - <session name>", owned by the host, when
+    the session has none yet), and everyone who has joined gets access.
+    Returns True when anything changed.
+    """
+    from app.modules.projects.models import Project
+
+    docs = await _documents(db, await document_ids(db, s))
+    loose = [d for d in docs if not getattr(d, "project_id", None)]
+    if not loose and s.project_id is not None:
+        return False
+    if s.project_id is None:
+        firsts = [d.project_id for d in docs if getattr(d, "project_id", None)]
+        if firsts:
+            s.project_id = firsts[0]
+        else:
+            p = Project(name=f"Studio - {s.name}"[:255], owner_id=s.owner_id)
+            db.add(p)
+            await db.flush()
+            s.project_id = p.id
+    for d in loose:
+        d.project_id = s.project_id
+    await db.flush()
+    joined = (
+        await db.execute(
+            select(StudioAttendee).where(StudioAttendee.session_id == s.id, StudioAttendee.status == "joined")
+        )
+    ).scalars()
+    for att in joined:
+        await grant_access(db, att, docs, [s.project_id])
+    await db.flush()
+    return True
+
+
 async def add_folder(db: AsyncSession, s: StudioSession, path: str) -> str:
     require_active(s)
     folder = normalise_folder(path)
@@ -560,7 +599,9 @@ async def finish(db: AsyncSession, s: StudioSession) -> None:
     await db.flush()
 
 
-async def post_message(db: AsyncSession, s: StudioSession, user_id: str, text: str) -> StudioMessage:
+async def post_message(
+    db: AsyncSession, s: StudioSession, user_id: str, text: str, mentions: list[str] | None = None
+) -> StudioMessage:
     require_active(s)
     text = text.strip()
     if not text:
@@ -568,7 +609,37 @@ async def post_message(db: AsyncSession, s: StudioSession, user_id: str, text: s
     m = StudioMessage(session_id=s.id, user_id=uuid.UUID(user_id), text=text[:4000])
     db.add(m)
     await db.flush()
+    if mentions:
+        await _notify_mentions(db, s, user_id, text, mentions)
     return m
+
+
+async def _notify_mentions(db: AsyncSession, s: StudioSession, user_id: str, text: str, mentions: list[str]) -> None:
+    """In-app notification for each @mentioned account (best effort)."""
+    from app.modules.notifications.service import NotificationService
+
+    me = await _users(db, [uuid.UUID(user_id)])
+    who = me.get(user_id, {}).get("name") or me.get(user_id, {}).get("email") or "Someone"
+    for mid in dict.fromkeys(mentions):
+        try:
+            uid = uuid.UUID(mid)
+        except (ValueError, TypeError):
+            continue
+        if str(uid) == user_id:
+            continue
+        try:
+            await NotificationService(db).create(
+                uid,
+                "studio_invite",
+                "notifications.takeoff.studio_mention.title",
+                entity_type="takeoff_studio_session",
+                entity_id=str(s.id),
+                body_key="notifications.takeoff.studio_mention.body",
+                body_context={"who": who, "session": s.name, "excerpt": text[:140]},
+                action_url=f"/takeoff?tab=measurements&studio={s.id}",
+            )
+        except Exception:
+            logger.exception("studio: mention notification failed")
 
 
 async def messages(db: AsyncSession, s: StudioSession) -> list[dict[str, Any]]:

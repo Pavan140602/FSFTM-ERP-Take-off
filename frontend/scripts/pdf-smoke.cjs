@@ -395,6 +395,13 @@ const check = (name, ok, detail = '') => {
     await page.waitForTimeout(300);
     const sugg = page.locator('[data-testid="team-mention-list"] button', { hasText: 'Ben Field' });
     check('@ suggests people', (await sugg.count()) === 1);
+    // A last name finds the person too.
+    await box2.press('End');
+    await box2.type(' and @fiel');
+    await page.waitForTimeout(250);
+    check('@ finds a person by last name', (await page.locator('[data-testid="team-mention-list"] button', { hasText: 'Ben Field' }).count()) === 1);
+    for (let i = 0; i < ' and @fiel'.length; i++) await box2.press('Backspace');
+    await page.waitForTimeout(150);
     check('@names are highlighted while typing', (await page.locator('[data-testid="team-comment-highlight"] mark').count()) >= 1);
     if (await sugg.count()) await sugg.first().dispatchEvent('mousedown');
     await page.locator('[data-testid="team-comment-send"]').click();
@@ -416,10 +423,16 @@ const check = (name, ok, detail = '') => {
     await page.waitForTimeout(1200);
     check('Studio: a session starts with the open PDF and the invite', !!studio.created && studio.created.document_ids.includes(ID(1)) && studio.created.invite[0] === 'ben@example.com', JSON.stringify(studio.created));
     check('Studio: the session ID is shown', (await page.locator('[data-testid="studio-code-shown"]').innerText().catch(() => '')) === '123-456-789');
+    check('Studio: the session ID and how to join are shown in the session', (await page.locator('[data-testid="studio-id-card"]', { hasText: '123-456-789' }).count()) === 1);
+    check('Studio: a big Add PDF button is in the open session', (await page.locator('[data-testid="studio-add-pdf-big"]:visible').count()) === 1);
     check('Studio: says who can see the session', (await page.locator('[data-testid="studio-visibility-note"]', { hasText: 'Only the people added here' }).count()) === 1);
     check('Studio: people in the session are listed', (await page.locator('[data-testid="studio-person"]', { hasText: 'Ben Field' }).count()) === 1);
     check('Studio: the viewer knows which PDFs are in the session (faster live sync)', (await S('studio.active'))?.docIds?.includes(ID(1)) === true);
     await shot('studio_live');
+    await page.locator('[data-testid="studio-chat-input"]').click();
+    await page.locator('[data-testid="studio-chat-input"]').type('Hi @Be');
+    await page.waitForTimeout(250);
+    check('Studio chat: @ suggests people', (await page.locator('[data-testid="studio-mention-list"] button', { hasText: 'Ben Field' }).count()) === 1);
     await page.locator('[data-testid="studio-chat-input"]').fill('Grid B is mine');
     await page.locator('[data-testid="studio-chat-send"]').click();
     await page.waitForTimeout(700);

@@ -21926,8 +21926,8 @@ export default function TakeoffViewerModule({
                   currentDocument={documentId && !documentId.startsWith('temp-') ? { id: documentId, name: fileName || 'Drawing' } : null}
                   openDocuments={(openDocuments ?? []).filter((d) => !d.id.startsWith('local:'))}
                   projectId={activeProjectId || docProjectId || null}
-                  onOpenDocument={(doc) => {
-                    if (doc.id === documentId) return;
+                  onOpenDocument={(doc, again) => {
+                    if (doc.id === documentId && !again) return;
                     if (onOpenSessionDocument) onOpenSessionDocument(doc);
                     else onSwitchDocument?.(doc.id);
                   }}

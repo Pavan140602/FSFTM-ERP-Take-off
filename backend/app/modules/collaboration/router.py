@@ -243,6 +243,22 @@ async def _verify_entity_access(
         await verify_project_access(project_uuid, str(user_id), session)
         return
 
+    if entity_type == "takeoff_document":
+        # A PDF Measurements drawing may have no project (uploaded with no
+        # project selected): then its owner (or an admin) may comment, the
+        # same rule as opening it (OE-DELIVERY 2026-11-27-fsftm-pdf).
+        from app.modules.takeoff.models import TakeoffDocument
+        from app.modules.takeoff.router import _verify_takeoff_doc_access
+
+        try:
+            doc = await session.get(TakeoffDocument, uuid.UUID(entity_id))
+        except (ValueError, TypeError):
+            doc = None
+        if doc is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entity not found")
+        await _verify_takeoff_doc_access(doc, str(user_id) if user_id else "", session)
+        return
+
     resolved = await _resolve_entity_project_id(entity_type, entity_id, session)
     if resolved is None:
         # Fail closed: a target we cannot tie to a project the caller can

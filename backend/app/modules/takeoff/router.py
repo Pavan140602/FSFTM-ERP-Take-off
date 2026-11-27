@@ -6842,6 +6842,8 @@ class StudioFolder(BaseModel):
 
 class StudioMessageIn(BaseModel):
     text: str = Field(..., min_length=1, max_length=4000)
+    #: Account ids @mentioned in the text: they get a notification.
+    mentions: list[str] = Field(default_factory=list, max_length=50)
 
 
 class StudioSettings(BaseModel):
@@ -6909,6 +6911,7 @@ async def studio_create(
         open_join=body.open_join,
         project_id=home,
     )
+    await studio.ensure_project(session, s)
     invites: list[dict[str, str]] = []
     if body.invite:
         invites = await studio.invite(
@@ -6936,6 +6939,7 @@ async def studio_join_by_code(
         raise HTTPException(status_code=404, detail="No session with that ID")
     email, _admin = await _studio_me(str(user_id), session)
     me = await studio.join(session, s, str(user_id), email)
+    await studio.ensure_project(session, s)
     return await studio.detail(session, s, me)
 
 
@@ -6949,6 +6953,8 @@ async def studio_get(
     from app.modules.takeoff import studio
 
     s, me = await studio.load_for_user(session, session_id, str(user_id))
+    if s.status == "active":
+        await studio.ensure_project(session, s)
     return await studio.detail(session, s, me)
 
 
@@ -7029,6 +7035,7 @@ async def studio_add_documents(
         raise HTTPException(status_code=403, detail="Join the session first")
     docs = await _studio_docs(body.document_ids, str(user_id), service, session)
     await studio.add_documents(session, s, str(user_id), docs, body.folder)
+    await studio.ensure_project(session, s)
     return await studio.detail(session, s, me)
 
 
@@ -7198,5 +7205,5 @@ async def studio_post_message(
     s, me = await studio.load_for_user(session, session_id, str(user_id))
     if me.status != "joined":
         raise HTTPException(status_code=403, detail="Join the session first")
-    await studio.post_message(session, s, str(user_id), body.text)
+    await studio.post_message(session, s, str(user_id), body.text, body.mentions)
     return {"messages": await studio.messages(session, s)}

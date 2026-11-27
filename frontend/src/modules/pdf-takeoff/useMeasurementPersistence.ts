@@ -1276,6 +1276,17 @@ export function useMeasurementPersistence({
             saveToStorage(projectId, documentId, legacy);
           }
         }
+        // A PDF that had no project (markups kept in this browser only under
+        // its file name) and was then put in a project - e.g. by a Studio
+        // session: carry those markups over; the sync then saves them to the
+        // server for everyone (OE-DELIVERY 2026-11-27-fsftm-pdf).
+        if (!data && projectId && documentId && fileName) {
+          const loose = readKey(`${STORAGE_PREFIX}local__${fileName.replace(/[^a-zA-Z0-9._-]/g, '_')}`);
+          if (loose && loose.measurements?.length) {
+            data = loose;
+            saveToStorage(projectId, documentId, loose);
+          }
+        }
         if (data) {
           hasPersistedRef.current = true;
           // Even with no server rows, honour a pending delete: a row deleted

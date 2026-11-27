@@ -113,6 +113,8 @@ _TEMPLATES: dict[str, str] = {
     # FSFTM Studio sessions (OE-DELIVERY 2026-11-27-fsftm-pdf)
     "notifications.takeoff.studio_invite.title": "{inviter} invited you to a session",
     "notifications.takeoff.studio_invite.body": 'Session "{session}" - ID {code}',
+    "notifications.takeoff.studio_mention.title": "{who} mentioned you in a session",
+    "notifications.takeoff.studio_mention.body": '{session}: "{excerpt}"',
     "notifications.collaboration.comment_added.title": "New comment in a discussion",
     "notifications.collaboration.comment_added.body": 'On {entity_type}: "{excerpt}"',
     # ── Clash coordination ───────────────────────────────────────────
