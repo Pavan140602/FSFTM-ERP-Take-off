@@ -863,6 +863,9 @@ interface Measurement {
   lineStyle?: 'solid' | 'dashed' | 'dotted' | 'dashdot';
   /** Label moved away from its default spot, in PDF units (OE-DELIVERY 2026-11-26-fsftm-pdf). */
   labelOffset?: { dx: number; dy: number };
+  /** Label turned by hand, in degrees (-180..180]; only the caption turns,
+   *  never the markup (OE-DELIVERY 2026-11-27-fsftm-pdf). */
+  labelRotation?: number;
   /** FSFTM Start / End line endings (OE-DELIVERY 2026-11-25-fsftm-pdf). */
   lineStart?: LineEnding;
   lineEnd?: LineEnding;
@@ -2797,7 +2800,7 @@ export default function TakeoffViewerModule({
   const { t, i18n } = useTranslation();
   // Keyboard goes to ONE viewer: the visible one, and among the editors on
   // screen (main + split panes) the one last clicked.
-  const [wsFocus] = useSharedState<string | null>('ws.focus', null);
+  const [wsFocus] = useSharedState<string | null>('ws.focus', null, hidden);
   const hiddenRef = useRef(hidden);
   const hiddenPropRef = useRef(hidden);
   hiddenPropRef.current = hidden;
@@ -5090,7 +5093,7 @@ export default function TakeoffViewerModule({
    * split pane's own editor fills them (portal) while it has the focus, so
    * every tool and command works on that pane. Nothing moves on screen. */
   const isChromeHost = !hidden && !compact;
-  const [visibleEditors, setVisibleEditors] = useSharedState<string[]>('ws.editors', []);
+  const [visibleEditors, setVisibleEditors] = useSharedState<string[]>('ws.editors', [], hidden);
   useEffect(() => {
     if (hidden || !focusKey) return;
     const k = focusKey;
@@ -5135,7 +5138,7 @@ export default function TakeoffViewerModule({
     const el = chromeSlots[name];
     return ownsChrome && el ? createPortal(node, el) : null;
   };
-  const [toolReq] = useSharedState<{ key: string; tool: string; n: number } | null>('ws.toolReq', null);
+  const [toolReq] = useSharedState<{ key: string; tool: string; n: number } | null>('ws.toolReq', null, hidden);
   hiddenRef.current = hidden || (!!wsFocus && !!focusKey && wsFocus !== focusKey);
   /** Latest document id for callbacks that outlive a render (thumbnails). */
   const documentIdRef = useRef(documentId);
@@ -5699,6 +5702,12 @@ export default function TakeoffViewerModule({
     const earlier = hostingNow.findIndex((x) => x.id === h.id) < i;
     return h.id === documentId || earlier ? `${h.id}@${pane}` : h.id;
   };
+  /** The pane the controls belong to right now (blue outline). */
+  const paneActive = (pane: string) => {
+    const k = paneEditorKey(pane);
+    if (k) return wsFocus === k;
+    return pane === 'p2' ? splitActive : activeExtraPane === pane;
+  };
   /** Clicking a pane (its tab bar too) hands it the controls. */
   const focusPane = (pane: string) => {
     const k = paneEditorKey(pane);
@@ -6245,6 +6254,47 @@ export default function TakeoffViewerModule({
   /** Label under the pointer / being moved: drawn with a move box + grip. */
   const [labelHoverId, setLabelHoverId] = useState<string | null>(null);
   const [labelDragId, setLabelDragId] = useState<string | null>(null);
+  /** Label rotate knobs from the last paint (device px): knob + label centre. */
+  const labelKnobRef = useRef<Map<string, { kx: number; ky: number; cx: number; cy: number }>>(new Map());
+  /** A label being turned: live angle for the readout. */
+  const labelRotRef = useRef<{ id: string; cx: number; cy: number; a0: number; base: number; k: number; left: number; top: number; before: Measurement } | null>(null);
+  const [labelRotLive, setLabelRotLive] = useState<{ id: string; deg: number } | null>(null);
+  useEffect(() => {
+    const move = (ev: MouseEvent) => {
+      const d = labelRotRef.current;
+      if (!d) return;
+      const px = (ev.clientX - d.left) * d.k;
+      const py = (ev.clientY - d.top) * d.k;
+      let deg = d.base + ((Math.atan2(py - d.cy, px - d.cx) - d.a0) * 180) / Math.PI;
+      deg = ((((deg + 180) % 360) + 360) % 360) - 180;
+      if (ev.shiftKey) deg = Math.round(deg / 15) * 15;
+      else {
+        // A light pull to the square angles.
+        for (const s of [-180, -90, 0, 90, 180]) if (Math.abs(deg - s) < 2.5) deg = s;
+      }
+      if (deg <= -180) deg += 360;
+      deg = Math.round(deg * 10) / 10;
+      setMeasurements((prev) => prev.map((x) => (x.id === d.id ? { ...x, labelRotation: deg } : x)));
+      setLabelRotLive({ id: d.id, deg });
+    };
+    const up = () => {
+      const d = labelRotRef.current;
+      if (!d) return;
+      labelRotRef.current = null;
+      setLabelRotLive(null);
+      const after = measurementsRef.current.find((x) => x.id === d.id);
+      if (after && after.labelRotation !== d.before.labelRotation) {
+        pushUndo({ kind: 'edit_geometry', measurementId: d.id, previousMeasurement: d.before, nextMeasurement: { ...after, points: [...after.points] } });
+      }
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+    return () => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     const move = (ev: MouseEvent) => {
       const d = labelDragRef.current;
@@ -7688,6 +7738,7 @@ export default function TakeoffViewerModule({
     ctx.font = `${12 * dpr}px sans-serif`;
     // Label boxes are re-recorded on every paint (movable labels).
     labelHitRef.current.clear();
+    labelKnobRef.current.clear();
 
     /** Draw an annotation label with a semi-transparent background at (lx, ly).
      *
@@ -7808,6 +7859,54 @@ export default function TakeoffViewerModule({
       ctx.strokeStyle = live ? '#ffffff' : '#2563EB';
       for (const d of HAND_GLYPH) ctx.stroke(d);
       ctx.restore();
+      // Rotate knob on the right of the caption: drag it round to turn the
+      // label to any angle (Shift = 15 degree steps).
+      {
+        const kr = 5.5 * dpr;
+        const kx = x + w + pad + kr + 5 * dpr;
+        const ky = y + h / 2;
+        ctx.setLineDash([]);
+        ctx.strokeStyle = '#2563EB';
+        ctx.lineWidth = Math.max(1, dpr);
+        ctx.beginPath();
+        ctx.moveTo(x + w + pad, ky);
+        ctx.lineTo(kx - kr, ky);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(kx, ky, kr, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(kx, ky, kr * 0.55, -Math.PI * 0.9, Math.PI * 0.55);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(kx + kr * 0.55 * Math.cos(Math.PI * 0.55) - 1.6 * dpr, ky + kr * 0.55 * Math.sin(Math.PI * 0.55) - 0.6 * dpr);
+        ctx.lineTo(kx + kr * 0.55 * Math.cos(Math.PI * 0.55), ky + kr * 0.55 * Math.sin(Math.PI * 0.55));
+        ctx.lineTo(kx + kr * 0.55 * Math.cos(Math.PI * 0.55) + 0.4 * dpr, ky + kr * 0.55 * Math.sin(Math.PI * 0.55) - 1.8 * dpr);
+        ctx.stroke();
+        const tm = ctx.getTransform();
+        const kp = tm.transformPoint(new DOMPoint(kx, ky));
+        const cp = tm.transformPoint(new DOMPoint(x + w / 2, y + h / 2));
+        labelKnobRef.current.set(id, { kx: kp.x, ky: kp.y, cx: cp.x, cy: cp.y });
+        if (labelRotLive?.id === id) {
+          // Live angle readout, always upright next to the knob.
+          ctx.save();
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          const txt = `${labelRotLive.deg.toFixed(1).replace(/\.0$/, '')}\u00B0`;
+          ctx.font = `bold ${12 * dpr}px sans-serif`;
+          const tw = ctx.measureText(txt).width + 10 * dpr;
+          const bx = kp.x + 12 * dpr;
+          const by = kp.y - 22 * dpr;
+          ctx.fillStyle = '#2563EB';
+          ctx.fillRect(bx, by, tw, 18 * dpr);
+          ctx.fillStyle = '#ffffff';
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(txt, bx + 5 * dpr, by + 9 * dpr);
+          ctx.restore();
+        }
+      }
       ctx.restore();
     };
 
@@ -7859,6 +7958,8 @@ export default function TakeoffViewerModule({
           cy += off.dy * dpr * zoom;
           labelAngle = 0;
         }
+        // Turned by hand (any angle): only the caption turns.
+        if (typeof m.labelRotation === 'number') labelAngle = (m.labelRotation * Math.PI) / 180;
         const zsHit = labelStyle === 'fsftm' ? zoom : 1;
         const fsHit = Math.max(m.labelTextSize ?? labelTextSize, m.labelDimSize ?? labelDimSize) * dpr * zsHit;
         const longest = Math.max(showName ? name.length : 0, showMaterial ? material.length : 0, showValue ? value.length : 0);
@@ -9834,7 +9935,7 @@ export default function TakeoffViewerModule({
       ctx.stroke();
       ctx.restore();
     }
-  }, [measurements, orderedMeasurements, activePoints, currentPage, zoom, settingScale, scalePoints, activeTool, hiddenGroups, hiddenMeasurements, scale, pageScales, annotationColor, rectStartPoint, isDraggingRect, selectedMeasurementId, selectedLedgerIds, marqueeRect, boxDragRect, zoomAreaRect, dragPreview, liveCursor, panning, searchMatches, activeMatchIdx, measurementSystem, snapPoint, snapIsContent, snapKind, showLabels, showDimensions, labelTextSize, labelMaterialSize, labelDimSize, labelTextColor, labelNameColor, labelMaterialColor, labelDimColor, labelBgColor, labelShowName, labelShowMaterial, labelShowDimension, renderNonce, groupColorMap, multiplyGhosts, offsetGhost, legendTextColor, legendBgColor, legendBorderStyle, legendStyle, legendPadTop, legendPadBottom, legendPadLeft, legendPadRight, showTextInput, editingTextId, viewportDraft, hiddenTypes, labelStyle, autoHighlightAll, autoShowColumns, labelFontCss, labelFontStyle, displayUnitPref, autoRoleFilter, markupTextPrompt, cloudLeader, labelHoverId, labelDragId]);
+  }, [measurements, orderedMeasurements, activePoints, currentPage, zoom, settingScale, scalePoints, activeTool, hiddenGroups, hiddenMeasurements, scale, pageScales, annotationColor, rectStartPoint, isDraggingRect, selectedMeasurementId, selectedLedgerIds, marqueeRect, boxDragRect, zoomAreaRect, dragPreview, liveCursor, panning, searchMatches, activeMatchIdx, measurementSystem, snapPoint, snapIsContent, snapKind, showLabels, showDimensions, labelTextSize, labelMaterialSize, labelDimSize, labelTextColor, labelNameColor, labelMaterialColor, labelDimColor, labelBgColor, labelShowName, labelShowMaterial, labelShowDimension, renderNonce, groupColorMap, multiplyGhosts, offsetGhost, legendTextColor, legendBgColor, legendBorderStyle, legendStyle, legendPadTop, legendPadBottom, legendPadLeft, legendPadRight, showTextInput, editingTextId, viewportDraft, hiddenTypes, labelStyle, autoHighlightAll, autoShowColumns, labelFontCss, labelFontStyle, displayUnitPref, autoRoleFilter, markupTextPrompt, cloudLeader, labelHoverId, labelDragId, labelRotLive]);
 
   /* ── Canvas click handler ────────────────────────────────────────── */
 
@@ -12238,6 +12339,18 @@ export default function TakeoffViewerModule({
           const k = ov.width / r.width;
           const px = (e.clientX - r.left) * k;
           const py = (e.clientY - r.top) * k;
+          // Rotate knob first.
+          for (const [id, kb] of labelKnobRef.current) {
+            if (Math.hypot(px - kb.kx, py - kb.ky) > 9 * (ov.width / Math.max(1, r.width))) continue;
+            const km = measurementsRef.current.find((x) => x.id === id);
+            if (!km || km.locked || km.page !== currentPageRef.current) continue;
+            const base = (Math.atan2(kb.ky - kb.cy, kb.kx - kb.cx) * 180) / Math.PI;
+            labelRotRef.current = { id, cx: kb.cx, cy: kb.cy, a0: Math.atan2(py - kb.cy, px - kb.cx), base, k, left: r.left, top: r.top, before: { ...km, points: [...km.points] } };
+            setLabelRotLive({ id, deg: Math.round(base * 10) / 10 });
+            setSelectedMeasurementId(id);
+            e.preventDefault();
+            return;
+          }
           let hitId: string | null = null;
           for (const [id, b] of labelHitRef.current) {
             if (Math.abs(px - b.x) <= b.w / 2 && Math.abs(py - b.y) <= b.h / 2) hitId = id;
@@ -13007,6 +13120,7 @@ export default function TakeoffViewerModule({
       // the cursor (value / group / linked BOQ). Reuses the same hit-test the
       // selection path uses so the hover target matches what a click selects.
       let overLabel: string | null = null;
+      let overKnob = false;
       if (activeTool === 'select' && pt && !deepModeRef.current && overlayRef.current && !dragRef.current) {
         const ov = overlayRef.current;
         const r = ov.getBoundingClientRect();
@@ -13017,6 +13131,13 @@ export default function TakeoffViewerModule({
           for (const [id, b] of labelHitRef.current) {
             if (Math.abs(px - b.x) <= b.w / 2 && Math.abs(py - b.y) <= b.h / 2) overLabel = id;
           }
+          overKnob = false;
+          for (const [id, kb] of labelKnobRef.current) {
+            if (Math.hypot(px - kb.kx, py - kb.ky) <= 9 * k) {
+              overLabel = id;
+              overKnob = true;
+            }
+          }
           if (overLabel) {
             const lm = measurementsRef.current.find((x) => x.id === overLabel);
             if (!lm || lm.locked || lm.page !== currentPageRef.current) overLabel = null;
@@ -13025,7 +13146,9 @@ export default function TakeoffViewerModule({
       }
       setLabelHoverId((prev) => (prev === overLabel ? prev : overLabel));
       if (activeTool === 'select' && pt && overLabel) {
-        setSelectHoverCursor((prev) => (prev === 'grab' ? prev : 'grab'));
+        // Four-arrow "move" over a caption; a hand over its rotate knob.
+        const want = overKnob ? 'grab' : 'move';
+        setSelectHoverCursor((prev) => (prev === want ? prev : want));
         if (hoverInfo) setHoverInfo(null);
       } else if (activeTool === 'select' && pt) {
         const z = zoomRef.current || 1;
@@ -21608,6 +21731,11 @@ export default function TakeoffViewerModule({
               // The drawing last clicked in gets the keyboard and the tools
               // picked from the main tool strip (OE-DELIVERY 2026-11-26-fsftm-pdf).
               if (fromNestedEditor(e)) return; // a split pane's own editor
+              // The shared controls (toolbar, page bar, ledger) sit inside this
+              // column but belong to the pane in use: pressing them must not
+              // hand the controls back here mid-click (that made every button
+              // need two clicks, and Split H in a pane split the wrong one).
+              if ((e.target as Element | null)?.closest?.('[data-chrome-slot]')) return;
               if (focusKey && getShared('ws.focus') !== focusKey) setShared('ws.focus', focusKey);
             }}
           >
@@ -22505,6 +22633,7 @@ export default function TakeoffViewerModule({
                   moveTabToMain(t);
                 }}
               >
+                {splitMode !== 'off' && splitTree && ownsChrome && <div className="pointer-events-none absolute inset-0 z-40 rounded-[2px] ring-2 ring-inset ring-oe-blue" data-testid="active-pane-ring" />}
                 {mainTabDropOver && (
                   <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center border-2 border-dashed border-oe-blue bg-oe-blue/10 text-sm font-semibold text-oe-blue">
                     Drop to open in this pane
@@ -22767,7 +22896,7 @@ export default function TakeoffViewerModule({
                       : spaceHeld || panLock
                         ? 'grab'
                         : activeTool === 'select'
-                          ? (dragPreview || labelDragId ? 'grabbing' : selectHoverCursor ?? 'default')
+                          ? (labelRotLive ? 'grabbing' : labelDragId ? 'move' : dragPreview ? 'grabbing' : selectHoverCursor ?? 'default')
                           : 'crosshair',
                   }}
                   onClick={handleCanvasClick}
@@ -23467,10 +23596,12 @@ export default function TakeoffViewerModule({
                 <div
                   className="flex min-h-0 min-w-0"
                   style={paneBox('p2')}
+                  data-pane-active={paneActive('p2') ? 'true' : undefined}
                   onPointerEnter={() => { syncLeaderRef.current = 'split'; }}
                   onMouseDownCapture={() => { syncLeaderRef.current = 'split'; }}
                   onWheelCapture={() => { syncLeaderRef.current = 'split'; }}
                 >
+                {paneActive('p2') && <div className="pointer-events-none absolute inset-0 z-40 rounded-[2px] ring-2 ring-inset ring-oe-blue" data-testid="active-pane-ring" />}
                 <SplitPane
                   slot={!!compareDoc && hostingNow.some((h) => h.pane === 'p2')}
                   measurementsKey={compareDoc && !compareDoc.id.startsWith('file:') ? `doc.m.${compareDoc.id}` : undefined}
@@ -23527,8 +23658,10 @@ export default function TakeoffViewerModule({
                     key={xp.key}
                     className="flex min-h-0 min-w-0"
                     style={paneBox(xp.key)}
+                    data-pane-active={paneActive(xp.key) ? 'true' : undefined}
                     onPointerDown={() => { setActiveExtraPane(xp.key); setSplitActive(false); focusPane(xp.key); }}
                   >
+                {paneActive(xp.key) && <div className="pointer-events-none absolute inset-0 z-40 rounded-[2px] ring-2 ring-inset ring-oe-blue" data-testid="active-pane-ring" />}
                     <SplitPane
                       paneKey={xp.key}
                       slot={!!shown && hostingNow.some((h) => h.pane === xp.key)}
@@ -27013,6 +27146,44 @@ export default function TakeoffViewerModule({
                     <span className="flex-1">Cut out a round hole</span>
                   </button>
                 </>
+              );
+            })()}
+            {(() => {
+              const rm = measurements.find((x) => x.id === contextMenu.measurementId);
+              if (!rm) return null;
+              const setAngle = (deg: number | undefined) => {
+                pushUndo({ kind: 'edit_geometry', measurementId: rm.id, previousMeasurement: { ...rm, points: [...rm.points] }, nextMeasurement: { ...rm, labelRotation: deg, points: [...rm.points] } });
+                setMeasurements((prev) => prev.map((x) => (x.id === rm.id ? { ...x, labelRotation: deg } : x)));
+              };
+              return (
+                <div className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-content-primary" role="menuitem" data-testid="context-label-angle">
+                  <RotateCcw size={13} className="rotate-90" />
+                  <span className="flex-1">Label angle</span>
+                  <input
+                    type="number"
+                    min={-180}
+                    max={180}
+                    step={1}
+                    defaultValue={typeof rm.labelRotation === 'number' ? rm.labelRotation : ''}
+                    placeholder="auto"
+                    onKeyDown={(e) => {
+                      e.stopPropagation();
+                      if (e.key === 'Enter') {
+                        const v = parseFloat((e.target as HTMLInputElement).value);
+                        setAngle(Number.isFinite(v) ? ((((v + 180) % 360) + 360) % 360) - 180 : undefined);
+                        setContextMenu(null);
+                      }
+                    }}
+                    className="h-6 w-16 rounded border border-border bg-surface-secondary px-1 text-right tabular-nums"
+                    title="Type an angle in degrees and press Enter (empty = automatic)"
+                  />
+                  <span>&deg;</span>
+                  {typeof rm.labelRotation === 'number' && (
+                    <button type="button" onClick={() => { setAngle(undefined); setContextMenu(null); }} className="rounded px-1 text-[11px] text-oe-blue hover:bg-oe-blue/10" title="Back to the automatic angle">
+                      Reset
+                    </button>
+                  )}
+                </div>
               );
             })()}
             {(() => {
