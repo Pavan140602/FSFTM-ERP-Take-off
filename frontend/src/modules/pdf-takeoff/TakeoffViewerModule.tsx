@@ -2964,10 +2964,36 @@ export default function TakeoffViewerModule({
       if (r.top !== 0) el.style.top = `${-r.top}px`;
       if (r.left !== 0) el.style.left = `${-r.left}px`;
     };
-    fit();
-    window.addEventListener('resize', fit);
+    // The page behind must not scroll: a scroll (focus moving, full screen
+    // starting) moved this pinned workspace down and showed a strip of the
+    // ERP page above it ("it jumps down"). Lock it, and re-pin whenever
+    // anything could have moved it.
+    const html = document.documentElement;
+    const prevHtml = html.style.overflow;
+    const prevBody = document.body.style.overflow;
+    html.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+    const refit = () => {
+      if (window.scrollX || window.scrollY) window.scrollTo(0, 0);
+      fit();
+    };
+    refit();
+    window.addEventListener('resize', refit);
+    window.addEventListener('scroll', refit, true);
+    document.addEventListener('fullscreenchange', refit);
+    // Belt and braces: a layout change above the workspace (a banner
+    // appearing, the header collapsing) does not fire any of the above.
+    const t = window.setInterval(() => {
+      const r = el.getBoundingClientRect();
+      if (Math.abs(r.top) > 0.5 || Math.abs(r.left) > 0.5 || Math.abs(r.height - window.innerHeight) > 0.5) refit();
+    }, 400);
     return () => {
-      window.removeEventListener('resize', fit);
+      window.removeEventListener('resize', refit);
+      window.removeEventListener('scroll', refit, true);
+      document.removeEventListener('fullscreenchange', refit);
+      window.clearInterval(t);
+      html.style.overflow = prevHtml;
+      document.body.style.overflow = prevBody;
       clear();
     };
   }, [workspaceOn, pdfDoc]);

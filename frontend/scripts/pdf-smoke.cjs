@@ -342,6 +342,12 @@ const check = (name, ok, detail = '') => {
     const fsLabel3 = (await page.locator('[data-testid="fsftm-workspace-toggle"]:visible').first().innerText().catch(() => '')).trim();
     check('full screen: switching panes keeps full screen and nothing moves', stillFs && moved3.length === 0, `${stillFs ? 'still full screen' : 'LEFT full screen'} | ${moved3.slice(0, 4).join(' | ')}`);
     check('full screen: the button reads Exit workspace from any pane', fsLabel2 === 'Exit workspace' && fsLabel3 === 'Exit workspace', `"${fsLabel2}" / "${fsLabel3}"`);
+    // Something scrolls the page behind the workspace: it must not slide down.
+    await page.evaluate(() => { document.body.style.minHeight = '3000px'; window.scrollTo(0, 120); document.scrollingElement && (document.scrollingElement.scrollTop = 120); });
+    await page.waitForTimeout(700);
+    const wsTop = await page.evaluate(() => { const r = document.querySelector('[data-viewer-root][data-fsftm-workspace="1"]')?.getBoundingClientRect(); return r ? [Math.round(r.top), Math.round(r.height), window.innerHeight] : null; });
+    await page.evaluate(() => { document.body.style.minHeight = ''; });
+    check('full screen: the workspace never slides down (page behind cannot scroll it)', !!wsTop && wsTop[0] === 0 && wsTop[1] === wsTop[2], JSON.stringify(wsTop));
     await page.keyboard.press('Escape');
     await page.waitForTimeout(600);
     check('full screen: Esc does not leave full screen', await page.evaluate(() => !!document.fullscreenElement));

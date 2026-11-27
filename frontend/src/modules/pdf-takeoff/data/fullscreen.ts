@@ -111,11 +111,12 @@ export function registerFullscreenViewer(): () => void {
         lockEsc();
       } else {
         try { keyboard()?.unlock?.(); } catch { /* ignore */ }
-        // Left with the browser's own keys (hold Esc / F11): go back to the
-        // normal page so the next click does not jump into full screen.
+        // Left by the browser itself (holding Esc, or a browser without the
+        // Esc lock): keep the big full-window workspace - never drop to the
+        // small normal page by surprise. Workspace goes full screen again;
+        // only Exit workspace returns to the normal page.
         if (!ourExit && getShared<ViewPref>(VIEW_PREF_KEY) === 'fullscreen') {
-          setPref('normal');
-          setWorkspace(false);
+          setWorkspace(true);
         }
         ourExit = false;
       }
