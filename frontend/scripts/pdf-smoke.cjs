@@ -335,6 +335,31 @@ const check = (name, ok, detail = '') => {
     await page.locator('[data-testid="doc-tab"]:visible', { hasText: 'Set A' }).first().locator('button').first().click();
     await page.waitForTimeout(2500);
 
+    // ── Switching the MAIN pane's PDF never moves the other pane ──
+    await page.locator('[data-testid="viewmode-split-vertical"]').first().click();
+    await page.waitForTimeout(2500);
+    const paneScroll = () => page.evaluate(() => {
+      const c = [...document.querySelectorAll('[data-testid="viewer-pane"] [data-viewer-root] .overflow-auto')].find((x) => x.getBoundingClientRect().width > 0);
+      return c ? [c.scrollLeft, c.scrollTop, Math.round(c.getBoundingClientRect().x)] : null;
+    });
+    await page.evaluate(() => {
+      const c = [...document.querySelectorAll('[data-testid="viewer-pane"] [data-viewer-root] .overflow-auto')].find((x) => x.getBoundingClientRect().width > 0);
+      if (c) { c.scrollLeft = 120; c.scrollTop = 60; }
+    });
+    await page.waitForTimeout(500);
+    const pv0 = await paneScroll();
+    await page.locator('[data-testid="doc-tab"]:visible', { hasText: 'Set C' }).first().locator('button').first().click();
+    await page.waitForTimeout(2500);
+    const pv1 = await paneScroll();
+    const paneStillA = (await page.locator('[data-testid="split-tab"]', { hasText: 'Set A' }).count()) === 1;
+    check('switching the main PDF does not move the other pane', !!pv0 && JSON.stringify(pv0) === JSON.stringify(pv1) && paneStillA, `pane view ${JSON.stringify(pv0)} -> ${JSON.stringify(pv1)}`);
+    await page.locator('[data-testid="doc-tab"]:visible', { hasText: 'Set A' }).first().locator('button').first().click();
+    await page.waitForTimeout(1500);
+    const pv2 = await paneScroll();
+    check('switching back keeps the other pane where it was', JSON.stringify(pv0) === JSON.stringify(pv2), `${JSON.stringify(pv0)} -> ${JSON.stringify(pv2)}`);
+    await page.locator('[data-testid="split-tab-close"]').first().click();
+    await page.waitForTimeout(1000);
+
     // ── Split, the new pane shows the same drawing, one-click focus ──
     await page.locator('[data-testid="viewmode-split-vertical"]').first().click();
     await page.waitForTimeout(2500);
@@ -465,8 +490,22 @@ const check = (name, ok, detail = '') => {
     await page.locator('[data-testid="combine-file-input"]').setInputFiles({ name: 'Extra.pdf', mimeType: 'application/pdf', buffer: Buffer.from(PDF['3']) });
     await page.waitForTimeout(400);
     await page.locator('[data-testid="combine-name"]').fill('Combined set');
+    // Record the progress shown while it works.
+    await page.evaluate(() => {
+      window.__cprog = [];
+      const mo = new MutationObserver(() => {
+        const el = document.querySelector('[data-testid="combine-progress-pct"]');
+        if (el) { const v = parseInt(el.textContent || '', 10); if (window.__cprog[window.__cprog.length - 1] !== v) window.__cprog.push(v); }
+      });
+      mo.observe(document.body, { childList: true, subtree: true, characterData: true });
+      window.__cprogStop = () => mo.disconnect();
+    });
     await page.locator('[data-testid="combine-ok"]').click();
-    await page.waitForTimeout(2500);
+    await page.locator('[data-testid="doc-tab"]:visible', { hasText: 'Combined set.pdf (unsaved)' }).first().waitFor({ timeout: 15000 }).catch(() => undefined);
+    await page.waitForTimeout(800);
+    const cprog = await page.evaluate(() => { window.__cprogStop?.(); return window.__cprog; });
+    const goesUp = cprog.length >= 3 && cprog.every((v, i) => i === 0 || v >= cprog[i - 1]) && cprog[cprog.length - 1] === 100;
+    check('Combine shows its progress in percent up to 100%', goesUp && (await page.locator('[data-testid="combine-progress"]').count()) === 0, cprog.join(' -> '));
     const comb = await page.evaluate(() => window.__generated);
     check('Combine opens the combined PDF as a new document', !!comb && comb.name === 'Combined set.pdf' && (await page.locator('[data-testid="doc-tab"]:visible', { hasText: 'Combined set.pdf (unsaved)' }).count()) >= 1, comb ? `${comb.name} ${comb.pages} pages` : 'nothing opened');
 

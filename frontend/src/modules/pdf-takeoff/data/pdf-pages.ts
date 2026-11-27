@@ -711,14 +711,22 @@ void PDFNumber;
 /* ── Combine + new PDF (update 21) ─────────────────────────────────── */
 
 /** Join PDFs in order; returns the bytes and where each part's page 1 landed (0-based offset). */
-export async function combinePdfs(parts: Uint8Array[]): Promise<{ bytes: Uint8Array; offsets: number[]; numPages: number }> {
+export async function combinePdfs(
+  parts: Uint8Array[],
+  /** Called after each file is merged (done of total); at done === total
+   *  the combined PDF is about to be written. */
+  onProgress?: (done: number, total: number) => void | Promise<void>,
+): Promise<{ bytes: Uint8Array; offsets: number[]; numPages: number }> {
   const out = await PDFDocument.create();
   const offsets: number[] = [];
+  let done = 0;
   for (const b of parts) {
     const src = await load(b);
     offsets.push(out.getPageCount());
     const copied = await out.copyPages(src, src.getPageIndices());
     copied.forEach((p) => out.addPage(p));
+    done++;
+    await onProgress?.(done, parts.length);
   }
   return { bytes: await out.save(), offsets, numPages: out.getPageCount() };
 }

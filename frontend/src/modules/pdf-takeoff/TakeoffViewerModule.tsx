@@ -15618,31 +15618,77 @@ export default function TakeoffViewerModule({
       addToast({ type: 'success', title: okMsg, message: `${name} downloaded.` });
     }
   };
+  /** Combine progress, shown while the PDFs are read and merged. */
+  const [combineProgress, setCombineProgress] = useState<{ pct: number; step: string } | null>(null);
   const runCombine = async (items: CombineItem[], outName: string) => {
     setCombineOpen(false);
+    // Let the bar paint between the heavy steps.
+    const show = async (pct: number, step: string) => {
+      setCombineProgress({ pct: Math.max(0, Math.min(100, Math.round(pct))), step });
+      await new Promise((ok) => window.setTimeout(ok, 0));
+    };
     try {
       const parts: Uint8Array[] = [];
       let currentAt = -1;
-      for (const it of items) {
+      const n = Math.max(1, items.length);
+      // Reading the files: 0-50 %.
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i]!;
+        const base = (i / n) * 50;
+        const step = `Reading ${it.name} (${i + 1} of ${items.length})`;
+        await show(base, step);
         if (it.kind === 'current') {
           currentAt = parts.length;
           parts.push(new Uint8Array(await pdfDoc!.getData()));
         } else if (it.kind === 'doc' && it.docId) {
           const res = await fetch(`/api/v1/takeoff/documents/${it.docId}/download/`, { headers: authHeaders() });
           if (!res.ok) throw new Error(`Could not read ${it.name} (${res.status})`);
-          parts.push(new Uint8Array(await res.arrayBuffer()));
+          const size = Number(res.headers.get('content-length')) || 0;
+          if (res.body && size > 0) {
+            // Streamed, so a big drawing set moves the bar as it arrives.
+            const reader = res.body.getReader();
+            const chunks: Uint8Array[] = [];
+            let got = 0;
+            let shown = -1;
+            for (;;) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              chunks.push(value);
+              got += value.length;
+              const pct = Math.round(base + Math.min(1, got / size) * (50 / n));
+              if (pct !== shown) {
+                shown = pct;
+                setCombineProgress({ pct, step });
+              }
+            }
+            const buf = new Uint8Array(got);
+            let at = 0;
+            for (const c of chunks) {
+              buf.set(c, at);
+              at += c.length;
+            }
+            parts.push(buf);
+          } else {
+            parts.push(new Uint8Array(await res.arrayBuffer()));
+          }
         } else if (it.file) {
           parts.push(new Uint8Array(await it.file.arrayBuffer()));
         }
       }
-      const r = await pdfPages.combinePdfs(parts);
+      // Merging: 50-85 %, then writing the new PDF.
+      await show(50, `Merging pages (0 of ${parts.length} files)`);
+      const r = await pdfPages.combinePdfs(parts, (done, total) =>
+        show(50 + (done / total) * 35, done < total ? `Merging pages (${done} of ${total} files)` : 'Writing the combined PDF'),
+      );
       let bytes = r.bytes;
       // The open drawing's markups and scales go with its pages.
       if (currentAt >= 0 && pdfDoc) {
+        await show(92, 'Adding the markups and scales');
         const map: Record<number, number> = {};
         for (let i = 1; i <= pdfDoc.numPages; i++) map[i] = r.offsets[currentAt]! + i;
         bytes = await pdfPages.withSnapshot(bytes, await snapshotFor(map));
       }
+      await show(97, 'Opening the combined PDF');
       const fileName = `${outName.replace(/\.pdf$/i, '')}.pdf`;
       // Like Overlay: the combined PDF opens at once as a new, unsaved
       // document, and the page asks whether to save it to the project
@@ -15653,8 +15699,11 @@ export default function TakeoffViewerModule({
       } else {
         await openOrDownload(bytes, fileName, `Combined ${items.length} files (${r.numPages} pages)`);
       }
+      await show(100, 'Done');
     } catch (err) {
       addToast({ type: 'error', title: 'Combine failed', message: err instanceof Error ? err.message : String(err) });
+    } finally {
+      window.setTimeout(() => setCombineProgress(null), 700);
     }
   };
   const runNewPdf = async (o: { name: string; widthPt: number; heightPt: number; pages: number; label: string; keepScale?: boolean }) => {
@@ -26824,6 +26873,27 @@ export default function TakeoffViewerModule({
           addToast({ type: 'info', title: 'Calibrate', message: 'Click two points of a known length on the sheet.' });
         }}
       />
+      {combineProgress && (
+        <div
+          className="fixed left-1/2 top-16 z-[200] w-80 -translate-x-1/2 rounded-lg border border-border bg-surface-primary px-4 py-3 shadow-xl"
+          role="progressbar"
+          aria-label="Combining PDFs"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={combineProgress.pct}
+          data-testid="combine-progress"
+        >
+          <div className="flex items-center gap-2 text-sm font-semibold text-content-primary">
+            <Loader2 size={14} className={clsx('shrink-0', combineProgress.pct < 100 && 'animate-spin')} />
+            <span className="flex-1">Combining PDFs</span>
+            <span className="tabular-nums" data-testid="combine-progress-pct">{combineProgress.pct}%</span>
+          </div>
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-secondary">
+            <div className="h-full rounded-full bg-oe-blue transition-[width] duration-200" style={{ width: `${Math.max(2, combineProgress.pct)}%` }} />
+          </div>
+          <div className="mt-1.5 truncate text-xs text-content-secondary">{combineProgress.step}</div>
+        </div>
+      )}
       <CombineDialog
         open={combineOpen}
         currentName={fileName || exportProjectName || 'drawing.pdf'}

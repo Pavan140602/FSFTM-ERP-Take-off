@@ -79,9 +79,11 @@ export function ViewerWorkspace({ docs, shownId, opening, openingPct = null, ren
       owners.set(doc.id, inst);
       instances.push(inst);
     };
-    for (const d of docs) {
-      if (d.id === shownId) addOwner(d, null, true);
-    }
+    // Every main-tab drawing keeps its owner in the main stack (shown or
+    // waiting there), so a pane showing one of them always keeps its OWN
+    // editor: switching the main tab never swaps the pane's viewer for the
+    // main one (that made the pane jump to the main pane's zoom and scroll).
+    for (const d of docs) addOwner(d, null, d.id === shownId);
     for (const h of live) {
       if (owners.has(h.id)) {
         instances.push({ key: `${h.id}@${h.pane}`, doc: url(h.id, h.name), pane: h.pane, visible: true, mirror: true });
@@ -95,6 +97,31 @@ export function ViewerWorkspace({ docs, shownId, opening, openingPct = null, ren
     for (const xp of splitExtra) for (const t of xp.tabs) addOwner(url(t.id, t.name), 'parked', false);
   }
 
+  // The last scroll of every view inside a host (kept while it is shown, so
+  // it survives the host being hidden or moved).
+  const scrollMemRef = useRef(new WeakMap<Element, [number, number]>());
+  useEffect(() => {
+    const onScroll = (e: Event) => {
+      const el = e.target;
+      if (!(el instanceof Element) || !el.closest('[data-viewer-host]')) return;
+      if (el.getClientRects().length === 0) return; // hidden: keep the last real one
+      scrollMemRef.current.set(el, [el.scrollLeft, el.scrollTop]);
+    };
+    document.addEventListener('scroll', onScroll, { capture: true, passive: true });
+    return () => document.removeEventListener('scroll', onScroll, { capture: true });
+  }, []);
+  const restoreScroll = (host: HTMLElement) => {
+    const put = () => {
+      for (const el of host.querySelectorAll('*')) {
+        const v = scrollMemRef.current.get(el);
+        if (!v) continue;
+        if (el.scrollLeft !== v[0]) el.scrollLeft = v[0];
+        if (el.scrollTop !== v[1]) el.scrollTop = v[1];
+      }
+    };
+    put();
+    requestAnimationFrame(put); // once the new place is laid out
+  };
   // Move each host to where its drawing shows - only when that changes, so
   // canvases and scroll positions stay as they are.
   useLayoutEffect(() => {
@@ -105,7 +132,14 @@ export function ViewerWorkspace({ docs, shownId, opening, openingPct = null, ren
       const slot = v.pane && v.pane !== 'parked' ? slots[v.pane] : null;
       const target = slot ?? stack;
       if (!target) continue;
-      if (host.parentElement !== target) target.appendChild(host);
+      if (host.parentElement !== target) {
+        const moved = !!host.parentElement;
+        target.appendChild(host);
+        // Hiding or moving an element resets its scroll. The pane slots
+        // belong to the shown main viewer, so switching the main tab moves
+        // the panes: put every view inside back where it was.
+        if (moved) restoreScroll(host);
+      }
       const cls = slot
         ? 'flex min-h-0 min-w-0 flex-1 flex-col'
         : clsx('absolute inset-0 flex min-h-0 flex-col', !v.visible && 'invisible pointer-events-none');
