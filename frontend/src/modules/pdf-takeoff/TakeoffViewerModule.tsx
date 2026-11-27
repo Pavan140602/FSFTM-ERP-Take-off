@@ -6652,6 +6652,25 @@ export default function TakeoffViewerModule({
     (async () => {
       const snapshot = await readTakeoffSnapshot(pdfDoc);
       if (cancelled || !snapshot) return;
+      // The embedded markups are brought in ONCE per drawing. After that the
+      // saved markups list is the only source: markups the user deleted must
+      // never come back from the file (OE-DELIVERY 2026-11-27-fsftm-pdf).
+      const docIdNow = documentIdRef.current;
+      const flagKey = docIdNow ? `takeoff.snapshotImported.${docIdNow}` : null;
+      let alreadyImported = false;
+      try { alreadyImported = !!flagKey && localStorage.getItem(flagKey) === '1'; } catch { /* ignore */ }
+      if (!alreadyImported && docIdNow) {
+        try {
+          const r = await apiGet<{ imported: boolean }>(`/v1/takeoff/documents/${docIdNow}/snapshot-imported/`);
+          alreadyImported = !!r?.imported;
+        } catch { /* an older server: fall back to this browser's record */ }
+      }
+      if (cancelled) return;
+      const markImported = () => {
+        if (!flagKey || !docIdNow) return;
+        try { localStorage.setItem(flagKey, '1'); } catch { /* ignore */ }
+        apiPut(`/v1/takeoff/documents/${docIdNow}/snapshot-imported/`, {}).catch(() => {});
+      };
       // The file also carries these markups as PDF annotations (FSFTM-style
       // save, update 15): draw the pages without annotations so the editable
       // markups are not doubled, and restore the saved page scales.
@@ -6701,9 +6720,19 @@ export default function TakeoffViewerModule({
           for (const ms of [1500, 4000]) setTimeout(() => { if (!cancelled) applyScales(); }, ms);
         }
       }
+      if (alreadyImported) return; // the layer stays hidden; nothing comes back
       const rows = await snapshotToMeasurements(snapshot, pdfDoc);
       if (cancelled || rows.length === 0) return;
+      // Give the saved markups list the first word: a drawing that already
+      // has (or had) markups saved never takes the file's copy.
+      await new Promise((res) => setTimeout(res, 1500));
+      if (cancelled) return;
+      if (measurementsRef.current.length > 0) {
+        markImported();
+        return;
+      }
       setMeasurements((prev) => (prev.length === 0 ? rows : prev));
+      markImported();
       // A brand-new server copy (page tools, update 15) loads its empty
       // server list after this: keep the restored rows if that wipes them.
       snapshotRestoreRef.current = { rows, scales: (snapshot as pdfPages.TakeoffSnapshotV).scales, pageMap: snapshot.pageMap, until: Date.now() + 15000 };

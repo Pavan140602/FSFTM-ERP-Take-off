@@ -5513,6 +5513,47 @@ async def put_auto_takeoff_rejected(
     return {"rejected": clean}
 
 
+@router.get(
+    "/documents/{doc_id}/snapshot-imported/",
+    dependencies=[Depends(RequirePermission("takeoff.read"))],
+)
+async def get_snapshot_imported(
+    doc_id: str,
+    user_id: CurrentUserId = None,  # type: ignore[assignment]
+    service: TakeoffService = Depends(_get_service),
+    session: SessionDep = None,  # type: ignore[assignment]
+) -> dict:
+    """Whether the markups embedded in this PDF were already brought in.
+
+    A PDF saved with its markups carries them inside the file. They are
+    brought in ONCE; after that the saved markups list is the only source, so
+    markups the user deletes never come back from the file on a later load
+    (OE-DELIVERY 2026-11-27-fsftm-pdf).
+    """
+    doc = await _doc_intel_document(doc_id, str(user_id) if user_id else "", service, session)
+    meta = doc.metadata_ or {}
+    return {"imported": bool(meta.get("snapshot_imported")) if isinstance(meta, dict) else False}
+
+
+@router.put(
+    "/documents/{doc_id}/snapshot-imported/",
+    dependencies=[Depends(RequirePermission("takeoff.update"))],
+)
+async def put_snapshot_imported(
+    doc_id: str,
+    user_id: CurrentUserId = None,  # type: ignore[assignment]
+    service: TakeoffService = Depends(_get_service),
+    session: SessionDep = None,  # type: ignore[assignment]
+) -> dict:
+    """Record that the embedded markups were brought in (see above)."""
+    doc = await _doc_intel_document(doc_id, str(user_id) if user_id else "", service, session)
+    meta = dict(doc.metadata_ or {})
+    meta["snapshot_imported"] = True
+    doc.metadata_ = meta
+    await session.commit()
+    return {"imported": True}
+
+
 @router.post(
     "/documents/{doc_id}/auto-takeoff/",
     dependencies=[Depends(RequirePermission("takeoff.read"))],
