@@ -174,11 +174,12 @@ const check = (name, ok, detail = '') => {
     await wsBtn().click();
     await page.waitForTimeout(700);
     const fsOn = await page.evaluate(() => !!document.fullscreenElement);
+    const fsLabel = (await wsBtn().innerText().catch(() => '')).trim();
     const noPopup = (await page.locator('[data-testid="workspace-menu"]').count()) === 0;
     await wsBtn().click();
     await page.waitForTimeout(700);
     const backNormal = await page.evaluate(() => !document.fullscreenElement && localStorage.getItem('takeoff.viewMode') === 'normal');
-    check('Workspace: one click to full screen, one click back to normal (no pop-up)', wsLabel === 'Workspace' && startNormal && fsOn && noPopup && backNormal, `label "${wsLabel}" fs ${fsOn} popup ${!noPopup} back ${backNormal}`);
+    check('Workspace: one click to full screen (shows Exit full screen), one click back (no pop-up)', wsLabel === 'Workspace' && fsLabel === 'Exit full screen' && startNormal && fsOn && noPopup && backNormal, `labels "${wsLabel}"/"${fsLabel}" fs ${fsOn} popup ${!noPopup} back ${backNormal}`);
 
     // ── Draw, label cursor, label rotation, delete ──
     const bb = await drawLength('[data-testid="viewer-active"]', 0.5);
@@ -235,6 +236,41 @@ const check = (name, ok, detail = '') => {
     await page.keyboard.press('Control+z');
     await page.waitForTimeout(400);
     check('Undo brings it back', (await marks(1)).length === 1);
+
+    // ── A caption turned along an angled line: the hand shows all along it ──
+    {
+      const vb = await visibleCanvas('[data-testid="viewer-active"]');
+      const p0 = { x: vb.x + vb.width * 0.3, y: vb.y + vb.height * 0.8 };
+      const p1 = { x: vb.x + vb.width * 0.62, y: vb.y + vb.height * 0.45 };
+      await page.locator('[data-strip-tool="distance"]').first().click();
+      await page.mouse.click(p0.x, p0.y);
+      await page.waitForTimeout(200);
+      await page.mouse.click(p1.x, p1.y);
+      await page.waitForTimeout(600);
+      await page.keyboard.press('Escape');
+      await page.locator('[data-strip-tool="select"]').first().click();
+      await page.waitForTimeout(300);
+      // Use the line as saved (Ortho may have snapped it to 45 degrees).
+      const saved = (await marks(1)).slice(-1)[0];
+      const ovr = await page.evaluate(() => { const c = document.querySelector('[data-testid="viewer-active"] canvas.absolute.left-0'); const r = c.getBoundingClientRect(); return { x: r.x, y: r.y, k: r.width / 1224 }; });
+      const q0 = { x: ovr.x + saved.points[0].x * ovr.k, y: ovr.y + saved.points[0].y * ovr.k };
+      const q1 = { x: ovr.x + saved.points[1].x * ovr.k, y: ovr.y + saved.points[1].y * ovr.k };
+      const L = Math.hypot(q1.x - q0.x, q1.y - q0.y);
+      const ux = (q1.x - q0.x) / L, uy = (q1.y - q0.y) / L;
+      const mx = (q0.x + q1.x) / 2, my = (q0.y + q1.y) / 2;
+      const along = [];
+      for (const side of [1, -1]) for (let dn = 3; dn <= 30; dn += 3) for (let t = -60; t <= 60; t += 6) {
+        const x = mx + ux * t + side * uy * dn, y = my + uy * t - side * ux * dn;
+        await page.mouse.move(x, y);
+        await page.waitForTimeout(25);
+        if ((await cursorAt(x, y)) === 'grab') along.push(t);
+      }
+      const spread = along.length ? Math.max(...along) - Math.min(...along) : 0;
+      check('angled caption: the hand cursor shows along the whole caption', (await marks(1)).length === 2 && spread >= 40, `hand at ${along.length} points, spread ${spread}px`);
+      await page.keyboard.press('Control+z');
+      await page.waitForTimeout(400);
+      await page.mouse.move(vb.x + 5, vb.y + 5);
+    }
 
     // ── Sync never splits ──
     await page.locator('[data-testid="status-sync"]').first().click();
@@ -326,6 +362,16 @@ const check = (name, ok, detail = '') => {
     await page.waitForTimeout(3000);
     check('the Overlay document opens as a new tab', (await page.locator('[data-testid="doc-tab"]:visible', { hasText: 'Overlay.pdf (unsaved)' }).count()) >= 1);
     await shot('overlay');
+
+    // ── Combine opens the combined PDF as a new document, like Overlay ──
+    await page.locator('[data-testid="toolbar-combine"]:visible').first().click();
+    await page.locator('[data-testid="combine-file-input"]').setInputFiles({ name: 'Extra.pdf', mimeType: 'application/pdf', buffer: Buffer.from(PDF['3']) });
+    await page.waitForTimeout(400);
+    await page.locator('[data-testid="combine-name"]').fill('Combined set');
+    await page.locator('[data-testid="combine-ok"]').click();
+    await page.waitForTimeout(2500);
+    const comb = await page.evaluate(() => window.__generated);
+    check('Combine opens the combined PDF as a new document', !!comb && comb.name === 'Combined set.pdf' && (await page.locator('[data-testid="doc-tab"]:visible', { hasText: 'Combined set.pdf (unsaved)' }).count()) >= 1, comb ? `${comb.name} ${comb.pages} pages` : 'nothing opened');
 
     // ── Team: who is working where, comments with @mentions ──
     // (comments need a saved drawing: back to Set A first)

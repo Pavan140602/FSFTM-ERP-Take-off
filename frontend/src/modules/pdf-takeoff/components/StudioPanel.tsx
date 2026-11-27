@@ -802,8 +802,8 @@ export function StudioPanel({
                     <span className="text-[10px] text-content-tertiary">· {live ? (host ? 'you host' : 'attendee') : `finished ${timeOf(d.finished_at)}`}</span>
                     <div className="relative ml-auto flex gap-1">
                       {live && (
-                        <button type="button" className={clsx(btn, 'flex items-center gap-0.5 border border-border')} onClick={() => setMenu((m) => (m === 'add' ? null : 'add'))} data-testid="studio-add">
-                          Add <ChevronDown size={10} />
+                        <button type="button" className={clsx(btn, 'flex items-center gap-0.5 bg-oe-blue text-white')} onClick={() => setMenu((m) => (m === 'add' ? null : 'add'))} title="Add PDFs: from this computer, from the project, or the open PDF" data-testid="studio-add">
+                          <Plus size={11} /> Add PDF <ChevronDown size={10} />
                         </button>
                       )}
                       <button type="button" className={clsx(btn, 'flex items-center gap-0.5 border border-border')} onClick={() => setMenu((m) => (m === 'actions' ? null : 'actions'))} data-testid="studio-actions">
@@ -815,7 +815,7 @@ export function StudioPanel({
                           <div className="absolute right-0 top-full z-[81] mt-1 w-56 rounded border border-border bg-surface-elevated py-1 shadow-xl">
                             {menu === 'add' ? (
                               <>
-                                <button type="button" className={menuItem} onClick={() => { setMenu(null); openUpload(''); }} data-testid="studio-upload-open"><Upload size={13} /> Upload files…</button>
+                                <button type="button" className={menuItem} onClick={() => { setMenu(null); openUpload(''); }} data-testid="studio-upload-open"><Upload size={13} /> Upload PDFs from this computer…</button>
                                 <button type="button" className={menuItem} onClick={() => { setMenu(null); setUploadTo(''); folderPick.current?.click(); }}><FolderUp size={13} /> Upload folder…</button>
                                 <button type="button" className={menuItem} onClick={() => { setMenu(null); setUploadTo(''); setNewFolder(''); setDialog('folder'); }} data-testid="studio-new-folder"><FolderPlus size={13} /> New folder</button>
                                 <button type="button" className={menuItem} disabled={!canAddCurrent} onClick={() => { setMenu(null); addCurrent(); }} data-testid="studio-add-current"><FilePlus size={13} /> Add the open PDF</button>
@@ -862,6 +862,7 @@ export function StudioPanel({
                             <button type="button" className={clsx(btn, 'bg-oe-blue text-white')} onClick={() => { setUploadTo(''); setNewFolder(''); setDialog('folder'); }}>New Folder</button>
                             <button type="button" className={clsx(btn, 'bg-oe-blue text-white')} onClick={() => openUpload('')}>Upload Files</button>
                             <button type="button" className={clsx(btn, 'bg-oe-blue text-white')} onClick={() => { setUploadTo(''); folderPick.current?.click(); }}>Upload Folder</button>
+                            {projectId && <button type="button" className={clsx(btn, 'bg-oe-blue text-white')} onClick={() => { setUploadTo(''); setProjPicked(new Set()); setDialog('project'); }}>From Project</button>}
                           </div>
                         )}
                       </div>

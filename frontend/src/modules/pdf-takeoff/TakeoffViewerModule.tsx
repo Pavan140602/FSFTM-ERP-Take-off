@@ -1867,6 +1867,19 @@ function fromNestedEditor(e: { target: EventTarget | null; currentTarget: EventT
 /** Hand glyph (lucide "hand") drawn on a label's move badge. */
 /** Cursor over a label's rotate knob: a circular arrow (falls back to the
  *  "alias" arrow where custom cursors are off). */
+/** Is a canvas point on a caption? Tested in the caption's own (turned)
+ *  frame with a small margin, so a turned caption along an angled line can
+ *  be grabbed anywhere on its text (no blind spots). */
+function onLabelBox(px: number, py: number, b: { x: number; y: number; w: number; h: number; a?: number }, pad: number): boolean {
+  const dx = px - b.x;
+  const dy = py - b.y;
+  const a = b.a ?? 0;
+  const c = Math.cos(a);
+  const s = Math.sin(a);
+  const u = dx * c + dy * s;
+  const v = -dx * s + dy * c;
+  return Math.abs(u) <= b.w / 2 + pad && Math.abs(v) <= b.h / 2 + pad;
+}
 const ROTATE_CURSOR = `url("data:image/svg+xml,${encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><g stroke="#fff" stroke-width="4"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v4h-4"/></g><g stroke="#111" stroke-width="2"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v4h-4"/></g></svg>',
 )}") 12 12, alias`;
@@ -4599,6 +4612,8 @@ export default function TakeoffViewerModule({
    *  measurement under the cursor without adding hoverInfo to its deps. */
   const hoverInfoRef = useRef(hoverInfo);
   /** Select tool: move cursor over a markup, crosshair over a grip. */
+  /** Resize cursor over a legend box's corner / edge (Select tool). */
+  const [legendCursor, setLegendCursor] = useState<string | null>(null);
   const [selectHoverCursor, setSelectHoverCursor] = useState<'move' | 'crosshair' | 'grab' | 'rotate' | null>(null);
   hoverInfoRef.current = hoverInfo;
 
@@ -6407,7 +6422,8 @@ export default function TakeoffViewerModule({
   const lastPasteRef = useRef<{ x: number; y: number; n: number } | null>(null);
   /** FSFTM movable labels: label boxes from the last paint (device px) and
    *  the label being dragged. */
-  const labelHitRef = useRef<Map<string, { x: number; y: number; w: number; h: number }>>(new Map());
+  /** Each caption's grab area: centre, size and turn (radians), in canvas px. */
+  const labelHitRef = useRef<Map<string, { x: number; y: number; w: number; h: number; a?: number }>>(new Map());
   const labelDragRef = useRef<{ id: string; startX: number; startY: number; dx0: number; dy0: number; before: Measurement } | null>(null);
   /** Label under the pointer / being moved: drawn with a move box + grip. */
   const [labelHoverId, setLabelHoverId] = useState<string | null>(null);
@@ -8215,7 +8231,8 @@ export default function TakeoffViewerModule({
           const top = showName ? -half - fsA * 1.15 : half;
           const bottom = showValue ? half + fsB * 1.15 : -half;
           const w = Math.max(wA, wB, 1);
-          if (labelAngle === 0) labelHitRef.current.set(m.id, { x: cx, y: cy + (top + bottom) / 2, w, h: bottom - top });
+          const mid = (top + bottom) / 2;
+          labelHitRef.current.set(m.id, { x: cx - Math.sin(labelAngle) * mid, y: cy + Math.cos(labelAngle) * mid, w, h: bottom - top, a: labelAngle });
           drawLabelCue(m.id, -w / 2, top, w, bottom - top);
         }
         ctx.restore();
@@ -8278,7 +8295,7 @@ export default function TakeoffViewerModule({
       const rcy = pcy;
       // The grab box is exactly the caption text (the earlier estimate was
       // larger and sat off-centre).
-      if (labelAngle === 0) labelHitRef.current.set(m.id, { x: pcx, y: pcy, w: boxW, h: boxH });
+      labelHitRef.current.set(m.id, { x: pcx, y: pcy, w: boxW, h: boxH, a: labelAngle });
       ctx.save();
       if (labelAngle !== 0) {
         ctx.translate(rcx, rcy);
@@ -12564,7 +12581,7 @@ export default function TakeoffViewerModule({
           }
           let hitId: string | null = null;
           for (const [id, b] of labelHitRef.current) {
-            if (Math.abs(px - b.x) <= b.w / 2 && Math.abs(py - b.y) <= b.h / 2) hitId = id;
+            if (onLabelBox(px, py, b, 5 * k)) hitId = id;
           }
           const hm = hitId ? measurementsRef.current.find((x) => x.id === hitId) : undefined;
           if (hm && !hm.locked && hm.page === currentPageRef.current) {
@@ -13168,9 +13185,11 @@ export default function TakeoffViewerModule({
           }
           if (cornerCursor) break;
         }
-        const canvas = e.currentTarget as HTMLCanvasElement;
-        const want = cornerCursor ?? '';
-        if (canvas.style.cursor !== want) canvas.style.cursor = want;
+        // Through React state (not canvas.style): writing the style here
+        // wiped the caption hand cursor on every mouse move, so it flickered
+        // away while still over a caption (the "blind spots").
+        const want = cornerCursor;
+        setLegendCursor((prev) => (prev === want ? prev : want));
       }
 
       // Zoom-to-area rectangle in flight: stretch the box.
@@ -13342,7 +13361,7 @@ export default function TakeoffViewerModule({
           const px = (e.clientX - r.left) * k;
           const py = (e.clientY - r.top) * k;
           for (const [id, b] of labelHitRef.current) {
-            if (Math.abs(px - b.x) <= b.w / 2 && Math.abs(py - b.y) <= b.h / 2) overLabel = id;
+            if (onLabelBox(px, py, b, 5 * k)) overLabel = id;
           }
           overKnob = false;
           for (const [id, kb] of labelKnobRef.current) {
@@ -15628,7 +15647,16 @@ export default function TakeoffViewerModule({
         for (let i = 1; i <= pdfDoc.numPages; i++) map[i] = r.offsets[currentAt]! + i;
         bytes = await pdfPages.withSnapshot(bytes, await snapshotFor(map));
       }
-      await openOrDownload(bytes, `${outName.replace(/\.pdf$/i, '')}.pdf`, `Combined ${items.length} files (${r.numPages} pages)`);
+      const fileName = `${outName.replace(/\.pdf$/i, '')}.pdf`;
+      // Like Overlay: the combined PDF opens at once as a new, unsaved
+      // document, and the page asks whether to save it to the project
+      // (user request 2026-11-27).
+      if (onOpenGeneratedPdf) {
+        onOpenGeneratedPdf(new File([bytes as unknown as BlobPart], fileName, { type: 'application/pdf' }));
+        addToast({ type: 'success', title: `Combined ${items.length} files (${r.numPages} pages)`, message: `${fileName} is open as a new document.` });
+      } else {
+        await openOrDownload(bytes, fileName, `Combined ${items.length} files (${r.numPages} pages)`);
+      }
     } catch (err) {
       addToast({ type: 'error', title: 'Combine failed', message: err instanceof Error ? err.message : String(err) });
     }
@@ -21195,17 +21223,17 @@ export default function TakeoffViewerModule({
                 the normal ERP page and full screen. */}
             <button
               type="button"
-              onClick={() => chooseViewMode(viewMode === 'normal' ? 'fullscreen' : 'normal')}
+              onClick={() => chooseViewMode(isTakeoffFullscreen ? 'normal' : 'fullscreen')}
               className={clsx(
                 'flex items-center gap-1 rounded border px-2 py-0.5 text-[11px] hover:bg-surface-tertiary',
-                viewMode !== 'normal' ? 'border-oe-blue bg-oe-blue/10 text-oe-blue' : 'border-border text-content-secondary',
+                isTakeoffFullscreen ? 'border-oe-blue bg-oe-blue/10 text-oe-blue' : 'border-border text-content-secondary',
               )}
-              title={viewMode === 'normal' ? 'Workspace: full screen' : 'Back to the normal page'}
-              aria-pressed={viewMode !== 'normal'}
+              title={isTakeoffFullscreen ? 'Leave full screen (back to the normal page)' : 'Workspace: full screen'}
+              aria-pressed={isTakeoffFullscreen}
               data-testid="fsftm-workspace-toggle"
             >
-              {viewMode === 'normal' ? <Maximize2 size={12} /> : <Minimize2 size={12} />}
-              Workspace
+              {isTakeoffFullscreen ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
+              {isTakeoffFullscreen ? 'Exit full screen' : 'Workspace'}
             </button>
             </div>
           }
@@ -23256,7 +23284,7 @@ export default function TakeoffViewerModule({
                       : spaceHeld || panLock
                         ? 'grab'
                         : activeTool === 'select'
-                          ? (labelRotLive ? 'grabbing' : labelDragId ? 'grabbing' : dragPreview ? 'grabbing' : selectHoverCursor === 'rotate' ? ROTATE_CURSOR : selectHoverCursor ?? 'default')
+                          ? (labelRotLive ? 'grabbing' : labelDragId ? 'grabbing' : dragPreview ? 'grabbing' : selectHoverCursor === 'rotate' ? ROTATE_CURSOR : selectHoverCursor ?? legendCursor ?? 'default')
                           : labelDragId
                             ? 'grabbing'
                             : selectHoverCursor === 'grab' && activePoints.length === 0
