@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:e2e": "playwright test",
+    "test:pdf-smoke": "node scripts/pdf-smoke.cjs",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:smoke": "playwright test smoke/",
