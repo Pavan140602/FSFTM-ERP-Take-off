@@ -1867,6 +1867,10 @@ type ExtraPane = { key: string; tabs: PaneDoc[]; activeId: string | null; page: 
 const splitViewMem = new Map<string, ViewSnap>();
 /** Mounted viewers; the shared split workspace is reset when the last goes. */
 let liveViewers = 0;
+/** Copied markups / pages, shared by every open drawing so they paste into
+ *  a different PDF too (OE-DELIVERY 2026-11-27-fsftm-pdf). */
+const SHARED_MARKUP_CLIP: { current: Measurement[] | null } = { current: null };
+const SHARED_PAGE_CLIP: { current: Uint8Array | null } = { current: null };
 /** Editors per drawing (owner + mirrors sharing its markups). */
 const docEditors = new Map<string, number>();
 
@@ -5575,7 +5579,24 @@ export default function TakeoffViewerModule({
   /** A tab dropped on pane `target` (from the main tab bar or another pane). */
   const dropTabOnPane = async (t: TabDragPayload, target: string) => {
     if (t.from === 'split' && (t.pane ?? 'p2') === target) return;
-    const tab = t.from === 'main' ? await docForMainTab(t) : takeFromPane(t.pane ?? 'p2', t.id);
+    // Already open in that pane: nothing moves (no second copy).
+    const there = target === 'p2'
+      ? splitTabsRef.current.some((x) => x.id === t.id)
+      : !!extraPanesRef.current.find((x) => x.key === target)?.tabs.some((x) => x.id === t.id);
+    if (there) {
+      addToast({ type: 'info', title: `${t.name} is already open in that pane` });
+      return;
+    }
+    if (t.from === 'main') {
+      const tab = await docForMainTab(t);
+      if (!tab) return;
+      putIntoPane(target, tab);
+      // Moved, not copied: it leaves the main tabs (the main pane keeps at
+      // least one drawing).
+      if ((openDocuments?.length ?? 0) > 1) onCloseDocumentTab?.(t.id);
+      return;
+    }
+    const tab = takeFromPane(t.pane ?? 'p2', t.id);
     if (tab) putIntoPane(target, tab);
   };
   const dropTabOnPaneRef = useRef(dropTabOnPane);
@@ -5584,6 +5605,10 @@ export default function TakeoffViewerModule({
    *  (it keeps its page and zoom); the previous one stays in the main tabs. */
   const moveTabToMain = (t: TabDragPayload) => {
     if (t.id === 'self') return;
+    if (t.id === documentId || openDocuments?.some((d) => d.id === t.id)) {
+      addToast({ type: 'info', title: `${t.name} is already open in the main pane` });
+      return;
+    }
     const pane = t.pane ?? 'p2';
     if (t.id.startsWith('file:') || !onSwitchDocument) {
       addToast({ type: 'info', title: 'Cannot move this drawing', message: 'Upload it to the project first, then it can move to the main pane.' });
@@ -5707,6 +5732,20 @@ export default function TakeoffViewerModule({
     if (activeExtraPane && panes.includes(activeExtraPane)) return activeExtraPane;
     return 'main';
   };
+  /** The drawing a pane shows (for opening the same one in a new split). */
+  const paneDrawing = (pane: string): (PaneDoc & { page: number }) | null => {
+    if (pane === 'main') {
+      if (!documentId || !pdfDoc) return null;
+      return { id: documentId, name: fileName ?? 'Drawing', doc: pdfDoc, page: currentPageRef.current };
+    }
+    if (pane === 'p2') {
+      const t = splitTabsRef.current.find((x) => x.id === splitTabIdRef.current);
+      return t ? { ...t, page: splitPageRef.current } : null;
+    }
+    const xp = extraPanesRef.current.find((x) => x.key === pane);
+    const t = xp?.tabs.find((x) => x.id === xp.activeId);
+    return t && xp ? { ...t, page: xp.page } : null;
+  };
   /** Split the pane in use in two (side by side / stacked), if there is
    *  room; otherwise say so, like a desktop PDF tool. */
   const splitFocused = (dir: SplitDir) => {
@@ -5724,7 +5763,16 @@ export default function TakeoffViewerModule({
     let n = 3;
     while (used.includes(`p${n}`)) n++;
     const key = `p${n}`;
-    setExtraPanes((prev) => [...prev, { key, tabs: [], activeId: null, page: currentPageRef.current, zoom: 1, choosing: true }]);
+    // The new pane shows the drawing of the pane that was split (no picker);
+    // switch or drag drawings afterwards as needed.
+    const src = paneDrawing(target);
+    if (src) retainPdf(src.doc);
+    setExtraPanes((prev) => [
+      ...prev,
+      src
+        ? { key, tabs: [src], activeId: src.id, page: src.page, zoom: 1, choosing: false }
+        : { key, tabs: [], activeId: null, page: currentPageRef.current, zoom: 1, choosing: true },
+    ]);
     setSplitTree(splitLeaf(tree, target, dir, key));
     setActiveExtraPane(key);
   };
@@ -6181,7 +6229,9 @@ export default function TakeoffViewerModule({
   }, [initialMeasurementId, measurements, totalPages, currentPage]);
 
   /** Copied markups (Ctrl+C) and the paste routine (Ctrl+V), update 19. */
-  const markupClipRef = useRef<Measurement[] | null>(null);
+  // Shared by every editor: copy markups in one drawing, paste in another
+  // (OE-DELIVERY 2026-11-27-fsftm-pdf).
+  const markupClipRef = SHARED_MARKUP_CLIP;
   const pasteMarkupsRef = useRef<(at?: Point | null) => void>(() => {});
   /** Last pointer position over the sheet, in PDF units (paste-at-cursor). */
   const lastPointerPdfRef = useRef<Point | null>(null);
@@ -15121,7 +15171,8 @@ export default function TakeoffViewerModule({
   const thumbAnchorRef = useRef<number | null>(null);
   const [thumbMenu, setThumbMenu] = useState<{ x: number; y: number; pages: number[] } | null>(null);
   const [thumbSub, setThumbSub] = useState<string | null>(null);
-  const pageClipRef = useRef<Uint8Array | null>(null);
+  // Shared by every editor: copy pages from one PDF, paste into another.
+  const pageClipRef = SHARED_PAGE_CLIP;
   const filePickRef = useRef<HTMLInputElement | null>(null);
   const filePickActionRef = useRef<((bytes: Uint8Array) => void) | null>(null);
   const baseName = (fileName || exportProjectName || 'drawing').replace(/\.pdf$/i, '');
