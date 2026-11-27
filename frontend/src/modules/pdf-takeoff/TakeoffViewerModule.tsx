@@ -22633,7 +22633,6 @@ export default function TakeoffViewerModule({
                   moveTabToMain(t);
                 }}
               >
-                {splitMode !== 'off' && splitTree && ownsChrome && <div className="pointer-events-none absolute inset-0 z-40 rounded-[2px] ring-2 ring-inset ring-oe-blue" data-testid="active-pane-ring" />}
                 {mainTabDropOver && (
                   <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center border-2 border-dashed border-oe-blue bg-oe-blue/10 text-sm font-semibold text-oe-blue">
                     Drop to open in this pane
@@ -23601,7 +23600,6 @@ export default function TakeoffViewerModule({
                   onMouseDownCapture={() => { syncLeaderRef.current = 'split'; }}
                   onWheelCapture={() => { syncLeaderRef.current = 'split'; }}
                 >
-                {paneActive('p2') && <div className="pointer-events-none absolute inset-0 z-40 rounded-[2px] ring-2 ring-inset ring-oe-blue" data-testid="active-pane-ring" />}
                 <SplitPane
                   slot={!!compareDoc && hostingNow.some((h) => h.pane === 'p2')}
                   measurementsKey={compareDoc && !compareDoc.id.startsWith('file:') ? `doc.m.${compareDoc.id}` : undefined}
@@ -23661,7 +23659,6 @@ export default function TakeoffViewerModule({
                     data-pane-active={paneActive(xp.key) ? 'true' : undefined}
                     onPointerDown={() => { setActiveExtraPane(xp.key); setSplitActive(false); focusPane(xp.key); }}
                   >
-                {paneActive(xp.key) && <div className="pointer-events-none absolute inset-0 z-40 rounded-[2px] ring-2 ring-inset ring-oe-blue" data-testid="active-pane-ring" />}
                     <SplitPane
                       paneKey={xp.key}
                       slot={!!shown && hostingNow.some((h) => h.pane === xp.key)}
