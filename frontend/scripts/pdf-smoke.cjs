@@ -62,7 +62,7 @@ const check = (name, ok, detail = '') => {
     if (m) return r.fulfill({ status: 200, contentType: 'application/pdf', body: PDF[m[1]] });
     // Team panel: someone else at work, the people list, comments.
     if (/\/takeoff\/presence\//.test(url)) {
-      return json(r, { active: [{ user_id: 'u-ana', name: 'Ana Lead', email: 'ana@example.com', document_id: ID(2), document_name: 'Set B.pdf', project_id: '', page: 2, seconds_ago: 5 }] });
+      return json(r, { active: [{ user_id: 'u-ana', name: 'Ana Lead', email: 'ana@example.com', document_id: ID(2), document_name: 'Set B.pdf', project_id: '', page: 2, seconds_ago: 5 }, { user_id: 'u-ben', name: 'Ben Field', email: 'ben@example.com', document_id: ID(1), document_name: 'Set A.pdf', project_id: '', page: 1, seconds_ago: 3 }, { user_id: 'u-me', name: 'Me', email: 'me@example.com', document_id: ID(1), document_name: 'Set A.pdf', project_id: '', page: 1, seconds_ago: 0 }], me: 'u-me' });
     }
     if (/\/takeoff\/people\//.test(url)) {
       return json(r, { people: [{ id: 'u-ana', name: 'Ana Lead', email: 'ana@example.com' }, { id: 'u-ben', name: 'Ben Field', email: 'ben@example.com' }] });
@@ -259,6 +259,9 @@ const check = (name, ok, detail = '') => {
     }
     await page.locator('[data-testid="rail-team"]:visible').first().click();
     await page.waitForTimeout(1200);
+    const tabA = page.locator('[data-testid="doc-tab"]:visible', { hasText: 'Set A' }).first();
+    const badge = tabA.locator('[data-testid="doc-tab-people"]');
+    check('file tab shows who else has it open (not me)', (await badge.count()) === 1 && (await badge.innerText()).trim() === 'BF', (await badge.count()) ? await badge.innerText() : 'no badge');
     check('Team panel shows who is working where', (await page.locator('[data-testid="team-presence"]', { hasText: 'Ana Lead' }).count()) === 1);
     const box2 = page.locator('[data-testid="team-comment-input"]');
     await box2.click();

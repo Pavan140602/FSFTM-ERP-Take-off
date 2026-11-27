@@ -6207,7 +6207,15 @@ export default function TakeoffViewerModule({
   // PDF / Excel export in-flight flags (drive button spinner state).
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingXlsx, setIsExportingXlsx] = useState(false);
+  /* Who else has each drawing open (from the presence heartbeat below):
+   * drives the initials on the file tabs and how often this drawing pulls
+   * other people's markups (OE-DELIVERY 2026-11-27-fsftm-pdf). */
+  const [othersByDoc, setOthersByDoc] = useState<Record<string, { name: string; email: string }[]>>({});
+  const othersHere = (documentId && othersByDoc[documentId]?.length) || 0;
   const { saveNow, clearPersisted, syncing, registerDeletion: registerOwnDeletion, hasUnsavedChanges, storageInfo } = useMeasurementPersistence({
+    // Someone else on this drawing: their markups arrive within ~4 s;
+    // otherwise a slow check still catches changes made since it opened.
+    liveSyncMs: hidden || mirror ? 0 : othersHere > 0 ? 4000 : 30000,
     // A mirror never loads or saves: the drawing's first editor does.
     fileName: mirror ? null : fileName,
     // Stable document UUID drives both the localStorage key and server sync
@@ -7109,8 +7117,19 @@ export default function TakeoffViewerModule({
   useEffect(() => {
     if (hidden || mirror || !documentId || !pdfDoc || documentId.startsWith('temp-')) return;
     const id = documentId;
+    type Active = { user_id: string; name: string; email: string; document_id: string };
     const send = (leaving = false) =>
-      apiPost('/v1/takeoff/presence/', { document_id: id, page: currentPageRef.current, leaving }).catch(() => undefined);
+      apiPost<{ active?: Active[]; me?: string }>('/v1/takeoff/presence/', { document_id: id, page: currentPageRef.current, leaving })
+        .then((r) => {
+          if (leaving || !r || !Array.isArray(r.active)) return;
+          const next: Record<string, { name: string; email: string }[]> = {};
+          for (const a of r.active) {
+            if (a.user_id === r.me) continue;
+            (next[a.document_id] ??= []).push({ name: a.name, email: a.email });
+          }
+          setOthersByDoc((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
+        })
+        .catch(() => undefined);
     void send();
     const t = window.setInterval(() => void send(), 20000);
     return () => {
@@ -22904,6 +22923,22 @@ export default function TakeoffViewerModule({
                     >
                       {d.name}
                     </button>
+                    {(othersByDoc[d.id]?.length ?? 0) > 0 && (
+                      <span
+                        className="flex shrink-0 -space-x-1"
+                        title={`Also working here: ${othersByDoc[d.id]!.map((o) => o.name || o.email).join(', ')}`}
+                        data-testid="doc-tab-people"
+                      >
+                        {othersByDoc[d.id]!.slice(0, 3).map((o, i) => (
+                          <span
+                            key={i}
+                            className="flex h-4 w-4 items-center justify-center rounded-full border border-black/30 bg-emerald-600 text-[8px] font-bold uppercase text-white"
+                          >
+                            {(o.name || o.email).split(/[\s@.]+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('')}
+                          </span>
+                        ))}
+                      </span>
+                    )}
                     {!isActive && d.id !== '__local' && (
                       <button
                         type="button"

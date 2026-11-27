@@ -5560,7 +5560,8 @@ async def report_presence(
                 at=_time.time(),
             )
         )
-    return {"active": presence.active(project_id or None)}
+    # ``me`` lets the viewer tell its own entry from the others'.
+    return {"active": presence.active(project_id or None), "me": uid}
 
 
 @router.get(

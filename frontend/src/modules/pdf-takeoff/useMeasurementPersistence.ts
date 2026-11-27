@@ -956,6 +956,10 @@ interface UseMeasurementPersistenceOptions {
    *  on measurements so the server B8 recompute uses the same ratio.
    *  (Per-measurement page scale is resolved from ``pageScales``.) */
   scale: ScaleConfig;
+  /** Live collaboration (OE-DELIVERY 2026-11-27-fsftm-pdf): fetch the
+   *  drawing's markups from the server every this many ms and merge what
+   *  OTHER people added, changed or deleted. 0 / undefined = off. */
+  liveSyncMs?: number;
   /** Active project ID for backend sync. */
   projectId?: string | null;
 }
@@ -1001,6 +1005,7 @@ export function useMeasurementPersistence({
   setPageScales,
   scale,
   projectId,
+  liveSyncMs = 0,
 }: UseMeasurementPersistenceOptions): UseMeasurementPersistenceResult {
   // Server identity (issue #238): both a project AND a stable document UUID
   // must be present before we touch the server or use the composite local
@@ -1746,6 +1751,81 @@ export function useMeasurementPersistence({
    * its localStorage copy is rewritten (handled by the auto-save effect when
    * state changes) - here it is a no-op.
    */
+  /* Live collaboration: someone else's work shows up here within seconds.
+   * Merge rules (server = what others saved; our own unsaved work wins):
+   *  - a server row we have never seen is ADDED (unless we deleted it and the
+   *    delete is still pending, or it is our own create awaiting its stamp);
+   *  - a row we know that changed on the server is REPLACED - but only when we
+   *    have not changed it ourselves since the last sync (then ours is newer
+   *    and will be saved over it: last change wins);
+   *  - a row of ours that is no longer on the server was DELETED by someone
+   *    else and goes here too.
+   * Skipped while one of our own create passes is on the way. */
+  const pullRemote = useCallback(async () => {
+    const pid = projectIdRef.current;
+    const did = documentIdRef.current;
+    if (!canSyncRef.current || !pid || !did || syncInFlightRef.current) return;
+    let rows: Measurement[];
+    try {
+      rows = (await takeoffApi.list(pid, did)).map(fromApiFormat);
+    } catch {
+      return;
+    }
+    if (syncInFlightRef.current || documentIdRef.current !== did) return;
+    const server = new Map(rows.filter((r) => r.serverId).map((r) => [r.serverId as string, r]));
+    const pending = pendingDeletesRef.current;
+    const stampedByUs = new Set(createdRef.current.values());
+    setMeasurementsRef.current((prev) => {
+      let changed = false;
+      const out: Measurement[] = [];
+      const seen = new Set<string>();
+      const localIds = new Set(prev.map((m) => m.id));
+      for (const m of prev) {
+        if (!m.serverId) {
+          out.push(m);
+          continue;
+        }
+        seen.add(m.serverId);
+        const srv = server.get(m.serverId);
+        if (!srv) {
+          if (pending.has(m.serverId)) {
+            out.push(m);
+            continue;
+          }
+          // Deleted by someone else.
+          syncSigRef.current.delete(m.serverId);
+          geomSigRef.current.delete(m.serverId);
+          changed = true;
+          continue;
+        }
+        const base = syncSigRef.current.get(m.serverId);
+        const mine = syncSignature(m);
+        const theirs = syncSignature({ ...srv, id: m.id });
+        if (base !== undefined && theirs !== base && mine === base) {
+          out.push({ ...srv, id: m.id });
+          syncSigRef.current.set(m.serverId, theirs);
+          geomSigRef.current.set(m.serverId, geometrySignature(srv));
+          changed = true;
+        } else {
+          out.push(m);
+        }
+      }
+      for (const [sid, srv] of server) {
+        if (seen.has(sid) || pending.has(sid) || stampedByUs.has(sid) || localIds.has(srv.id)) continue;
+        out.push(srv);
+        syncSigRef.current.set(sid, syncSignature(srv));
+        geomSigRef.current.set(sid, geometrySignature(srv));
+        changed = true;
+      }
+      return changed ? out : prev;
+    });
+  }, []);
+  useEffect(() => {
+    if (!liveSyncMs || liveSyncMs < 1000 || !canSync) return;
+    const t = window.setInterval(() => { void pullRemote(); }, liveSyncMs);
+    return () => window.clearInterval(t);
+  }, [liveSyncMs, canSync, pullRemote]);
+
   const registerDeletion = useCallback((serverId: string | undefined) => {
     if (!serverId) return;
     pendingDeletesRef.current.add(serverId);

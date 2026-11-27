@@ -653,6 +653,35 @@ describe('useMeasurementPersistence', () => {
     expect(rows.map((r) => r.serverId)).toEqual(['a', 'b', 'c']);
   });
 
+  // ── Live collaboration: other people's markups arrive while it is open ───
+  it('merges markups other people added, changed and deleted (live sync)', async () => {
+    const { takeoffApi } = await import('@/features/takeoff/api');
+    const list = takeoffApi.list as unknown as ReturnType<typeof vi.fn>;
+    list.mockResolvedValueOnce([
+      serverRow({ id: 'sa', created_at: '2026-01-01T00:00:00Z', metadata: { frontend_id: 'a' } }),
+      serverRow({ id: 'sb', created_at: '2026-01-02T00:00:00Z', metadata: { frontend_id: 'b' } }),
+    ]);
+    // Next pulls: 'a' was moved, 'b' deleted, 'c' added by someone else.
+    list.mockResolvedValue([
+      serverRow({ id: 'sa', points: [{ x: 5, y: 5 }, { x: 50, y: 5 }], created_at: '2026-01-01T00:00:00Z', metadata: { frontend_id: 'a' } }),
+      serverRow({ id: 'sc', created_at: '2026-01-03T00:00:00Z', metadata: { frontend_id: 'c' } }),
+    ]);
+    const { result } = renderHook(() => {
+      const [ms, setMs] = useState<TestMeasurement[]>([]);
+      useMeasurementPersistence({
+        fileName: 'live.pdf', documentId: DOC, measurements: ms as never,
+        setMeasurements: setMs as never, pageScales: basePageScales, setPageScales: vi.fn(),
+        scale: defaultScale, projectId: PROJECT, liveSyncMs: 1000,
+      });
+      return ms;
+    });
+    await waitFor(() => expect(result.current.map((m) => m.id)).toEqual(['a', 'b']));
+    await waitFor(() => expect(result.current.map((m) => m.id).sort()).toEqual(['a', 'c']), { timeout: 4000 });
+    expect(result.current.find((m) => m.id === 'a')!.points[0]).toEqual({ x: 5, y: 5 });
+    // Someone else's delete is not echoed back as our own delete.
+    expect(takeoffApi.delete).not.toHaveBeenCalled();
+  });
+
   // ── Issue #194: the review state has to survive the reload ────────────────
   // Once a detector stores what it proposes, a reload is what decides whether
   // review means anything. Dropping `review_status` on the way in made a
