@@ -541,6 +541,7 @@ import {
   readViewPref,
   readWorkspace,
   registerFullscreenViewer,
+  takeEscNotice,
   toggleFullscreen,
   type ViewPref,
 } from './data/fullscreen';
@@ -3363,6 +3364,17 @@ export default function TakeoffViewerModule({
    * column is flex-sized, so it claims the extra space automatically. */
   const toggleTakeoffFullscreen = useCallback(() => toggleFullscreen(), []);
   useEffect(() => registerFullscreenViewer(), []);
+  // On a plain http:// server address the browser does not allow the Esc
+  // lock, so Esc leaves full screen there: say so once, and how to fix it.
+  useEffect(() => {
+    if (!isTakeoffFullscreen || !takeEscNotice()) return;
+    useToastStore.getState().addToast({
+      type: 'info',
+      title: 'Esc leaves full screen on this address',
+      message: 'The browser only lets the page keep Esc on an https:// address (or localhost). Click the drawing to go full screen again, or open the site over https.',
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTakeoffFullscreen]);
   // Full screen is the chosen mode but not on yet (just signed in / page
   // reloaded): go full screen on the first click in the viewer.
   useEffect(() => {
@@ -5657,6 +5669,22 @@ export default function TakeoffViewerModule({
   };
   const putIntoPaneRef = useRef(putIntoPane);
   putIntoPaneRef.current = putIntoPane;
+  /** A drawing was MOVED out of `pane`: when it was the pane's last one, the
+   *  pane closes (the same as closing its last tab) - it must not stay
+   *  behind showing a picture of the main drawing. */
+  const closePaneIfEmptied = (pane: string, movedId: string) => {
+    if (movedId === 'self') return;
+    if (pane === 'p2') {
+      if (splitTabsRef.current.some((x) => x.id !== movedId)) return;
+      setSplitTabId('self');
+      dropFromLayoutRef.current?.('p2');
+      return;
+    }
+    const xp = extraPanesRef.current.find((x) => x.key === pane);
+    if (!xp || xp.tabs.some((t) => t.id !== movedId)) return;
+    setExtraPanes((prev) => prev.filter((x) => x.key !== pane));
+    dropFromLayoutRef.current?.(pane);
+  };
   /** A tab dropped on pane `target` (from the main tab bar or another pane). */
   const dropTabOnPane = async (t: TabDragPayload, target: string) => {
     if (t.from === 'split' && (t.pane ?? 'p2') === target) return;
@@ -5677,8 +5705,11 @@ export default function TakeoffViewerModule({
       if ((openDocuments?.length ?? 0) > 1) onCloseDocumentTab?.(t.id);
       return;
     }
-    const tab = takeFromPane(t.pane ?? 'p2', t.id);
-    if (tab) putIntoPane(target, tab);
+    const from = t.pane ?? 'p2';
+    const tab = takeFromPane(from, t.id);
+    if (!tab) return;
+    putIntoPane(target, tab);
+    closePaneIfEmptied(from, t.id);
   };
   const dropTabOnPaneRef = useRef(dropTabOnPane);
   dropTabOnPaneRef.current = dropTabOnPane;
@@ -5705,6 +5736,7 @@ export default function TakeoffViewerModule({
     }
     const tab = takeFromPane(pane, t.id);
     if (!tab) return;
+    closePaneIfEmptied(pane, t.id);
     if (tab.id === documentId) {
       releasePooledPdf(tab.doc);
       return;
@@ -5870,7 +5902,7 @@ export default function TakeoffViewerModule({
     const tree = splitTreeRef.current;
     const next = tree ? removeLeaf(tree, key) : null;
     if (!next || leaves(next).length <= 1) {
-      closeAllPanes();
+      closeAllPanes(key);
       setSplitTree(null);
       setSplitMode('off');
       setSyncViews(false);
@@ -5887,8 +5919,9 @@ export default function TakeoffViewerModule({
     dropFromLayout(key);
   };
   dropFromLayoutRef.current = dropFromLayout;
-  const closeAllPanes = () => {
-    for (const xp of extraPanesRef.current) for (const x of xp.tabs) releasePooledPdf(x.doc);
+  const closeAllPanes = (except?: string) => {
+    // `except`: a pane whose drawings were already released or moved away.
+    for (const xp of extraPanesRef.current) if (xp.key !== except) for (const x of xp.tabs) releasePooledPdf(x.doc);
     setExtraPanes([]);
     setSplitTree(null);
   };

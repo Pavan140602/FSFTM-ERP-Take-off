@@ -62,6 +62,21 @@ export function setWorkspace(on: boolean) {
   try { localStorage.setItem('takeoff.fsftmWorkspace', on ? '1' : '0'); } catch { /* ignore */ }
 }
 
+/** Can this page keep Esc from leaving full screen? The browser allows the
+ *  Esc lock only on a secure address (https://, or localhost); on a plain
+ *  http:// server address Esc always leaves full screen. */
+export function escLockSupported(): boolean {
+  return typeof window !== 'undefined' && window.isSecureContext && !!keyboard()?.lock;
+}
+
+let escNoticeShown = false;
+/** True once per page load: show the "Esc lock needs https" notice. */
+export function takeEscNotice(): boolean {
+  if (escNoticeShown || escLockSupported()) return false;
+  escNoticeShown = true;
+  return true;
+}
+
 function lockEsc() {
   try { void keyboard()?.lock?.(['Escape'])?.catch?.(() => undefined); } catch { /* not supported */ }
 }

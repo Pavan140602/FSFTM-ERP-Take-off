@@ -320,6 +320,21 @@ const check = (name, ok, detail = '') => {
     await page.waitForTimeout(800);
     check("closing the pane's only drawing closes the pane", (await page.locator('[data-testid="split-pane"]').count()) === 0 && (await S('split.mode')) === 'off');
 
+    // ── Moving a pane's only drawing out closes the pane too ──
+    await page.locator('[data-testid="viewmode-split-vertical"]').first().click();
+    await page.waitForTimeout(2000);
+    await page.locator('[data-testid="doc-tab"]:visible', { hasText: 'Set C' }).first().dragTo(page.locator('[data-testid="split-tabs"]').first());
+    await page.waitForTimeout(3000);
+    await page.locator('[data-testid="split-tab"]', { hasText: 'Set A' }).first().locator('[data-testid="split-tab-close"]').click();
+    await page.waitForTimeout(800);
+    const onlyB = await page.locator('[data-testid="split-tab"]').allInnerTexts();
+    await page.locator('[data-testid="split-tab"]', { hasText: 'Set C' }).first().dragTo(page.locator('[data-testid="viewer-active"]').first());
+    await page.waitForTimeout(3000);
+    check("moving the pane's only drawing out closes the pane", (await page.locator('[data-testid="split-pane"]').count()) === 0 && (await S('split.mode')) === 'off', `pane tabs before: ${onlyB.join(' | ')}; panes left ${await page.locator('[data-testid="split-pane"]').count()}`);
+    // Back to Set A in the main pane for the checks below.
+    await page.locator('[data-testid="doc-tab"]:visible', { hasText: 'Set A' }).first().locator('button').first().click();
+    await page.waitForTimeout(2500);
+
     // ── Split, the new pane shows the same drawing, one-click focus ──
     await page.locator('[data-testid="viewmode-split-vertical"]').first().click();
     await page.waitForTimeout(2500);
