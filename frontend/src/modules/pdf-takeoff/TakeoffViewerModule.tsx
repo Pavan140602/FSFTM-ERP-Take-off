@@ -19737,7 +19737,7 @@ export default function TakeoffViewerModule({
       case 'lastPage': goToPage(totalPagesRef.current || 1); break;
       case 'splitVertical': toggleSplit('vertical'); break;
       case 'splitHorizontal': toggleSplit('horizontal'); break;
-      case 'toggleSplit': if (splitMode === 'off') toggleSplit('vertical'); else { setSplitMode('off'); setSyncViews(false); } break;
+      case 'toggleSplit': if (sharedSplitMode === 'off') toggleSplit('vertical'); else { setSplitMode('off'); setSyncViews(false); } break;
       case 'unsplit': setSplitMode('off'); setSyncViews(false); break;
       case 'singlePage': setPageMode('single'); break;
       case 'continuous': setPageMode('continuous'); break;
@@ -20814,7 +20814,7 @@ export default function TakeoffViewerModule({
                     ['As calibrated', 'auto'], ['ft-in', 'ftin'], ['Feet', 'ft'], ['Inches', 'in'], ['Millimetres', 'mm'], ['Centimetres', 'cm'], ['Metres', 'm'],
                   ] as [string, DisplayUnitPref][]).map(([label, u]) => ({ label, checked: displayUnitPref === u, onClick: () => setDisplayUnitPref(u) })),
                 },
-                { label: 'Sync Split Views', checked: syncViews, onClick: () => { if (splitMode === 'off') toggleSplit('vertical'); setSyncViews((x) => { if (!x) { syncDeltaRef.current = 0; setSplitPage(currentPage); setSplitZoom(zoom); } return !x; }); } },
+                { label: 'Sync Split Views', checked: syncViews, onClick: () => { setSyncViews((x) => { if (!x) { syncDeltaRef.current = 0; setSplitPage(currentPage); setSplitZoom(zoom); } return !x; }); } },
                 { label: 'Legend', checked: legendDashboardVisible && showSidebar && sidebarTab === 'properties', onClick: () => toggleLegendRef.current(), testId: 'fsftm-view-legend' },
                 { label: `Show/Hide Markup Types…${hiddenTypes.size > 0 ? ` (${hiddenTypes.size} hidden)` : ''}`, checked: hiddenTypes.size > 0, onClick: () => setShowTypeFilter(true), testId: 'fsftm-view-show-hide' },
                 { label: 'Show Labels', checked: showLabels, onClick: () => setShowLabels((x) => !x) },
@@ -24283,26 +24283,25 @@ export default function TakeoffViewerModule({
                   <option value="cm">centimetres</option>
                   <option value="m">metres</option>
                 </select>
-                {/* Sync & compare (OE-DELIVERY 2026-11-02-fsftm-left-panel-v2): one click opens the
-                    next sheet beside this one and keeps both in step. */}
+                {/* Sync (OE-DELIVERY 2026-11-27-fsftm-pdf): turns syncing of the split
+                    panes on / off; it does not open a split. */}
                 <button
                   type="button"
                   onClick={() => {
-                    // FSFTM Sync (OE-DELIVERY 2026-11-02-fsftm-dock): both panes on the same
-                    // page number, zoom and position, driven from either one.
-                    if (splitMode === 'off') toggleSplit('vertical');
+                    // FSFTM Sync: only switches syncing on / off - it never splits the
+                    // view (OE-DELIVERY 2026-11-27-fsftm-pdf). With panes open, the
+                    // drawing in use leads and the others follow.
                     setSyncViews((x) => {
-                      if (!x || splitMode === 'off') {
+                      if (!x) {
                         syncDeltaRef.current = 0;
                         setSplitPage(currentPage);
                         setSplitZoom(zoom);
-                        return true;
                       }
-                      return false;
+                      return !x;
                     });
                   }}
                   aria-pressed={syncViews}
-                  title={syncViews ? 'Sync on: both panes show the same page, zoom and position' : 'Sync: split the view and keep both panes on the same page, zoom and position'}
+                  title={syncViews ? 'Sync on: the panes follow the drawing in use (page, zoom and position)' : 'Sync: keep split panes on the same page, zoom and position as the drawing in use'}
                   className={clsx(
                     'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wide border',
                     syncViews ? 'border-oe-blue bg-oe-blue/10 text-oe-blue' : 'border-border text-content-tertiary',
