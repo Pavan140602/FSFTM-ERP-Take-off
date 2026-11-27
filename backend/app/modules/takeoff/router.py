@@ -5583,12 +5583,28 @@ async def list_presence(
 )
 async def list_people(
     session: SessionDep = None,  # type: ignore[assignment]
+    user_id: CurrentUserId = None,  # type: ignore[assignment]
     q: str = Query("", max_length=100),
+    project_id: str = Query("", max_length=64),
 ) -> dict:
-    """Active users, for @mentions in drawing comments."""
+    """Active users, for @mentions in drawing comments.
+
+    With ``project_id`` only the people on that project (owner and team) -
+    someone outside it could not open the drawing a mention links to.
+    """
     from app.modules.users.models import User
 
     stmt = select(User.id, User.full_name, User.email).where(User.is_active.is_(True))
+    if project_id.strip():
+        from app.modules.projects.member_service import list_project_members
+
+        try:
+            pid = _uuid.UUID(project_id.strip())
+        except ValueError:
+            raise HTTPException(status_code=404, detail="Project not found") from None
+        await verify_project_access(pid, str(user_id), session)
+        member_ids = [m.user_id for m in await list_project_members(session, pid)]
+        stmt = stmt.where(User.id.in_(member_ids))
     if q.strip():
         like = f"%{q.strip()}%"
         stmt = stmt.where((User.full_name.ilike(like)) | (User.email.ilike(like)))

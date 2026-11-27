@@ -16,6 +16,7 @@
  *   npm run dev            (in another terminal: http://localhost:5173)
  *   npm run test:pdf-smoke [-- --headed] [-- --shots <folder>]
  */
+const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright-core');
 const { PDFDocument, rgb, StandardFonts } = require('pdf-lib');
@@ -149,6 +150,16 @@ const check = (name, ok, detail = '') => {
     check('opens a drawing', (await page.locator('[data-testid="viewer-active"] canvas').count()) > 0);
     const toolbarNames = await page.evaluate(() => ['Width', 'Page', 'Ortho', 'Snap', 'Multiply'].every((t) => [...document.querySelectorAll('button span')].some((s) => s.textContent === t)));
     check('toolbar icons have names', toolbarNames);
+    // Top-right Full screen button.
+    const fsBtn = page.locator('[data-testid="fsftm-workspace-toggle"]:visible').first();
+    await fsBtn.click();
+    await page.waitForTimeout(700);
+    const fsOn = await page.evaluate(() => !!document.fullscreenElement);
+    const fsLabel = await fsBtn.innerText().catch(() => '');
+    await page.locator('[data-testid="fsftm-workspace-toggle"]:visible').first().click();
+    await page.waitForTimeout(700);
+    const fsOff = await page.evaluate(() => !document.fullscreenElement);
+    check('Full screen button enters and leaves full screen', fsOn && /Exit full screen/.test(fsLabel) && fsOff, `on ${fsOn} label "${fsLabel}" off ${fsOff}`);
 
     // ── Draw, label cursor, label rotation, delete ──
     const bb = await drawLength('[data-testid="viewer-active"]', 0.5);
@@ -158,15 +169,15 @@ const check = (name, ok, detail = '') => {
       const x = bb.x + bb.width * 0.45, y = bb.y + bb.height * 0.5 - dy;
       await page.mouse.move(x, y);
       await page.waitForTimeout(30);
-      if ((await cursorAt(x, y)) === 'move') lab = { x, y };
+      if ((await cursorAt(x, y)) === 'grab') lab = { x, y };
     }
-    check('label shows the move cursor', !!lab);
+    check('label shows the hand cursor', !!lab);
     let knob = null;
     if (lab) for (let dy = -36; dy < 24 && !knob; dy += 4) for (let dx = 10; dx < 220 && !knob; dx += 4) {
       await page.mouse.move(lab.x, lab.y);
       await page.mouse.move(lab.x + dx, lab.y + dy);
       await page.waitForTimeout(15);
-      if ((await cursorAt(lab.x + dx, lab.y + dy)) === 'grab') knob = { x: lab.x + dx, y: lab.y + dy };
+      if ((await cursorAt(lab.x + dx, lab.y + dy)).includes('alias')) knob = { x: lab.x + dx, y: lab.y + dy };
     }
     if (knob) {
       const before = (await marks(1))[0].points;
@@ -177,6 +188,23 @@ const check = (name, ok, detail = '') => {
       const m = (await marks(1))[0];
       check('label rotates, markup stays', typeof m.labelRotation === 'number' && m.labelRotation !== 0 && JSON.stringify(m.points) === JSON.stringify(before), `angle ${m.labelRotation}`);
     } else check('label rotates, markup stays', false, 'rotate knob not found');
+    // With the Length tool still on (right after drawing), the caption can be dragged.
+    if (lab) {
+      await page.locator('[data-strip-tool="distance"]').first().click();
+      await page.mouse.move(lab.x + 1, lab.y);
+      await page.waitForTimeout(60);
+      const curDraw = await cursorAt(lab.x + 1, lab.y);
+      const off0 = JSON.stringify((await marks(1))[0].labelOffset || {});
+      await page.mouse.down();
+      await page.mouse.move(lab.x + 40, lab.y - 30, { steps: 6 });
+      await page.mouse.up();
+      await page.waitForTimeout(300);
+      const after = await marks(1);
+      check('caption drags with a drawing tool on (hand cursor, no new point)', curDraw === 'grab' && after.length === 1 && JSON.stringify(after[0].labelOffset || {}) !== off0, `cursor ${curDraw}, markups ${after.length}`);
+      await page.keyboard.press('Escape');
+      await page.locator('[data-strip-tool="select"]').first().click();
+      await page.waitForTimeout(200);
+    }
     await page.mouse.move(bb.x + bb.width * 0.2, bb.y + bb.height * 0.35);
     await page.mouse.down();
     await page.mouse.move(bb.x + bb.width * 0.7, bb.y + bb.height * 0.65, { steps: 6 });
@@ -326,6 +354,13 @@ const check = (name, ok, detail = '') => {
     await page.waitForTimeout(700);
     check('Studio: chat message shows', (await page.locator('[data-testid="studio-chat"]', { hasText: 'Grid B is mine' }).count()) === 1);
     check('Studio: report shows markups per person', (await page.locator('[data-testid="studio-report"]', { hasText: '2 distance' }).count()) === 1);
+    const [dl] = await Promise.all([
+      page.waitForEvent('download', { timeout: 8000 }).catch(() => null),
+      page.locator('[data-testid="studio-report-pdf"]').click(),
+    ]);
+    let pdfHead = '';
+    if (dl) { const fp = await dl.path(); pdfHead = fs.readFileSync(fp).subarray(0, 5).toString(); }
+    check('Studio: report downloads as a PDF', pdfHead === '%PDF-', dl ? `${dl.suggestedFilename()} ${pdfHead}` : 'no download');
     page.once('dialog', (dlg) => dlg.accept());
     await page.locator('[data-testid="studio-finish"]').click();
     await page.waitForTimeout(1000);

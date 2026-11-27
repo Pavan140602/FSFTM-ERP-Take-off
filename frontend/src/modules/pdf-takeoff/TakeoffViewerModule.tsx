@@ -1865,6 +1865,11 @@ function fromNestedEditor(e: { target: EventTarget | null; currentTarget: EventT
 }
 
 /** Hand glyph (lucide "hand") drawn on a label's move badge. */
+/** Cursor over a label's rotate knob: a circular arrow (falls back to the
+ *  "alias" arrow where custom cursors are off). */
+const ROTATE_CURSOR = `url("data:image/svg+xml,${encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><g stroke="#fff" stroke-width="4"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v4h-4"/></g><g stroke="#111" stroke-width="2"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v4h-4"/></g></svg>',
+)}") 12 12, alias`;
 const HAND_GLYPH: Path2D[] = typeof Path2D === 'undefined'
   ? []
   : [
@@ -3863,6 +3868,9 @@ export default function TakeoffViewerModule({
     [measurements, groupBandMap],
   );
   const [activePoints, setActivePoints] = useState<Point[]>([]);
+  /** Nothing half-drawn: a press on a caption may grab it with any tool. */
+  const drawIdleRef = useRef(true);
+  drawIdleRef.current = activePoints.length === 0;
   // Esc, a tool change or a finished line ends a "Resume markup" session.
   useEffect(() => {
     if (activePoints.length === 0 || (activeTool !== 'polyline' && activeTool !== 'polylineMarkup')) resumeTargetRef.current = null;
@@ -4527,7 +4535,7 @@ export default function TakeoffViewerModule({
    *  measurement under the cursor without adding hoverInfo to its deps. */
   const hoverInfoRef = useRef(hoverInfo);
   /** Select tool: move cursor over a markup, crosshair over a grip. */
-  const [selectHoverCursor, setSelectHoverCursor] = useState<'move' | 'crosshair' | 'grab' | null>(null);
+  const [selectHoverCursor, setSelectHoverCursor] = useState<'move' | 'crosshair' | 'grab' | 'rotate' | null>(null);
   hoverInfoRef.current = hoverInfo;
 
   /** Right-click context menu for a measurement (select tool). Positioned at
@@ -7967,14 +7975,9 @@ export default function TakeoffViewerModule({
       ctx.save();
       ctx.strokeStyle = '#2563EB';
       ctx.lineWidth = Math.max(1, dpr);
-      ctx.setLineDash(live ? [] : [3 * dpr, 2 * dpr]);
-      ctx.globalAlpha = live ? 0.9 : 0.55;
-      ctx.beginPath();
-      if (typeof ctx.roundRect === 'function') ctx.roundRect(x - pad, y - pad, w + pad * 2, h + pad * 2, 2 * dpr);
-      else ctx.rect(x - pad, y - pad, w + pad * 2, h + pad * 2);
-      ctx.stroke();
+      // No box round the caption (user request 2026-11-27): the hand cursor
+      // and the grip badge say "drag me".
       ctx.setLineDash([]);
-      ctx.globalAlpha = 1;
       // Hand badge above the caption: "grab here to move the label".
       const r = 7 * dpr;
       const gx = x + w / 2;
@@ -12472,8 +12475,11 @@ export default function TakeoffViewerModule({
         const ae = document.activeElement as HTMLElement | null;
         if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'SELECT')) ae.blur();
       }
-      // FSFTM movable labels: Select tool + press on a label = drag the label.
-      if (e.button === 0 && activeToolRef.current === 'select' && !deepModeRef.current && overlayRef.current) {
+      // FSFTM movable labels: press on a caption = drag it. Works with the
+      // Select tool and with a drawing tool that has nothing half-drawn
+      // (right after drawing a line the caption can be moved at once).
+      const labelGrabTool = activeToolRef.current === 'select' || drawIdleRef.current;
+      if (e.button === 0 && labelGrabTool && !spaceHeldRef.current && !panLockRef.current && !deepModeRef.current && overlayRef.current) {
         const ov = overlayRef.current;
         const r = ov.getBoundingClientRect();
         if (r.width > 0) {
@@ -12508,6 +12514,8 @@ export default function TakeoffViewerModule({
             };
             setLabelDragId(hm.id);
             setSelectedMeasurementId(hm.id);
+            // A drawing tool must not take the release as a new point.
+            if (activeToolRef.current !== 'select') suppressNextClickRef.current = true;
             e.preventDefault();
             return;
           }
@@ -13262,7 +13270,7 @@ export default function TakeoffViewerModule({
       // selection path uses so the hover target matches what a click selects.
       let overLabel: string | null = null;
       let overKnob = false;
-      if (activeTool === 'select' && pt && !deepModeRef.current && overlayRef.current && !dragRef.current) {
+      if ((activeTool === 'select' || drawIdleRef.current) && pt && !deepModeRef.current && overlayRef.current && !dragRef.current) {
         const ov = overlayRef.current;
         const r = ov.getBoundingClientRect();
         if (r.width > 0) {
@@ -13286,9 +13294,15 @@ export default function TakeoffViewerModule({
         }
       }
       setLabelHoverId((prev) => (prev === overLabel ? prev : overLabel));
-      if (activeTool === 'select' && pt && overLabel) {
-        // Four-arrow "move" over a caption; a hand over its rotate knob.
-        const want = overKnob ? 'grab' : 'move';
+      if (activeTool !== 'select') {
+        // Drawing tools: a hand over a caption, the crosshair elsewhere.
+        const want = overLabel && !overKnob ? 'grab' : null;
+        setSelectHoverCursor((prev) => (prev === want ? prev : want));
+        if (hoverInfo) setHoverInfo(null);
+      } else if (activeTool === 'select' && pt && overLabel) {
+        // A hand over a caption (drag to move it); a crosshair over its
+        // rotate knob.
+        const want = overKnob ? 'rotate' : 'grab';
         setSelectHoverCursor((prev) => (prev === want ? prev : want));
         if (hoverInfo) setHoverInfo(null);
       } else if (activeTool === 'select' && pt) {
@@ -21113,14 +21127,23 @@ export default function TakeoffViewerModule({
           ]}
           right={
             <div className="flex items-center gap-2">
+            {/* Full screen (user request 2026-11-27): the whole workspace
+                fills the screen, no browser bars; click again to leave. */}
             <button
               type="button"
-              onClick={() => setFSFTMWorkspace((w) => !w)}
-              className="rounded border border-border px-2 py-0.5 text-[11px] text-content-secondary hover:bg-surface-tertiary"
-              title={fsftmWorkspace ? 'Back to the normal ERP page' : 'Fill the browser window like FSFTM'}
+              onClick={() => {
+                if (!isTakeoffFullscreen) setFSFTMWorkspace(true);
+                toggleTakeoffFullscreen();
+              }}
+              className={clsx(
+                'flex items-center gap-1 rounded border px-2 py-0.5 text-[11px] hover:bg-surface-tertiary',
+                isTakeoffFullscreen ? 'border-oe-blue text-oe-blue' : 'border-border text-content-secondary',
+              )}
+              title={isTakeoffFullscreen ? 'Leave full screen' : 'Full screen: the workspace fills the whole screen'}
               data-testid="fsftm-workspace-toggle"
             >
-              {fsftmWorkspace ? 'Exit workspace' : 'Workspace'}
+              {isTakeoffFullscreen ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
+              {isTakeoffFullscreen ? 'Exit full screen' : 'Full screen'}
             </button>
             </div>
           }
@@ -23170,8 +23193,12 @@ export default function TakeoffViewerModule({
                       : spaceHeld || panLock
                         ? 'grab'
                         : activeTool === 'select'
-                          ? (labelRotLive ? 'grabbing' : labelDragId ? 'move' : dragPreview ? 'grabbing' : selectHoverCursor ?? 'default')
-                          : 'crosshair',
+                          ? (labelRotLive ? 'grabbing' : labelDragId ? 'grabbing' : dragPreview ? 'grabbing' : selectHoverCursor === 'rotate' ? ROTATE_CURSOR : selectHoverCursor ?? 'default')
+                          : labelDragId
+                            ? 'grabbing'
+                            : selectHoverCursor === 'grab' && activePoints.length === 0
+                              ? 'grab'
+                              : 'crosshair',
                   }}
                   onClick={handleCanvasClick}
                   onDoubleClick={handleCanvasDblClick}

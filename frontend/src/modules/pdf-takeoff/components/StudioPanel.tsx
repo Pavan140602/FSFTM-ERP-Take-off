@@ -115,6 +115,76 @@ export function reportCsv(detail: SessionDetail, report: Report): string {
   return lines.join('\r\n');
 }
 
+/** The session report as a one-or-more-page PDF (A4 landscape). */
+export async function reportPdf(detail: SessionDetail, report: Report): Promise<Uint8Array> {
+  const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib');
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  // Standard fonts only cover Latin-1.
+  const safe = (t: string) => t.replace(/[\u2000-\u200B\u202F\u205F]/g, ' ').replace(/[\u2010-\u2015]/g, '-').replace(/[^\x20-\x7E\xA0-\xFF]/g, '?');
+  const W = 842;
+  const H = 595;
+  const M = 40;
+  let page = doc.addPage([W, H]);
+  let y = H - M;
+  const line = (text: string, x: number, size = 10, f = font, color = rgb(0.1, 0.1, 0.1)) =>
+    page.drawText(safe(text), { x, y, size, font: f, color, maxWidth: W - x - M });
+  const need = (h: number) => {
+    if (y - h < M) {
+      page = doc.addPage([W, H]);
+      y = H - M;
+    }
+  };
+  line(`Session report - ${detail.name}`, M, 18, bold);
+  y -= 24;
+  line(`Session ID ${detail.code}   ·   Started ${timeOf(detail.created_at)}${detail.finished_at ? `   ·   Finished ${timeOf(detail.finished_at)}` : '   ·   Still running'}`, M, 10, font, rgb(0.35, 0.35, 0.35));
+  y -= 14;
+  line(`${report.total} markups by ${report.people.length} ${report.people.length === 1 ? 'person' : 'people'} in ${detail.documents.length} PDF${detail.documents.length === 1 ? '' : 's'}`, M, 10, font, rgb(0.35, 0.35, 0.35));
+  y -= 26;
+  const types = Array.from(new Set(report.people.flatMap((p) => Object.keys(p.by_type)))).sort();
+  const table = (head: string[], rows: string[][], widths: number[]) => {
+    need(40);
+    page.drawRectangle({ x: M, y: y - 4, width: W - 2 * M, height: 16, color: rgb(0.92, 0.94, 0.98) });
+    let x = M + 4;
+    head.forEach((h, i) => { line(h, x, 9, bold); x += widths[i]!; });
+    y -= 18;
+    for (const r of rows) {
+      need(16);
+      x = M + 4;
+      r.forEach((c, i) => { line(c, x, 9); x += widths[i]!; });
+      y -= 14;
+    }
+    y -= 14;
+  };
+  line('People', M, 12, bold);
+  y -= 18;
+  const typeW = Math.max(60, Math.min(90, (W - 2 * M - 330) / Math.max(1, types.length)));
+  table(
+    ['Person', 'Email', 'Markups', ...types],
+    report.people.map((p) => [label(p), p.email, String(p.count), ...types.map((t) => String(p.by_type[t] ?? 0))]),
+    [150, 180, 60, ...types.map(() => typeW)],
+  );
+  line('PDFs', M, 12, bold);
+  y -= 18;
+  table(
+    ['PDF', 'Project', 'Markups'],
+    detail.documents.map((d) => {
+      const r = report.documents.find((x) => x.document_id === d.id);
+      return [d.name, d.project_name || '', String(r?.count ?? 0)];
+    }),
+    [330, 250, 60],
+  );
+  line('People in the session', M, 12, bold);
+  y -= 18;
+  table(
+    ['Name', 'Email', 'Role', 'Status'],
+    detail.attendees.map((a) => [label(a), a.email, a.role === 'host' ? 'Host' : 'Attendee', a.status]),
+    [180, 230, 90, 90],
+  );
+  return doc.save();
+}
+
 export function StudioPanel({
   currentDocument,
   openDocuments,
@@ -305,6 +375,16 @@ export function StudioPanel({
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   };
+  const downloadReportPdf = () =>
+    run(async () => {
+      if (!d || !report.data) return;
+      const bytes = await reportPdf(d, report.data);
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([bytes as unknown as BlobPart], { type: 'application/pdf' }));
+      a.download = `${d.name.replace(/[^\w\- ]+/g, '').trim() || 'session'} report.pdf`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    });
   const copyId = () => {
     if (!d) return;
     void navigator.clipboard?.writeText(d.code).then(
@@ -516,9 +596,14 @@ export function StudioPanel({
           </div>
         ))}
         {report.data && report.data.total === 0 && <div className="text-[11px] text-content-tertiary">No markups yet in this session.</div>}
-        <button type="button" className={clsx(btn, 'mt-1 border border-border')} onClick={downloadReport} disabled={!report.data} data-testid="studio-report-csv">
-          Download report (CSV)
-        </button>
+        <div className="mt-1 flex gap-1.5">
+          <button type="button" className={clsx(btn, 'border border-border')} onClick={downloadReportPdf} disabled={!report.data || busy} data-testid="studio-report-pdf">
+            Report (PDF)
+          </button>
+          <button type="button" className={clsx(btn, 'border border-border')} onClick={downloadReport} disabled={!report.data} data-testid="studio-report-csv">
+            Report (CSV)
+          </button>
+        </div>
       </div>
 
       <div className={section}>Chat</div>

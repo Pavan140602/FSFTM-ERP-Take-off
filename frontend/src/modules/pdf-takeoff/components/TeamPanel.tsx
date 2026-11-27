@@ -63,8 +63,10 @@ export function TeamPanel({
     refetchInterval: 15000,
   });
   const people = useQuery({
-    queryKey: ['takeoff-people'],
-    queryFn: () => apiGet<{ people: Person[] }>('/v1/takeoff/people/'),
+    // Only the project's people: a mention links to this drawing, which
+    // someone outside the project could not open.
+    queryKey: ['takeoff-people', projectId],
+    queryFn: () => apiGet<{ people: Person[] }>(`/v1/takeoff/people/${projectId ? `?project_id=${encodeURIComponent(projectId)}` : ''}`),
     staleTime: 5 * 60_000,
   });
   const commentsKey = ['takeoff-comments', documentId];
