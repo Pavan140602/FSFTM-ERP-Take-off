@@ -141,6 +141,41 @@ const check = (name, ok, detail = '') => {
     const x = Math.max(c.x, h.x), y = Math.max(c.y, h.y);
     return { x, y, width: Math.min(c.x + c.width, h.x + h.width) - x, height: Math.min(c.y + c.height, h.y + h.height) - y };
   };
+  /** Run an action and report everything on screen that moved or changed
+   *  size during the next ~900 ms (layout shake / blink). */
+  const watchLayout = async (action) => {
+    await page.evaluate(() => {
+      const w = window;
+      w.__shake = {};
+      w.__shakeOn = true;
+      const keyOf = (el, i) => el.getAttribute('data-chrome-slot') ? `slot:${el.getAttribute('data-chrome-slot')}` : el.getAttribute('data-testid') ? `${el.getAttribute('data-testid')}#${i}` : `${el.tagName}.${String(el.className).split(' ')[0]}#${i}`;
+      const sample = () => {
+        if (!w.__shakeOn) return;
+        const els = [
+          ...document.querySelectorAll('[data-chrome-slot]'),
+          ...document.querySelectorAll('[data-testid="split-pane"], [data-testid="viewer-pane"], [data-testid="doc-tab-strip"]'),
+          ...[...document.querySelectorAll('canvas.block')].filter((c) => c.getBoundingClientRect().width > 0),
+          ...[...document.querySelectorAll('[data-viewer-root] .overflow-auto')].filter((c) => c.getBoundingClientRect().width > 0),
+        ];
+        els.forEach((el, i) => {
+          const r = el.getBoundingClientRect();
+          const k = keyOf(el, i);
+          const v = [Math.round(r.x), Math.round(r.y), Math.round(r.width), Math.round(r.height), el.scrollLeft | 0, el.scrollTop | 0, getComputedStyle(el).visibility === 'hidden' ? 0 : 1];
+          const e = w.__shake[k] || (w.__shake[k] = { first: v, changes: 0, last: v });
+          if (v.some((x, j) => Math.abs(x - e.last[j]) > 1)) e.changes++;
+          e.last = v;
+        });
+        requestAnimationFrame(sample);
+      };
+      requestAnimationFrame(sample);
+    });
+    await action();
+    await page.waitForTimeout(900);
+    return page.evaluate(() => {
+      window.__shakeOn = false;
+      return Object.entries(window.__shake).filter(([, e]) => e.changes > 0).map(([k, e]) => `${k} ${JSON.stringify(e.first)}->${JSON.stringify(e.last)} x${e.changes}`);
+    });
+  };
   const drawLength = async (hostSel, fy) => {
     const bb = await visibleCanvas(hostSel);
     await page.locator('[data-strip-tool="distance"]').first().click();
@@ -179,7 +214,7 @@ const check = (name, ok, detail = '') => {
     await wsBtn().click();
     await page.waitForTimeout(700);
     const backNormal = await page.evaluate(() => !document.fullscreenElement && localStorage.getItem('takeoff.viewMode') === 'normal');
-    check('Workspace: one click to full screen (shows Exit full screen), one click back (no pop-up)', wsLabel === 'Workspace' && fsLabel === 'Exit full screen' && startNormal && fsOn && noPopup && backNormal, `labels "${wsLabel}"/"${fsLabel}" fs ${fsOn} popup ${!noPopup} back ${backNormal}`);
+    check('Workspace: one click to full screen (shows Exit workspace), one click back (no pop-up)', wsLabel === 'Workspace' && fsLabel === 'Exit workspace' && startNormal && fsOn && noPopup && backNormal, `labels "${wsLabel}"/"${fsLabel}" fs ${fsOn} popup ${!noPopup} back ${backNormal}`);
 
     // ── Draw, label cursor, label rotation, delete ──
     const bb = await drawLength('[data-testid="viewer-active"]', 0.5);
@@ -291,6 +326,28 @@ const check = (name, ok, detail = '') => {
     check('Split V opens the same drawing in the new pane (no picker)', (await page.locator('[data-testid="viewer-pane"]').count()) === 1 && (await page.locator('[data-testid="split-chooser"]').count()) === 0);
     check('no SPLIT badge / + Pane button', (await page.locator('text="SPLIT"').count()) === 0 && (await page.locator('[data-testid="split-add-pane"]').count()) === 0);
     const pane = await box('[data-testid="viewer-pane"]');
+    await page.waitForTimeout(800);
+    const moved1 = await watchLayout(() => page.mouse.click(pane.x + pane.width * 0.5, pane.y + pane.height * 0.3));
+    check('switching to the other pane: nothing moves or blinks', moved1.length === 0, moved1.slice(0, 4).join(' | '));
+    const mainBox = await box('[data-testid="viewer-active"]');
+    const moved2 = await watchLayout(() => page.mouse.click(mainBox.x + 40, mainBox.y + mainBox.height * 0.5));
+    check('switching back to the main pane: nothing moves or blinks', moved2.length === 0, moved2.slice(0, 4).join(' | '));
+    // The same in full screen.
+    await page.locator('[data-testid="fsftm-workspace-toggle"]:visible').first().click();
+    await page.waitForTimeout(1200);
+    const fsLabel2 = (await page.locator('[data-testid="fsftm-workspace-toggle"]:visible').first().innerText().catch(() => '')).trim();
+    const paneF = await box('[data-testid="viewer-pane"]');
+    const moved3 = await watchLayout(() => page.mouse.click(paneF.x + paneF.width * 0.5, paneF.y + paneF.height * 0.3));
+    const stillFs = await page.evaluate(() => !!document.fullscreenElement);
+    const fsLabel3 = (await page.locator('[data-testid="fsftm-workspace-toggle"]:visible').first().innerText().catch(() => '')).trim();
+    check('full screen: switching panes keeps full screen and nothing moves', stillFs && moved3.length === 0, `${stillFs ? 'still full screen' : 'LEFT full screen'} | ${moved3.slice(0, 4).join(' | ')}`);
+    check('full screen: the button reads Exit workspace from any pane', fsLabel2 === 'Exit workspace' && fsLabel3 === 'Exit workspace', `"${fsLabel2}" / "${fsLabel3}"`);
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(600);
+    check('full screen: Esc does not leave full screen', await page.evaluate(() => !!document.fullscreenElement));
+    await page.locator('[data-testid="fsftm-workspace-toggle"]:visible').first().click();
+    await page.waitForTimeout(900);
+    check('Exit workspace goes back to the normal screen', await page.evaluate(() => !document.fullscreenElement) && (await page.locator('[data-testid="fsftm-workspace-toggle"]:visible').first().innerText()).trim() === 'Workspace');
     await page.mouse.click(pane.x + pane.width * 0.5, pane.y + pane.height * 0.3);
     await page.waitForTimeout(250);
     check('one click hands the controls to the pane', (await focus()) === '1@p2', `focus ${await focus()}`);
@@ -341,6 +398,25 @@ const check = (name, ok, detail = '') => {
     await page.waitForTimeout(3500);
     const tabs = await page.evaluate(() => window.__tabs);
     check('dragging a tab into a pane moves it', !tabs.includes('Set C.pdf'), `main tabs ${tabs.join(', ')}`);
+    // Different PDFs in the two panes: moving between them must not shake.
+    {
+      await page.waitForTimeout(800);
+      const pb = await box('[data-testid="viewer-pane"]');
+      const mb = await box('[data-testid="viewer-active"]');
+      const a1 = await watchLayout(() => page.mouse.click(pb.x + pb.width * 0.5, pb.y + pb.height * 0.4));
+      const a2 = await watchLayout(() => page.mouse.click(mb.x + 40, mb.y + mb.height * 0.5));
+      check('different PDFs in the panes: switching between them, nothing moves', a1.length === 0 && a2.length === 0, [...a1, ...a2].slice(0, 4).join(' | '));
+      await page.locator('[data-testid="fsftm-workspace-toggle"]:visible').first().click();
+      await page.waitForTimeout(1200);
+      const pf = await box('[data-testid="viewer-pane"]');
+      const mf = await box('[data-testid="viewer-active"]');
+      const b1 = await watchLayout(() => page.mouse.click(pf.x + pf.width * 0.5, pf.y + pf.height * 0.4));
+      const b2 = await watchLayout(() => page.mouse.click(mf.x + 40, mf.y + mf.height * 0.5));
+      const fsKept = await page.evaluate(() => !!document.fullscreenElement);
+      check('different PDFs, full screen: switching panes keeps full screen and nothing moves', fsKept && b1.length === 0 && b2.length === 0, `${fsKept ? '' : 'LEFT full screen | '}${[...b1, ...b2].slice(0, 4).join(' | ')}`);
+      await page.locator('[data-testid="fsftm-workspace-toggle"]:visible').first().click();
+      await page.waitForTimeout(900);
+    }
 
     // ── Overlay Pages: layers in colour -> a new Overlay document ──
     await page.mouse.click(bb.x + 15, bb.y + 15);

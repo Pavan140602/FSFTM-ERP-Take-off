@@ -348,7 +348,6 @@ import {
   type ChestMaterial,
 } from './data/tool-chest-library';
 import { CollapsedEdgeTab } from './components/CollapsedEdgeTab';
-import { FullscreenToastStack } from './components/FullscreenToastStack';
 import { FSFTMMenuBar } from './components/FSFTMMenuBar';
 // FSFTM Properties toolbar + FSFTM shortcuts (OE-DELIVERY 2026-11-02-fsftm-properties-bar).
 import { FSFTMPropertiesBar, type PropsBarPatch } from './components/FSFTMPropertiesBar';
@@ -532,6 +531,19 @@ import { retainPdf, releasePdf as releasePooledPdf } from './data/pdf-doc-pool';
 import { useSharedState, getShared, setShared, clearShared } from './data/shared-state';
 import { useSmoothProgress } from './data/smooth-progress';
 import { TeamPanel } from './components/TeamPanel';
+import {
+  FS_KEY,
+  VIEW_PREF_KEY,
+  WORKSPACE_KEY,
+  enterFullscreen,
+  exitFullscreen,
+  isPageFullscreen,
+  readViewPref,
+  readWorkspace,
+  registerFullscreenViewer,
+  toggleFullscreen,
+  type ViewPref,
+} from './data/fullscreen';
 import { StudioPanel, STUDIO_ACTIVE_KEY, readStoredStudio, type StudioActive, type StudioDoc } from './components/StudioPanel';
 import { RadioTower as StudioIcon } from 'lucide-react';
 import { OverlayPagesDialog } from './components/OverlayPagesDialog';
@@ -2913,13 +2925,13 @@ export default function TakeoffViewerModule({
 
   /* ── Resizable side panels + fullscreen measuring mode ──────────────── */
   const viewerRootRef = useRef<HTMLDivElement>(null);
-  const [isTakeoffFullscreen, setIsTakeoffFullscreen] = useState(false);
+  // One full screen for the whole page, shared by every viewer and pane
+  // (see data/fullscreen.ts).
+  const [isTakeoffFullscreen] = useSharedState<boolean>(FS_KEY, isPageFullscreen);
   /** FSFTM-style full-window workspace (OE-DELIVERY 2026-11-02-fsftm-workspace): the takeoff
    *  fills the browser window (ERP header, banners and tabs covered) with
    *  its own menu bar, panels and status bar - FSFTM's window layout. */
-  const [fsftmWorkspace, setFSFTMWorkspace] = useState<boolean>(() => {
-    try { return localStorage.getItem('takeoff.fsftmWorkspace') !== '0'; } catch { return true; }
-  });
+  const [fsftmWorkspace, setFSFTMWorkspace] = useSharedState<boolean>(WORKSPACE_KEY, readWorkspace);
   useEffect(() => {
     try { localStorage.setItem('takeoff.fsftmWorkspace', fsftmWorkspace ? '1' : '0'); } catch { /* ignore */ }
   }, [fsftmWorkspace]);
@@ -2937,7 +2949,7 @@ export default function TakeoffViewerModule({
     const clear = () => {
       for (const k of ['top', 'left', 'right', 'bottom', 'width', 'height'] as const) el.style[k] = '';
     };
-    if (!workspaceOn || isTakeoffFullscreen) {
+    if (!workspaceOn) {
       clear();
       return;
     }
@@ -2958,7 +2970,7 @@ export default function TakeoffViewerModule({
       window.removeEventListener('resize', fit);
       clear();
     };
-  }, [workspaceOn, isTakeoffFullscreen, pdfDoc]);
+  }, [workspaceOn, pdfDoc]);
   const [leftStripWidth, setLeftStripWidth] = useSharedState<number>('ui.leftStripWidth', () =>
     readPanelWidth(LEFT_STRIP_KEY, LEFT_STRIP_DEFAULT, LEFT_STRIP_MIN, leftStripMax()));
   const [rightPanelWidth, setRightPanelWidth] = useSharedState<number>('ui.rightPanelWidth', () =>
@@ -3311,47 +3323,20 @@ export default function TakeoffViewerModule({
    * allows full screen after a click or key press). Leaving full screen with
    * the browser's own keys (hold Esc / F11) switches the choice to window so
    * the next click does not jump back. */
-  type ViewMode = 'fullscreen' | 'window' | 'normal';
-  const [viewPref, setViewPref] = useState<ViewMode>(() => {
-    try {
-      const v = localStorage.getItem('takeoff.viewMode');
-      return v === 'normal' ? 'normal' : 'fullscreen';
-    } catch {
-      return 'fullscreen';
-    }
-  });
+  const [viewPref] = useSharedState<ViewPref>(VIEW_PREF_KEY, readViewPref);
   const viewPrefRef = useRef(viewPref);
   viewPrefRef.current = viewPref;
-  const ourFsExitRef = useRef(false);
-  const chooseViewMode = (mode: ViewMode) => {
-    setViewPref(mode);
-    try { localStorage.setItem('takeoff.viewMode', mode); } catch { /* ignore */ }
-    if (mode === 'fullscreen') {
-      setFSFTMWorkspace(true);
-      if (!document.fullscreenElement) void viewerRootRef.current?.requestFullscreen?.()?.catch?.(() => undefined);
-      return;
-    }
-    if (document.fullscreenElement) {
-      ourFsExitRef.current = true;
-      void document.exitFullscreen?.()?.catch?.(() => undefined);
-    }
-    setFSFTMWorkspace(mode === 'window');
+  const chooseViewMode = (mode: ViewPref) => {
+    if (mode === 'fullscreen') enterFullscreen();
+    else exitFullscreen();
   };
 
   /* ── Fullscreen measuring mode ────────────────────────────────────────
    * Expands the whole viewer row (strips + canvas) to the viewport, the
    * same requestFullscreen pattern as the BIM federated viewer. The canvas
    * column is flex-sized, so it claims the extra space automatically. */
-  const toggleTakeoffFullscreen = useCallback(() => {
-    const el = viewerRootRef.current;
-    if (!el) return;
-    if (document.fullscreenElement) {
-      ourFsExitRef.current = true;
-      void document.exitFullscreen?.();
-    } else {
-      void el.requestFullscreen?.();
-    }
-  }, []);
+  const toggleTakeoffFullscreen = useCallback(() => toggleFullscreen(), []);
+  useEffect(() => registerFullscreenViewer(), []);
   // Full screen is the chosen mode but not on yet (just signed in / page
   // reloaded): go full screen on the first click in the viewer.
   useEffect(() => {
@@ -3360,63 +3345,16 @@ export default function TakeoffViewerModule({
     if (!el) return;
     const go = () => {
       if (document.fullscreenElement || viewPrefRef.current !== 'fullscreen') return;
-      setFSFTMWorkspace(true);
-      void el.requestFullscreen?.()?.catch?.(() => undefined);
+      enterFullscreen();
     };
     el.addEventListener('pointerdown', go, { once: true, capture: true });
     return () => el.removeEventListener('pointerdown', go, { capture: true });
   }, [compact, hidden, pdfDoc, viewPref, isTakeoffFullscreen]);
 
-  useEffect(() => {
-    const onFullscreenChange = () => {
-      const isFs = document.fullscreenElement === viewerRootRef.current;
-      setIsTakeoffFullscreen(isFs);
-      if (!isFs && !document.fullscreenElement) {
-        // Left with the browser's keys (hold Esc / F11): back to the
-        // normal page, so the next click does not jump into full screen.
-        if (!ourFsExitRef.current && viewPrefRef.current === 'fullscreen') {
-          setViewPref('normal');
-          setFSFTMWorkspace(false);
-          try { localStorage.setItem('takeoff.viewMode', 'normal'); } catch { /* ignore */ }
-        }
-        ourFsExitRef.current = false;
-      }
-      // Step 1: only the function key (F11) should exit fullscreen, not ESC.
-      // Browsers reserve ESC to leave fullscreen and it cannot be
-      // preventDefault-ed; the Keyboard Lock API (Chromium) lets a fullscreen
-      // element capture ESC so a plain press does nothing (hold ESC still
-      // exits as a browser safety). Other browsers fall back to native
-      // ESC-exits-fullscreen behaviour.
-      try {
-        const kb = (navigator as unknown as {
-          keyboard?: { lock?: (keys: string[]) => Promise<void>; unlock?: () => void };
-        }).keyboard;
-        if (isFs) {
-          void kb?.lock?.(['Escape'])?.catch?.(() => {});
-        } else {
-          kb?.unlock?.();
-        }
-      } catch { /* Keyboard Lock API unavailable - native behaviour */ }
-    };
-    document.addEventListener('fullscreenchange', onFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
-  }, []);
+  // (The page-wide full screen listener and its Esc lock live in
+  // data/fullscreen.ts - one for all viewers.)
 
-  /* ── F11 toggles the measurement fullscreen (in addition to Esc, which
-   *  the browser reserves for exiting fullscreen). preventDefault stops
-   *  the browser's own F11 fullscreen so ours wins. */
-  useEffect(() => {
-    if (!pdfDoc) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (hiddenRef.current) return;
-      if (e.key === 'F11') {
-        e.preventDefault();
-        toggleTakeoffFullscreen();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [pdfDoc, toggleTakeoffFullscreen]);
+  // F11 toggles full screen: handled once for the page in data/fullscreen.ts.
 
   /* ── Page view mode: single page vs continuous scroll ─────────────────
    *  Continuous stacks every page vertically in the scroll container; the
@@ -20833,14 +20771,12 @@ export default function TakeoffViewerModule({
         data-viewer-root=""
         className={clsx(
           'flex flex-1 min-h-0 min-w-0 flex-col',
-          isTakeoffFullscreen && 'bg-surface-primary p-3 overflow-auto',
-          workspaceOn && !isTakeoffFullscreen && 'fixed inset-0 z-50 bg-surface-primary p-1 gap-1 overflow-hidden',
+          workspaceOn && 'fixed inset-0 z-50 bg-surface-primary p-1 gap-1 overflow-hidden',
         )}
         data-fsftm-workspace={workspaceOn ? '1' : '0'}
       >
       {/* Fullscreen-scoped notifications (the global toast stack is hidden
           while this element is fullscreen). */}
-      {isTakeoffFullscreen && <FullscreenToastStack />}
       {/* Overlay Pages panel (OE-DELIVERY 2026-11-02-fsftm-left-panel) */}
       {pdfDoc && overlayPanelOpen && (
         <div className="fixed right-6 top-16 z-[70] w-72 rounded-lg border border-border bg-surface-primary p-3 text-[11px] shadow-2xl" data-testid="overlay-panel">
@@ -21227,12 +21163,12 @@ export default function TakeoffViewerModule({
                 'flex items-center gap-1 rounded border px-2 py-0.5 text-[11px] hover:bg-surface-tertiary',
                 isTakeoffFullscreen ? 'border-oe-blue bg-oe-blue/10 text-oe-blue' : 'border-border text-content-secondary',
               )}
-              title={isTakeoffFullscreen ? 'Leave full screen (back to the normal page)' : 'Workspace: full screen'}
+              title={isTakeoffFullscreen ? 'Exit workspace: back to the normal screen' : 'Workspace: full screen'}
               aria-pressed={isTakeoffFullscreen}
               data-testid="fsftm-workspace-toggle"
             >
               {isTakeoffFullscreen ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
-              {isTakeoffFullscreen ? 'Exit full screen' : 'Workspace'}
+              {isTakeoffFullscreen ? 'Exit workspace' : 'Workspace'}
             </button>
             </div>
           }
