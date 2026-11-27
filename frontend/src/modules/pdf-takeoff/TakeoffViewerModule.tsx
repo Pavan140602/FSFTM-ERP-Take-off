@@ -1934,7 +1934,6 @@ function SplitPane({
   syncApiRef,
   onDropTab,
   paneKey = 'p2',
-  onAddPane,
   slot = false,
   measurementsKey,
   chooser,
@@ -1975,8 +1974,6 @@ function SplitPane({
   onDropTab?: (t: TabDragPayload) => void;
   /** Which pane this is ('p2', 'p3', 'p4'), for tab drags between panes. */
   paneKey?: string;
-  /** Add another pane to the workspace (shown while fewer than 4). */
-  onAddPane?: () => void;
   /** The shown drawing is a full editor placed here (its own viewer) - this
    *  pane only keeps its tab bar (OE-DELIVERY 2026-11-26-fsftm-pdf). */
   slot?: boolean;
@@ -2498,18 +2495,6 @@ function SplitPane({
           </>
         )}
         {slot && <span className="flex-1" />}
-        {onAddPane && (
-          <button
-            type="button"
-            onClick={onAddPane}
-            className="ml-1 flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-semibold text-oe-blue hover:bg-oe-blue/10"
-            title="Add another pane (up to 4) to open one more drawing side by side"
-            data-testid="split-add-pane"
-          >
-            <Columns2 size={12} />
-            {!narrow && '+ Pane'}
-          </button>
-        )}
         {onSwap && (
           <button
             type="button"
@@ -5114,13 +5099,14 @@ export default function TakeoffViewerModule({
   const [slotBottom] = useSharedState<HTMLElement | null>('ws.chrome.bottom', null);
   const [slotLedger] = useSharedState<HTMLElement | null>('ws.chrome.ledger', null);
   const [slotSide] = useSharedState<HTMLElement | null>('ws.chrome.side', null);
+  const [slotProps] = useSharedState<HTMLElement | null>('ws.chrome.props', null);
   const chromeSlots: Record<string, HTMLElement | null> = {
     menu: slotMenu, rail: slotRail, thumbs: slotThumbs, strip: slotStrip,
-    toolbar: slotToolbar, bottom: slotBottom, ledger: slotLedger, side: slotSide,
+    toolbar: slotToolbar, bottom: slotBottom, ledger: slotLedger, side: slotSide, props: slotProps,
   };
   const chromeSlotRefs = useMemo(() => {
     const out: Record<string, (el: HTMLElement | null) => void> = {};
-    for (const name of ['menu', 'rail', 'thumbs', 'strip', 'toolbar', 'bottom', 'ledger', 'side']) {
+    for (const name of ['menu', 'rail', 'thumbs', 'strip', 'toolbar', 'bottom', 'ledger', 'side', 'props']) {
       let mine: HTMLElement | null = null;
       out[name] = (el) => {
         const key = `ws.chrome.${name}`;
@@ -5378,7 +5364,27 @@ export default function TakeoffViewerModule({
 
   /** Overlay Pages (FSFTM compare): another page drawn over this one in a
    *  colour, with opacity and an alignment nudge. */
-  const [overlayCfg, setOverlayCfg] = useState<{ page: number; color: 'red' | 'blue' | 'green'; opacity: number; dx: number; dy: number; src?: 'self' | 'compare' } | null>(null);
+  /* Overlay Pages (OE-DELIVERY 2026-11-27-fsftm-pdf): lay a sheet of this
+   * or ANY other drawing over the current page, in colour.
+   *  - mode 'page': one chosen page of the source stays over whatever page is
+   *    shown; mode 'all': page for page (page N over page N) as you move
+   *    through the set.
+   *  - fit 'fit': the source page is scaled to fit this page (centred), so
+   *    sheets of different sizes still line up; 'actual': true size from the
+   *    top-left corner. Scale % and the nudges fine-tune either. */
+  type OverlayCfg = {
+    srcId: string;
+    srcName: string;
+    mode: 'page' | 'all';
+    page: number;
+    color: 'red' | 'blue' | 'green';
+    opacity: number;
+    dx: number;
+    dy: number;
+    fit: 'fit' | 'actual';
+    scalePct: number;
+  };
+  const [overlayCfg, setOverlayCfg] = useState<OverlayCfg | null>(null);
   /** Revision compare (OE-DELIVERY 2026-11-25-fsftm-pdf): another drawing (the
    *  old or new revision) shown in the split pane and usable as overlay. */
   /** Split-pane document tabs (OE-DELIVERY 2026-11-26-fsftm-pdf): several
@@ -5792,14 +5798,6 @@ export default function TakeoffViewerModule({
   };
   const splitFocusedRef = useRef(splitFocused);
   splitFocusedRef.current = splitFocused;
-  /** Add a pane next to the one in use; with split off, split first. */
-  const addPane = () => {
-    if (splitMode === 'off') {
-      toggleSplit('vertical');
-      return;
-    }
-    splitFocused(splitTreeRef.current?.kind === 'split' && splitTreeRef.current.dir === 'col' ? 'col' : 'row');
-  };
   /** Take pane `key` out of the layout; the last one left turns split off. */
   const dropFromLayout = (key: string) => {
     const tree = splitTreeRef.current;
@@ -5898,6 +5896,8 @@ export default function TakeoffViewerModule({
   };
   /** Which pane the "From computer" picker opens into (p2 by default). */
   const fileTargetPaneRef = useRef<string>('p2');
+  const fetchPaneDocRef = useRef(fetchPaneDoc);
+  fetchPaneDocRef.current = fetchPaneDoc;
   const loadCompareFile = async (file: File) => {
     const target = fileTargetPaneRef.current;
     fileTargetPaneRef.current = 'p2';
@@ -5918,16 +5918,49 @@ export default function TakeoffViewerModule({
   };
   const [overlayPanelOpen, setOverlayPanelOpen] = useState(false);
   const [overlayImg, setOverlayImg] = useState<{ url: string; w: number; h: number } | null>(null);
+  /** The source drawing of the overlay (loaded once, shared with panes). */
+  const [overlaySrcDoc, setOverlaySrcDoc] = useState<PDFDocumentProxy | null>(null);
   useEffect(() => {
-    const overlaySrc = overlayCfg?.src === 'compare' && compareDoc ? compareDoc.doc : pdfDoc;
-    if (!overlaySrc || !overlayCfg) {
+    const id = overlayCfg?.srcId;
+    if (!id || id === 'self' || id === documentId) {
+      setOverlaySrcDoc(null);
+      return;
+    }
+    let cancelled = false;
+    let held: PDFDocumentProxy | null = null;
+    (async () => {
+      const got = await fetchPaneDocRef.current?.(id, overlayCfg?.srcName ?? 'Drawing');
+      if (!got) return;
+      if (cancelled) {
+        releasePooledPdf(got.doc);
+        return;
+      }
+      held = got.doc;
+      setOverlaySrcDoc(got.doc);
+    })();
+    return () => {
+      cancelled = true;
+      releasePooledPdf(held);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [overlayCfg?.srcId, documentId]);
+  const overlaySource = !overlayCfg ? null : overlayCfg.srcId === 'self' || overlayCfg.srcId === documentId ? pdfDoc : overlaySrcDoc;
+  /** The source page shown over the current page (null: that page does not exist). */
+  const overlayPageNo = !overlayCfg || !overlaySource
+    ? null
+    : (() => {
+        const n = overlayCfg.mode === 'all' ? currentPage : overlayCfg.page;
+        return n >= 1 && n <= overlaySource.numPages ? n : null;
+      })();
+  useEffect(() => {
+    if (!overlaySource || !overlayCfg || !overlayPageNo) {
       setOverlayImg(null);
       return;
     }
     let cancelled = false;
     (async () => {
       try {
-        const page = await overlaySrc.getPage(Math.min(overlayCfg.page, overlaySrc.numPages));
+        const page = await overlaySource.getPage(overlayPageNo);
         const vp1 = page.getViewport({ scale: 1 });
         const s = Math.min(3, 6000 / Math.max(vp1.width, vp1.height));
         const vp = page.getViewport({ scale: s });
@@ -5958,9 +5991,21 @@ export default function TakeoffViewerModule({
     return () => {
       cancelled = true;
     };
-    // Colour / page changes re-render; opacity and nudge are CSS only.
+    // Colour / page / source changes re-render; opacity, fit and nudge are CSS only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pdfDoc, overlayCfg?.page, overlayCfg?.color, overlayCfg?.src, compareDoc]);
+  }, [overlaySource, overlayPageNo, overlayCfg?.color]);
+  /** Where the overlay sits on this page (PDF points at zoom 1). */
+  const overlayPlacement = (() => {
+    const base = pageSizePdfRef.current;
+    if (!overlayCfg || !overlayImg || !base) return null;
+    const k = Math.max(0.05, overlayCfg.scalePct / 100);
+    const sc = overlayCfg.fit === 'fit' ? Math.min(base.w / overlayImg.w, base.h / overlayImg.h) * k : k;
+    const w = overlayImg.w * sc;
+    const h = overlayImg.h * sc;
+    const x = (overlayCfg.fit === 'fit' ? (base.w - w) / 2 : 0) + overlayCfg.dx;
+    const y = (overlayCfg.fit === 'fit' ? (base.h - h) / 2 : 0) + overlayCfg.dy;
+    return { x, y, w, h, sc, base };
+  })();
 
   /** Dimension display units for every label, the legend and the lists. */
   const [displayUnitPref, setDisplayUnitPref] = useState<DisplayUnitPref>(() => {
@@ -20638,49 +20683,122 @@ export default function TakeoffViewerModule({
             <span className="text-[12px] font-semibold">Overlay Pages</span>
             <button type="button" className="text-content-tertiary hover:text-content-primary" onClick={() => setOverlayPanelOpen(false)}>✕</button>
           </div>
-          <p className="mb-2 text-content-tertiary">Lay another sheet over this one in colour to compare revisions. This page stays black; the overlay shows in colour.</p>
-          {/* Source: this drawing, or the revision opened for comparison
-              (OE-DELIVERY 2026-11-25-fsftm-pdf). */}
-          <label className="mb-1.5 flex items-center gap-2">
-            <span className="w-16 text-content-secondary">Source</span>
-            <select
-              className="min-w-0 flex-1 rounded border border-border bg-surface-primary px-1 py-0.5"
-              value={overlayCfg?.src === 'compare' && compareDoc ? 'compare' : 'self'}
-              onChange={(e) => {
-                const src = e.target.value === 'compare' ? 'compare' : 'self';
-                if (src === 'compare' && !compareDoc) return;
-                setOverlayCfg({ page: src === 'compare' ? Math.min(currentPage, compareDoc!.doc.numPages) : overlayCfg?.page ?? (currentPage > 1 ? 1 : 2), color: overlayCfg?.color ?? 'red', opacity: overlayCfg?.opacity ?? 0.7, dx: 0, dy: 0, src });
-              }}
-              data-testid="overlay-source-select"
-            >
-              <option value="self">This drawing</option>
-              {compareDoc && <option value="compare">{compareDoc.name} (compare)</option>}
-            </select>
-          </label>
-          {!compareDoc && (
-            <p className="mb-2 text-content-tertiary">To overlay another revision, open it in the split pane first (Document &gt; Compare Revisions…).</p>
-          )}
-          <label className="mb-1.5 flex items-center gap-2">
-            <span className="w-16 text-content-secondary">Overlay</span>
-            <select
-              className="min-w-0 flex-1 rounded border border-border bg-surface-primary px-1 py-0.5"
-              value={overlayCfg?.page ?? ''}
-              onChange={(e) => {
-                const p = Number(e.target.value);
-                setOverlayCfg(p ? { page: p, color: overlayCfg?.color ?? 'red', opacity: overlayCfg?.opacity ?? 0.7, dx: 0, dy: 0, src: overlayCfg?.src } : null);
-              }}
-              data-testid="overlay-page-select"
-            >
-              <option value="">None</option>
-              {overlayCfg?.src === 'compare' && compareDoc
-                ? Array.from({ length: compareDoc.doc.numPages }, (_, i) => i + 1).map((p) => (
-                  <option key={p} value={p}>{`Page ${p} of ${compareDoc.name}`}</option>
-                ))
-                : Array.from({ length: totalPages }, (_, i) => i + 1).filter((p) => p !== currentPage).map((p) => (
-                  <option key={p} value={p}>{`${p}  ${sheetCaption(sheetFor(p))}`.trim()}</option>
-                ))}
-            </select>
-          </label>
+          <p className="mb-2 text-content-tertiary">Lay a sheet of this or another drawing over the current page in colour to compare revisions. This page stays black; the overlay shows in colour.</p>
+          {(() => {
+            const sources: { id: string; name: string }[] = [{ id: 'self', name: `${fileName ?? 'This drawing'} (this drawing)` }];
+            const seen = new Set<string>(['self', documentId ?? '']);
+            const add = (id: string, name: string) => {
+              if (!id || seen.has(id) || id.startsWith('file:') || id.startsWith('temp-')) return;
+              seen.add(id);
+              sources.push({ id, name });
+            };
+            for (const d of openDocuments ?? []) add(d.id, d.name);
+            for (const t of splitTabs) add(t.id, t.name);
+            for (const xp of extraPanes) for (const t of xp.tabs) add(t.id, t.name);
+            for (const d of recentDocuments ?? []) add(d.id, d.filename);
+            const cfgFor = (patch: Partial<OverlayCfg>): OverlayCfg => ({
+              srcId: 'self', srcName: fileName ?? 'This drawing', mode: 'page', page: currentPage > 1 ? 1 : 2,
+              color: 'red', opacity: 0.7, dx: 0, dy: 0, fit: 'fit', scalePct: 100,
+              ...(overlayCfg ?? {}), ...patch,
+            });
+            const srcPages = overlaySource?.numPages ?? 0;
+            const base = pageSizePdfRef.current;
+            const inch = (v: number) => (v / 72).toFixed(1);
+            return (
+              <>
+                <label className="mb-1.5 flex items-center gap-2">
+                  <span className="w-16 text-content-secondary">Source</span>
+                  <select
+                    className="min-w-0 flex-1 rounded border border-border bg-surface-primary px-1 py-0.5"
+                    value={overlayCfg?.srcId ?? ''}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      if (!id) { setOverlayCfg(null); return; }
+                      const name = sources.find((x) => x.id === id)?.name ?? 'Drawing';
+                      const self = id === 'self';
+                      setOverlayCfg(cfgFor({ srcId: id, srcName: name, mode: self ? 'page' : 'all', page: self ? (currentPage > 1 ? 1 : 2) : currentPage, dx: 0, dy: 0 }));
+                    }}
+                    data-testid="overlay-source-select"
+                  >
+                    <option value="">None</option>
+                    {sources.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+                  </select>
+                </label>
+                {overlayCfg && (
+                  <>
+                    <div className="mb-1.5 flex items-center gap-2">
+                      <span className="w-16 text-content-secondary">Pages</span>
+                      <label className="flex items-center gap-1">
+                        <input type="radio" checked={overlayCfg.mode === 'page'} onChange={() => setOverlayCfg(cfgFor({ mode: 'page' }))} />
+                        One page
+                      </label>
+                      <label className={clsx('flex items-center gap-1', overlayCfg.srcId === 'self' && 'opacity-40')} title={overlayCfg.srcId === 'self' ? 'Page for page needs another drawing' : 'Page N of the source over page N here, as you move through the set'}>
+                        <input type="radio" disabled={overlayCfg.srcId === 'self'} checked={overlayCfg.mode === 'all'} onChange={() => setOverlayCfg(cfgFor({ mode: 'all' }))} data-testid="overlay-mode-all" />
+                        Whole PDF
+                      </label>
+                    </div>
+                    {overlayCfg.mode === 'page' && (
+                      <label className="mb-1.5 flex items-center gap-2">
+                        <span className="w-16 text-content-secondary">Page</span>
+                        <select
+                          className="min-w-0 flex-1 rounded border border-border bg-surface-primary px-1 py-0.5"
+                          value={overlayCfg.page}
+                          onChange={(e) => setOverlayCfg(cfgFor({ page: Number(e.target.value) }))}
+                          data-testid="overlay-page-select"
+                        >
+                          {Array.from({ length: srcPages }, (_, i) => i + 1)
+                            .filter((pg) => !(overlayCfg.srcId === 'self' && pg === currentPage))
+                            .map((pg) => (
+                              <option key={pg} value={pg}>
+                                {overlayCfg.srcId === 'self' ? `${pg}  ${sheetCaption(sheetFor(pg))}`.trim() : `Page ${pg} of ${srcPages}`}
+                              </option>
+                            ))}
+                        </select>
+                      </label>
+                    )}
+                    <div className="mb-1.5 flex items-center gap-2">
+                      <span className="w-16 text-content-secondary">Size</span>
+                      <label className="flex items-center gap-1" title="Scale the source page to fit this page (centred): sheets of different sizes line up">
+                        <input type="radio" checked={overlayCfg.fit === 'fit'} onChange={() => setOverlayCfg(cfgFor({ fit: 'fit', dx: 0, dy: 0 }))} />
+                        Fit to page
+                      </label>
+                      <label className="flex items-center gap-1" title="True size from the top-left corner">
+                        <input type="radio" checked={overlayCfg.fit === 'actual'} onChange={() => setOverlayCfg(cfgFor({ fit: 'actual', dx: 0, dy: 0 }))} />
+                        Actual
+                      </label>
+                    </div>
+                    <label className="mb-1.5 flex items-center gap-2">
+                      <span className="w-16 text-content-secondary">Scale</span>
+                      <input
+                        type="number" min={10} max={400} step={0.5}
+                        value={overlayCfg.scalePct}
+                        onChange={(e) => { const v = Number(e.target.value); if (v > 0) setOverlayCfg(cfgFor({ scalePct: v })); }}
+                        className="h-6 w-20 rounded border border-border bg-surface-secondary px-1 text-right tabular-nums"
+                      />
+                      <span>%</span>
+                    </label>
+                    {/* What does not match, said plainly. */}
+                    {!overlaySource && <p className="mb-1.5 text-content-tertiary">Opening {overlayCfg.srcName}…</p>}
+                    {overlaySource && !overlayPageNo && (
+                      <p className="mb-1.5 rounded bg-amber-500/15 px-2 py-1 text-amber-600" data-testid="overlay-missing">
+                        {overlayCfg.srcName} has no page {overlayCfg.mode === 'all' ? currentPage : overlayCfg.page} ({srcPages} page{srcPages === 1 ? '' : 's'}): nothing to overlay on this page.
+                      </p>
+                    )}
+                    {overlayCfg.mode === 'all' && overlaySource && srcPages !== totalPages && (
+                      <p className="mb-1.5 text-content-tertiary">Page counts differ: this drawing {totalPages}, source {srcPages}. Pages without a partner show no overlay.</p>
+                    )}
+                    {overlayImg && base && (Math.abs(overlayImg.w - base.w) / base.w > 0.01 || Math.abs(overlayImg.h - base.h) / base.h > 0.01) && (
+                      <p className="mb-1.5 text-content-tertiary" data-testid="overlay-size-note">
+                        Sheet sizes differ: this page {inch(base.w)} x {inch(base.h)} in, overlay {inch(overlayImg.w)} x {inch(overlayImg.h)} in
+                        {overlayCfg.fit === 'fit' && overlayPlacement ? ` - scaled to ${Math.round(overlayPlacement.sc * 100)}% to fit.` : ' - shown at true size.'}
+                        {(overlayImg.w > overlayImg.h) !== (base.w > base.h) ? ' Orientation differs: rotate one of the pages (Document > Rotate Pages) for a true match.' : ''}
+                      </p>
+                    )}
+                  </>
+                )}
+              </>
+            );
+          })()}
           {overlayCfg && (
             <>
               <div className="mb-1.5 flex items-center gap-2">
@@ -22054,12 +22172,15 @@ export default function TakeoffViewerModule({
                 </button>
                 <button onClick={() => fitToViewport('width')} className={tbBtn(false)} title={t('takeoff_viewer.fit_width_hint', { defaultValue: 'Fit the page to the viewport width (Shift+1)' })} aria-label={t('takeoff_viewer.fit_width', { defaultValue: 'Fit width' })}>
                   <MoveHorizontal size={16} />
+                  <span className="text-[11px]">Width</span>
                 </button>
                 <button onClick={zoomFit} className={tbBtn(false)} title={t('takeoff_viewer.fit_page_hint', { defaultValue: 'Fit the whole page in view (Shift+2)' })} aria-label={t('takeoff_viewer.fit_page', { defaultValue: 'Fit page' })}>
                   <Maximize size={16} />
+                  <span className="text-[11px]">Page</span>
                 </button>
                 <button onClick={zoomToSelection} disabled={!selectedMeasurementId} className={tbBtn(false)} title={t('takeoff_viewer.zoom_selection_hint', { defaultValue: 'Zoom to the selected measurement (Shift+3)' })} aria-label={t('takeoff_viewer.zoom_selection', { defaultValue: 'Zoom to selection' })}>
                   <Focus size={16} />
+                  <span className="text-[11px]">Selection</span>
                 </button>
               </div>
 
@@ -22076,6 +22197,7 @@ export default function TakeoffViewerModule({
                   data-testid="ortho-lock-toggle"
                 >
                   <Spline size={16} />
+                  <span className="text-[11px]">Ortho</span>
                 </button>
                 <button
                   onClick={() => { setVertexSnap((v) => !v); setSnapPoint(null); }}
@@ -22086,6 +22208,7 @@ export default function TakeoffViewerModule({
                   data-testid="vertex-snap-toggle"
                 >
                   <Magnet size={16} />
+                  <span className="text-[11px]">Snap</span>
                 </button>
                 <button
                   onClick={() => { setContentSnap((v) => { const next = !v; try { localStorage.setItem('oe-content-snap', next ? '1' : '0'); } catch { /* ignore */ } return next; }); setSnapPoint(null); }}
@@ -22096,6 +22219,7 @@ export default function TakeoffViewerModule({
                   data-testid="content-snap-toggle"
                 >
                   <Crosshair size={16} />
+                  <span className="text-[11px]">Content</span>
                 </button>
                 <button
                   onClick={() => { setLineWeightsOff((v) => { const next = !v; try { localStorage.setItem('oe-line-weights', next ? '1' : '0'); } catch { /* ignore */ } return next; }); }}
@@ -22106,6 +22230,7 @@ export default function TakeoffViewerModule({
                   data-testid="line-weights-toggle"
                 >
                   <Feather size={16} />
+                  <span className="text-[11px]">Thin lines</span>
                 </button>
                 <button
                   onClick={() => setPanLock((v) => !v)}
@@ -22116,6 +22241,7 @@ export default function TakeoffViewerModule({
                   data-testid="pan-toggle"
                 >
                   <Hand size={16} />
+                  <span className="text-[11px]">Pan</span>
                 </button>
                 <button
                   ref={offsetBtnRef}
@@ -22147,6 +22273,7 @@ export default function TakeoffViewerModule({
                   data-testid="offset-tool-toggle"
                 >
                   <Copy size={16} />
+                  <span className="text-[11px]">Offset</span>
                 </button>
                 <button
                   onClick={() => {
@@ -22167,6 +22294,7 @@ export default function TakeoffViewerModule({
                   data-testid="multiply-tool-toggle"
                 >
                   <Grid2x2 size={16} />
+                  <span className="text-[11px]">Multiply</span>
                 </button>
               </div>
 
@@ -22393,8 +22521,11 @@ export default function TakeoffViewerModule({
             {/* Properties bars float over the top of the drawing and show only
                 while a tool is active or markups are selected (update 18), so
                 the drawing never jumps when they come and go. */}
+            {chromeSlot('props')}
+            {chrome('props', (
             <div className="relative z-30 h-0" data-testid="props-overlay-host">
-            <div className="absolute inset-x-0 top-0 drop-shadow-md">
+            {/* Below the tab names (h-7): the file tabs always stay visible. */}
+            <div className="absolute inset-x-0 top-7 drop-shadow-md">
             {selectedMeasurement?.type === 'legend' ? (
             <div className="mb-1.5" data-testid="legend-props-bar-host">
               <LegendPropertiesPanel
@@ -22507,6 +22638,7 @@ export default function TakeoffViewerModule({
             )}
             </div>
             </div>
+            ))}
 
 
             {/* No-text-layer banner (8.2.0) — surfaces how many pages came back
@@ -22723,7 +22855,6 @@ export default function TakeoffViewerModule({
                     >
                       {d.name}
                     </button>
-                    {isCompared && <span className="shrink-0 rounded bg-oe-blue/15 px-1 text-[9px] font-semibold text-oe-blue">SPLIT</span>}
                     {!isActive && d.id !== '__local' && (
                       <button
                         type="button"
@@ -22894,17 +23025,17 @@ export default function TakeoffViewerModule({
                     aria-hidden="true"
                   />
                   {/* Overlay Pages (OE-DELIVERY 2026-11-02-fsftm-left-panel): the compared page in colour. */}
-                  {overlayCfg && overlayImg && pageSizePdfRef.current && (
+                  {overlayCfg && overlayImg && overlayPlacement && (
                     <img
                       src={overlayImg.url}
                       alt=""
                       aria-hidden="true"
                       className="pointer-events-none absolute left-0 top-0"
                       style={{
-                        width: overlayImg.w * zoom,
-                        height: overlayImg.h * zoom,
+                        width: overlayPlacement.w * zoom,
+                        height: overlayPlacement.h * zoom,
                         opacity: overlayCfg.opacity,
-                        transform: `translate(${overlayCfg.dx * zoom}px, ${overlayCfg.dy * zoom}px)`,
+                        transform: `translate(${overlayPlacement.x * zoom}px, ${overlayPlacement.y * zoom}px)`,
                         mixBlendMode: 'multiply',
                       }}
                       data-testid="overlay-page-img"
@@ -23666,7 +23797,6 @@ export default function TakeoffViewerModule({
                   onSwap={swapSplitPanes}
                   onDropTab={(tp) => { void dropTabOnPane(tp, 'p2'); }}
                   paneKey="p2"
-                  onAddPane={addPane}
                   pdfDoc={compareDoc?.doc ?? pdfDoc}
                   page={splitPage}
                   zoom={splitZoom}
@@ -23712,7 +23842,6 @@ export default function TakeoffViewerModule({
                       selfName={fileName ?? undefined}
                       onPickDoc={(id) => { void pickInExtraPane(xp.key, id); }}
                       onDropTab={(tp) => { void dropTabOnPane(tp, xp.key); }}
-                      onAddPane={addPane}
                       active={activeExtraPane === xp.key}
                       pdfDoc={shown?.doc ?? pdfDoc}
                       page={xp.page}
@@ -24317,7 +24446,7 @@ export default function TakeoffViewerModule({
                     className="rounded border border-red-400 bg-red-50 px-1.5 py-0.5 text-[10px] font-bold text-red-700 dark:bg-red-950/30"
                     title="Overlay Pages"
                   >
-                    OVERLAY p.{overlayCfg.page}
+                    {overlayCfg.mode === 'all' ? `OVERLAY ${overlayPageNo ? `p.${overlayPageNo}` : 'none'}` : `OVERLAY p.${overlayCfg.page}`}
                   </button>
                 )}
                 <span className="tabular-nums" title="Zoom">{Math.round(zoom * 100)}%</span>
